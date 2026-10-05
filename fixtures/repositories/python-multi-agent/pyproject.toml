@@ -1,0 +1,4 @@
+[project]
+name = "support-crew"
+version = "0.1.0"
+dependencies = ["crewai", "langgraph"]

@@ -1,0 +1,8 @@
+[package]
+name = "rust-agent"
+version = "0.1.0"
+
+[dependencies]
+async-openai = "0.23"
+axum = "0.7"
+tokio = "1"
