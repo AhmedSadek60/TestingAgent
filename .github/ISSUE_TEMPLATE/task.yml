@@ -1,0 +1,27 @@
+name: Engineering task
+description: Chore, refactor, docs, or other engineering work
+labels: ["task"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: "Objective"
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: "Details / context"
+  - type: textarea
+    id: done
+    attributes:
+      label: "Definition of done"
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options: [Trivial, Standard, High risk]
+    validations:
+      required: true
