@@ -1,0 +1,45 @@
+name: report-generation
+version: 1.0.0
+title: Report generation
+description: 'How results become a report: executive summary, scores, findings with evidence, coverage and limitations
+  in HTML, Markdown, JSON and PDF, with observed facts kept apart from inferences and recommendations.'
+kind: meta
+status: stable
+taxonomy: []
+category: reporting
+score_category: functional_quality
+id_prefix: REP
+risk_class: safe
+applicability:
+  always: false
+prerequisites:
+  notes:
+  - PDF export needs a browser or the bundled PDF writer.
+methodology: Reports are rendered from the stored run (never from live state). Each finding separates observed fact,
+  inference, judgment and recommendation, carries severity and root cause with confidence, and links to evidence.
+  BLOCKED, SKIPPED and STOPPED tests are reported separately from failures. A leaky or unsafe agent never receives
+  an unqualified excellent rating; limitations and non-covered capabilities are always included.
+test_generation: No tests. The report skill defines sections and wording rules used by the report renderers.
+execution: Renders JSON (canonical), Markdown, HTML (self-contained) and PDF, writes a checksummed bundle and records
+  the report version.
+evaluation_rules:
+- Executive summary states coverage and caveats first.
+- No claim without evidence; inference is labelled.
+- Secrets are redacted in every format.
+severity:
+  default: info
+  guidance:
+  - Not applicable.
+evidence_requirements:
+- run id, plan hash, tool and skill versions
+- checksums of all report files
+metrics: []
+dependencies: []
+limitations:
+- PDF layout is simpler than HTML.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.nist.gov/itl/ai-risk-management-framework
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents

@@ -9,6 +9,7 @@ every test exists so the plan can explain itself before anything runs.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -66,7 +67,8 @@ class SkillContext:
     browser_available: bool = False
     credential_names: list[str] = field(default_factory=list)
     intensity: str = "standard"
-    fixtures_dir: Path | None = None
+    fixtures_dir: Path | None = None  # writable directory for generated fixture files (attachments)
+    doc_paths: dict[str, Path] = field(default_factory=dict)  # document name -> file the user supplied
     previous: list[TestResult] = field(default_factory=list)
     seed: int = 0
     user_requirements: list[str] = field(default_factory=list)
@@ -172,6 +174,49 @@ class SkillContext:
             "thorough": thorough if thorough is not None else standard * 2,
         }.get(self.intensity, standard)
 
+    @property
+    def latency_budget_ms(self) -> float:
+        return self.config.evaluation.latency_budget_ms
+
+    @cached_property
+    def observed_citations(self) -> bool:
+        probe = self.profile.raw_signals.get("probe") or {}
+        return any(o.get("citations") for o in probe.get("observations", []))
+
+    @cached_property
+    def observed_contexts(self) -> bool:
+        probe = self.profile.raw_signals.get("probe") or {}
+        return bool(probe.get("contexts_seen"))
+
+    @property
+    def reports_contexts(self) -> bool:
+        return self.adapter_supports("reports_contexts") or self.observed_contexts
+
+    @property
+    def reports_tool_calls(self) -> bool:
+        return self.adapter_supports("reports_tool_calls") or bool(
+            (self.profile.raw_signals.get("probe") or {}).get("tools_seen")
+        )
+
+    def new_fixture(self, name: str, data: bytes) -> str | None:
+        """Write a generated fixture (e.g. a corrupt PDF) where the conversation engine may attach it from."""
+        if self.fixtures_dir is None:
+            return None
+        self.fixtures_dir.mkdir(parents=True, exist_ok=True)
+        (self.fixtures_dir / name).write_bytes(data)
+        return name
+
+    def attach_document(self, name: str) -> str | None:
+        """Make a user-supplied document attachable: copy it into the fixtures directory, return its file name."""
+        src = self.doc_paths.get(name)
+        if src is None or self.fixtures_dir is None or not src.is_file():
+            return None
+        self.fixtures_dir.mkdir(parents=True, exist_ok=True)
+        target = self.fixtures_dir / src.name
+        if not target.exists():
+            target.write_bytes(src.read_bytes())
+        return src.name
+
     def risky_fraction(self) -> float:
         if not self.tools:
             return 0.0
@@ -205,7 +250,7 @@ class Draft:
 
 
 def _slug_topic(topic: str) -> str:
-    return re.sub(r"[^A-Z0-9]+", "-", topic.upper()).strip("-")[:24] or "GENERAL"
+    return re.sub(r"[^A-Z0-9]+", "-", topic.upper()).strip("-")[:24].strip("-") or "GENERAL"
 
 
 class SkillRun:
@@ -235,12 +280,12 @@ class SkillRun:
         objective: str,
         *,
         input: str | None = None,
-        turns: list[Turn] | list[dict[str, Any]] | None = None,
-        assertions: list[AssertionSpec | dict[str, Any]] | None = None,
-        judge: list[JudgeCriterion | dict[str, Any]] | None = None,
+        turns: Sequence[Turn | dict[str, Any]] | None = None,
+        assertions: Sequence[AssertionSpec | dict[str, Any]] | None = None,
+        judge: Sequence[JudgeCriterion | dict[str, Any]] | None = None,
         expected_behavior: str = "",
         expected_output: str | None = None,
-        expected_tool_calls: list[ExpectedToolCall | dict[str, Any]] | None = None,
+        expected_tool_calls: Sequence[ExpectedToolCall | dict[str, Any]] | None = None,
         forbidden: list[str] | None = None,
         severity: Severity = Severity.MEDIUM,
         risk: RiskClass | None = None,
@@ -320,9 +365,11 @@ class SkillRun:
             from agentlab.core.models import BrowserStep
 
             t.browser_steps = [BrowserStep(**s) for s in browser_steps]
-        d = Draft(
-            test=t, reasons=why, evidence=ev, taxonomy=list(taxonomy or m.taxonomy), requires=dict(requires or {})
-        )
+        needs = dict(requires or {})
+        caps = list(t.context.get("requires_capabilities") or [])
+        if caps:
+            needs.setdefault("capabilities", caps)
+        d = Draft(test=t, reasons=why, evidence=ev, taxonomy=list(taxonomy or m.taxonomy), requires=needs)
         self.drafts.append(d)
         return d
 
@@ -349,6 +396,11 @@ def A(
         metric=metric,
         turn=turn,
     )
+
+
+def STATUS(codes: list[int], *, optional: bool = False, description: str | None = None) -> AssertionSpec:
+    """HTTP status must be one of ``codes``; with ``optional`` it is ignored on interfaces that have no status."""
+    return AssertionSpec(type="status_code", params={"in": codes, "optional": optional}, description=description)
 
 
 def J(metric: str, rubric: str, *, weight: float = 1.0, threshold: float = 0.6) -> JudgeCriterion:

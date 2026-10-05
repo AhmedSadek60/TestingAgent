@@ -153,6 +153,13 @@ class TestExecutor:
                 test,
             )
 
+        missing = self._missing_capabilities(test, adapter)
+        if missing:
+            return self._finish(
+                TestResult(**base, status=TestStatus.BLOCKED, blocked_reason=missing),
+                test,
+            )
+
         reps = self._repetitions(test, decision.risk)
         started = utcnow()
         attempts: list[AttemptResult] = []
@@ -187,6 +194,28 @@ class TestExecutor:
         if test.required_interfaces:
             return None
         return self.d.runtime.adapter()
+
+    def _missing_capabilities(self, test: TestCase, adapter: AgentAdapter) -> str | None:
+        """Tests that must *plant* something in the target (canary, document, poisoned tool output) can only run
+        where the interface lets AgentLab do that; otherwise they are BLOCKED with the reason, never faked."""
+        needs = list(test.context.get("requires_capabilities") or [])
+        if "canary_seeding" in needs and not getattr(adapter.capabilities, "canary_seeding", False):
+            declared = bool(self.d.runtime.spec.known_canaries)
+            if declared:
+                needs = [n for n in needs if n != "canary_seeding"]  # the owner planted canaries in the target
+        missing = [n for n in needs if not getattr(adapter.capabilities, n, False)]
+        if not missing:
+            return None
+        hint = {
+            "canary_seeding": "AgentLab cannot place a secret in this target's hidden instructions; declare "
+            "`known_canaries` in target.yaml for a deployment you configured with synthetic secrets",
+            "knowledge_injection": "AgentLab cannot add documents to this target's knowledge for a single session",
+            "tool_output_injection": "AgentLab cannot replace a tool result of this target with test content",
+            "multimodal": "this interface cannot pass images/attachments to the model",
+            "attachments": "this interface does not accept file attachments",
+        }
+        why = "; ".join(hint.get(m, m) for m in missing)
+        return f"interface '{adapter.kind}' lacks capability {missing}: {why}"
 
     def _repetitions(self, test: TestCase, risk: RiskClass) -> int:
         """Explicit test setting > reliability tests > per-risk override > global default."""

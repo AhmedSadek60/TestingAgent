@@ -311,6 +311,9 @@ class MockAgentAdapter(AgentAdapter):
             reports_contexts=bool(cfg.knowledge),
             reports_events=True,
             reports_usage=True,
+            canary_seeding=True,
+            knowledge_injection=True,
+            tool_output_injection=True,
             notes=["in-process deterministic simulator"],
         )
         self.latency = 0.05 if self.agent.has("slow") else 0.0

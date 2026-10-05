@@ -52,7 +52,7 @@ agentlab = "agentlab.cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentlab = ["py.typed", "reports/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml"]
+agentlab = ["py.typed", "reports/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

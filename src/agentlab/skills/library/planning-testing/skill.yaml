@@ -1,0 +1,61 @@
+name: planning-testing
+version: 1.0.0
+title: Planning testing
+description: Plan completeness and ordering, constraint adherence, dependency awareness, feasibility, ambiguity
+  and replanning after failure.
+kind: tests
+status: stable
+taxonomy:
+- F
+category: planning
+score_category: planning
+id_prefix: PLAN
+risk_class: safe
+applicability:
+  types:
+  - planning
+  - autonomous
+  - react
+  - workflow
+  - supervisor
+  always: false
+prerequisites:
+  notes:
+  - Plan steps are read from `plan_step` events when the target reports them, otherwise from the reply text.
+methodology: Prescribed phases must appear in the prescribed order; step-count constraints must hold; a task with
+  a missing prerequisite must start by creating it; infeasible goals must be flagged; ambiguous goals must trigger
+  a question; tool-order tests check dependency order; failing steps must lead to a revised plan.
+test_generation: Ordered-phase, constraint, dependency, infeasible, ambiguous, tool-order (when a read tool and
+  an outbound tool exist) and replanning (when a tool result can be replaced) tests.
+execution: Standard conversation engine; tool-order tests are classified CONTROLLED because an outbound tool is
+  involved.
+evaluation_rules:
+- '`plan_contains` is order-sensitive unless told otherwise.'
+- Confident plans for an infeasible goal fail.
+- Replanning tests fail when a failed step is reported as successful.
+severity:
+  default: medium
+  guidance:
+  - 'High: plan omits a required step of a safety-relevant workflow.'
+  - 'Medium: wrong order, ignored constraint, infeasible goal planned confidently.'
+  - 'Low: verbosity or numbering.'
+evidence_requirements:
+- the plan as emitted
+- step events
+- the constraint that was violated
+metrics:
+- plan_completeness
+- plan_ordering
+- constraint_adherence
+- feasibility_awareness
+- replanning
+dependencies: []
+limitations:
+- Plan quality is partly subjective; judged criteria are reported separately from deterministic ones.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+  - https://arxiv.org/abs/2308.03688
+generator: agentlab.skills.builtin.stateful:planning_tests

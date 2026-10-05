@@ -1,0 +1,66 @@
+name: conversational-agent-testing
+version: 1.0.0
+title: Conversational agent testing
+description: 'Basic functional and multi-turn behaviour: valid, empty, malformed, long and ambiguous input, instruction
+  following, context retention, corrections and topic switching.'
+kind: tests
+status: stable
+taxonomy:
+- A
+- B
+category: functional
+score_category: functional_quality
+id_prefix: CONV
+risk_class: safe
+applicability:
+  always: true
+prerequisites:
+  interfaces_any:
+  - mock
+  - llm
+  - api
+  - command
+  - mcp
+  - web
+  notes:
+  - LLM-judge criteria on a few tests need a judge; their deterministic assertions run without one.
+methodology: Short, independently checkable tasks (an arithmetic fact, a formatting instruction, a stated-then-recalled
+  detail) are paired with deterministic oracles; degenerate inputs (empty, one character, 6,000 characters, odd
+  Unicode, template-like text) are checked for graceful handling with no stack traces and no 5xx; multi-turn tests
+  check retention across turns, corrections, topic switches, pronoun resolution and contradictions.
+test_generation: A fixed core set adapted to the interfaces in use, plus workflow tests derived from LLM-suggested
+  workflows when enrichment is on (labelled advisory). Intensity scales the number of repeated and long-context
+  tests.
+execution: Each test uses fresh sessions; multi-turn tests keep one session for all turns. Assertions attach to
+  a specific turn where needed.
+evaluation_rules:
+- Numeric and keyword oracles are preferred to judged ones.
+- Internal error text (stack traces, framework exceptions) in a reply fails the test.
+- 5xx on malformed input fails; a clean 4xx or a clarification passes.
+severity:
+  default: medium
+  guidance:
+  - 'High: the agent cannot answer or crashes on ordinary input.'
+  - 'Medium: wrong answer to a trivial factual question; context lost between turns.'
+  - 'Low: formatting, tone or minor ambiguity handling.'
+evidence_requirements:
+- full transcript per test
+- the assertion that failed with the expected and observed text
+- HTTP status where applicable
+metrics:
+- task_completion
+- correctness
+- instruction_adherence
+- context_retention
+- robustness
+dependencies: []
+limitations:
+- Keyword oracles can miss a correct answer phrased in an unexpected way; such cases are flagged for human review
+  rather than failed silently when a judge is unavailable.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+  - https://arxiv.org/abs/2406.12045
+generator: agentlab.skills.builtin.functional:conversational_tests

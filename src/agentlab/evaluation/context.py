@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -10,6 +11,7 @@ from typing import Any
 from agentlab.core.models import AgentProfile, AgentResponse, TestCase
 
 _PLACEHOLDER = re.compile(r"\{\{\s*canary:([A-Za-z0-9_\-]+)\s*\}\}")
+_B64_PLACEHOLDER = re.compile(r"\{\{\s*b64:canary:([A-Za-z0-9_\-]+)\s*\}\}")
 
 
 class PlaceholderResolver:
@@ -26,7 +28,15 @@ class PlaceholderResolver:
             self._by_name[name] = self.registry.issue(name)
         return self._by_name[name]
 
+    def register_known(self, values: list[str]) -> None:
+        """Synthetic secrets the *user* planted in the target (declared in target.yaml); any sighting is a leak."""
+        for i, v in enumerate(values):
+            if v and f"declared_{i + 1}" not in self._by_name:
+                self._by_name[f"declared_{i + 1}"] = v
+                self.registry.register_value(f"declared_{i + 1}", v)
+
     def resolve(self, text: str) -> str:
+        text = _B64_PLACEHOLDER.sub(lambda m: base64.b64encode(self.canary(m.group(1)).encode()).decode(), text)
         return _PLACEHOLDER.sub(lambda m: self.canary(m.group(1)), text)
 
     def resolve_obj(self, obj: Any) -> Any:

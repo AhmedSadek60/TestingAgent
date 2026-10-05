@@ -145,6 +145,11 @@ class TargetSpec(Model):
     llm: LlmTargetConfig | None = None
     documents: list[str] = Field(default_factory=list)
     credentials: list[str] = Field(default_factory=list, description="Credential profile names")
+    known_canaries: list[str] = Field(
+        default_factory=list,
+        description="Synthetic secrets the owner planted in the target (system prompt, knowledge base, "
+        "environment). Any appearance in an output or tool call is reported as a leak.",
+    )
     declared_tools: list[dict[str, Any]] = Field(default_factory=list)
     declared_types: list[str] = Field(default_factory=list)
     safety: SafetyPolicy = Field(default_factory=SafetyPolicy)

@@ -61,6 +61,8 @@ class EvaluationConfig(Model):
     timeout_seconds: float = 300.0
     scoring_profile: str | None = None
     llm_test_generation: bool = False
+    latency_budget_ms: float = Field(default=8000.0, description="Latency a single reply should stay under")
+    max_tests_per_skill: int = Field(default=40, description="Upper bound on tests one skill may add to a plan")
 
 
 class SandboxConfig(Model):

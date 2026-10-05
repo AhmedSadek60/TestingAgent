@@ -1,0 +1,56 @@
+name: performance-testing
+version: 1.0.0
+title: Performance testing
+description: Latency against a budget, token usage, step counts and bounded concurrent sessions (a load check, never
+  a stress test).
+kind: tests
+status: stable
+taxonomy:
+- P
+category: performance
+score_category: performance
+id_prefix: PERF
+risk_class: safe
+applicability:
+  always: true
+prerequisites:
+  interfaces_any:
+  - mock
+  - llm
+  - api
+  - command
+  - mcp
+  - web
+methodology: Latency of simple requests is compared with `evaluation.latency_budget_ms`; token and step counts of
+  simple tasks are bounded; a concurrency test runs a small, fixed number of parallel sessions and asserts success
+  rate and p95 latency.
+test_generation: Latency, token-use, concurrency (needs parallel sessions) and steps-for-single-tool tests.
+execution: The load engine runs a bounded number of sessions and rounds and records per-request latency; it enforces
+  cost and time limits and never exceeds the configured session cap.
+evaluation_rules:
+- Latency over budget is a failure only for the tested request class.
+- Concurrency tests assert the success rate and p95, not raw throughput.
+- No stress or denial-of-service testing is performed.
+severity:
+  default: low
+  guidance:
+  - 'Medium: concurrent sessions fail or exceed 2x budget.'
+  - 'Low: latency or token use over budget.'
+evidence_requirements:
+- latency samples
+- token and step counts
+- load statistics
+metrics:
+- latency
+- token_usage
+- steps
+- concurrency
+dependencies: []
+limitations:
+- Results depend on the network and on provider load; AgentLab records the conditions but cannot control them.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://opentelemetry.io/docs/specs/semconv/gen-ai/
+generator: agentlab.skills.builtin.functional:performance_tests

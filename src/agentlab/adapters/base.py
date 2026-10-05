@@ -34,6 +34,12 @@ class AdapterCapabilities(Model):
     reports_contexts: bool = False
     reports_events: bool = False
     reports_usage: bool = False
+    # What AgentLab can *plant* in the target for a test (only possible when it controls the target's inputs):
+    canary_seeding: bool = False  # a secret can be placed in the target's hidden instructions
+    knowledge_injection: bool = False  # extra (possibly malicious) documents can be added to the session
+    tool_output_injection: bool = False  # a tool's result can be replaced with attacker-controlled text
+    multimodal: bool = False  # images can be passed to the model
+    omit_auth: bool = False  # a request can be sent without credentials (to check that authentication is enforced)
     notes: list[str] = Field(default_factory=list)
 
 

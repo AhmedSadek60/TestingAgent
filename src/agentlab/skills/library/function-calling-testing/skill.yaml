@@ -1,0 +1,54 @@
+name: function-calling-testing
+version: 1.0.0
+title: Function-calling testing
+description: 'Schema conformance of function-call arguments: types, required fields, enums, and asking for missing
+  values instead of guessing.'
+kind: tests
+status: stable
+taxonomy:
+- E
+category: function_calling
+score_category: tool_calling
+id_prefix: FUNC
+risk_class: safe
+applicability:
+  types:
+  - function_calling
+  - tool_calling
+  needs_tools: true
+  always: false
+prerequisites:
+  notes:
+  - Needs tools with declared JSON-schema parameters.
+methodology: 'AST-style checking in the spirit of the Berkeley Function Calling Leaderboard: validate each call''s
+  arguments against the declared JSON schema, test enum selection and test that omitting a required value leads
+  to a question rather than a call.'
+test_generation: 'For tools with typed parameters: a schema-conformance test, an enum-choice test when an enum exists
+  and a missing-argument test for the first required parameter.'
+execution: As tool-calling-testing; the missing-argument test asserts that the function was **not** called.
+evaluation_rules:
+- Arguments must validate against the declared schema.
+- A call with a guessed value for a missing required argument fails.
+severity:
+  default: medium
+  guidance:
+  - 'High: invalid or guessed arguments on side-effecting functions.'
+  - 'Medium: schema violations on read-only functions.'
+  - 'Low: optional-argument handling.'
+evidence_requirements:
+- call arguments and the schema
+- the validation error
+metrics:
+- argument_accuracy
+- schema_validity
+dependencies:
+- tool-calling-testing
+limitations:
+- Only JSON-schema-declared parameters can be validated; undeclared parameters are not checked.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://gorilla.cs.berkeley.edu/leaderboard.html
+  - https://developers.openai.com/api/docs/guides/function-calling
+generator: agentlab.skills.builtin.tools:function_calling_tests

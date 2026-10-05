@@ -88,6 +88,16 @@ def load_attachment(ref: str, base: Path | None) -> Attachment:
     return Attachment(name=path.name, media_type=mt, content_b64=base64.b64encode(data).decode())
 
 
+def _request_metadata(test: TestCase, env: AttemptEnv, turn: int) -> dict[str, Any]:
+    """Per-request hints. ``inject_knowledge`` / ``poison_tool_output`` are only honoured by interfaces that
+    declare the matching capability; the executor blocks tests that need them elsewhere."""
+    meta: dict[str, Any] = {"test_id": test.id, "turn": turn, "attempt": env.attempt}
+    for key in ("inject_knowledge", "poison_tool_output"):
+        if test.context.get(key):
+            meta[key] = env.resolver.resolve_obj(test.context[key])
+    return meta
+
+
 class ConversationEngine(ExecutionEngine):
     name = "conversation"
 
@@ -111,7 +121,7 @@ class ConversationEngine(ExecutionEngine):
                     session_id=sessions[turn.session],
                     attachments=[load_attachment(a, fixtures) for a in turn.attachments],
                     credential=test.required_credentials[0] if test.required_credentials else None,
-                    metadata={"test_id": test.id, "turn": i, "attempt": env.attempt},
+                    metadata=_request_metadata(test, env, i),
                 )
                 env.trace.record(
                     EventType.AGENT_REQUEST,
