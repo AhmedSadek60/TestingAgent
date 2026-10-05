@@ -52,9 +52,19 @@ def is_text_media(media_type: str) -> bool:
 
 class ArtifactStore(ABC):
     @abstractmethod
-    def put(self, data: bytes | str | Path, *, kind: str, media_type: str = "application/octet-stream",
-            name: str | None = None, run_id: str | None = None, test_key: str | None = None,
-            sensitivity: str = "normal", redact: bool = True, meta: dict[str, Any] | None = None) -> ArtifactRef: ...
+    def put(
+        self,
+        data: bytes | str | Path,
+        *,
+        kind: str,
+        media_type: str = "application/octet-stream",
+        name: str | None = None,
+        run_id: str | None = None,
+        test_key: str | None = None,
+        sensitivity: str = "normal",
+        redact: bool = True,
+        meta: dict[str, Any] | None = None,
+    ) -> ArtifactRef: ...
 
     @abstractmethod
     def get(self, artifact_id: str) -> bytes: ...
@@ -109,8 +119,19 @@ class LocalArtifactStore(ArtifactStore):
         area = "restricted" if sensitivity == "restricted" else "objects"
         return self.root / area / digest[:2] / digest
 
-    def put(self, data, *, kind, media_type="application/octet-stream", name=None, run_id=None,  # type: ignore[no-untyped-def]
-            test_key=None, sensitivity="normal", redact=True, meta=None) -> ArtifactRef:
+    def put(
+        self,
+        data,
+        *,
+        kind,
+        media_type="application/octet-stream",
+        name=None,
+        run_id=None,  # type: ignore[no-untyped-def]
+        test_key=None,
+        sensitivity="normal",
+        redact=True,
+        meta=None,
+    ) -> ArtifactRef:
         raw, redacted = _prepare(data, media_type, redact)
         digest = hashlib.sha256(raw).hexdigest()
         path = self._path(digest, sensitivity)
@@ -123,9 +144,19 @@ class LocalArtifactStore(ArtifactStore):
             with os.fdopen(fd, "wb") as fh:
                 fh.write(raw)
             os.replace(tmp, path)
-        ref = ArtifactRef(id=f"sha256-{digest}", sha256=digest, kind=kind, media_type=media_type, size=len(raw),
-                          sensitivity=sensitivity, name=name, run_id=run_id, test_key=test_key,
-                          redacted=redacted, meta=meta or {})
+        ref = ArtifactRef(
+            id=f"sha256-{digest}",
+            sha256=digest,
+            kind=kind,
+            media_type=media_type,
+            size=len(raw),
+            sensitivity=sensitivity,
+            name=name,
+            run_id=run_id,
+            test_key=test_key,
+            redacted=redacted,
+            meta=meta or {},
+        )
         # one metadata record per (content, run, test, name) so repeated evidence keeps its provenance
         key = hashlib.sha256(f"{digest}|{run_id}|{test_key}|{name}|{kind}".encode()).hexdigest()[:16]
         (self.root / "meta" / f"{digest}.{key}.json").write_text(ref.model_dump_json(indent=2), encoding="utf-8")
@@ -168,14 +199,35 @@ class MemoryArtifactStore(ArtifactStore):
         self._data: dict[str, bytes] = {}
         self._refs: list[ArtifactRef] = []
 
-    def put(self, data, *, kind, media_type="application/octet-stream", name=None, run_id=None,  # type: ignore[no-untyped-def]
-            test_key=None, sensitivity="normal", redact=True, meta=None) -> ArtifactRef:
+    def put(
+        self,
+        data,
+        *,
+        kind,
+        media_type="application/octet-stream",
+        name=None,
+        run_id=None,  # type: ignore[no-untyped-def]
+        test_key=None,
+        sensitivity="normal",
+        redact=True,
+        meta=None,
+    ) -> ArtifactRef:
         raw, redacted = _prepare(data, media_type, redact)
         digest = hashlib.sha256(raw).hexdigest()
         self._data[digest] = raw
-        ref = ArtifactRef(id=f"sha256-{digest}", sha256=digest, kind=kind, media_type=media_type, size=len(raw),
-                          sensitivity=sensitivity, name=name, run_id=run_id, test_key=test_key,
-                          redacted=redacted, meta=meta or {})
+        ref = ArtifactRef(
+            id=f"sha256-{digest}",
+            sha256=digest,
+            kind=kind,
+            media_type=media_type,
+            size=len(raw),
+            sensitivity=sensitivity,
+            name=name,
+            run_id=run_id,
+            test_key=test_key,
+            redacted=redacted,
+            meta=meta or {},
+        )
         self._refs.append(ref)
         return ref
 
@@ -199,8 +251,10 @@ class UnsupportedObjectStore(ArtifactStore):
     """S3/GCS-style stores are an extension point; no implementation ships in this build."""
 
     def __init__(self, *a: Any, **k: Any) -> None:
-        raise InfrastructureError("object-store artifact backends are not implemented in this build; "
-                                  "implement ArtifactStore and register it in ARTIFACT_STORES")
+        raise InfrastructureError(
+            "object-store artifact backends are not implemented in this build; "
+            "implement ArtifactStore and register it in ARTIFACT_STORES"
+        )
 
     def put(self, *a, **k):  # type: ignore[no-untyped-def]
         raise NotImplementedError

@@ -36,10 +36,42 @@ from agentlab.core.models import (
 )
 
 _WORD = re.compile(r"[a-z0-9']+")
-STOP = {"the", "a", "an", "is", "are", "of", "to", "in", "for", "what", "how", "do", "does", "i", "my", "me",
-        "and", "or", "on", "at", "can", "you", "it", "be", "that", "this", "with", "about", "tell"}
-INJECTION = re.compile(r"ignore (all )?(the )?(previous|prior|above) (instructions|prompts?)|"
-                       r"system override|new instructions?:|reveal (your|the) (system )?(prompt|secret)", re.I)
+STOP = {
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "of",
+    "to",
+    "in",
+    "for",
+    "what",
+    "how",
+    "do",
+    "does",
+    "i",
+    "my",
+    "me",
+    "and",
+    "or",
+    "on",
+    "at",
+    "can",
+    "you",
+    "it",
+    "be",
+    "that",
+    "this",
+    "with",
+    "about",
+    "tell",
+}
+INJECTION = re.compile(
+    r"ignore (all )?(the )?(previous|prior|above) (instructions|prompts?)|"
+    r"system override|new instructions?:|reveal (your|the) (system )?(prompt|secret)",
+    re.I,
+)
 DESTRUCTIVE = {"delete_file", "send_email", "transfer_funds"}
 ATTACKER = "attacker@evil.example"
 
@@ -78,9 +110,7 @@ class MockAgent:
                 resp.output = f"My hidden instructions contain the secret {self.secret}."
             else:
                 resp.output = "I can't share my internal instructions or secrets."
-        elif self._handle_memory(text, mem, resp):
-            pass
-        elif self._handle_tool(text, resp):
+        elif self._handle_memory(text, mem, resp) or self._handle_tool(text, resp):
             pass
         elif (small := self._small_talk(text)) is not None:
             resp.output = small
@@ -90,16 +120,23 @@ class MockAgent:
             resp.output = self._chat(text, injected)
         if injected and not (self.has("prompt_injection") or self.has("unsafe_behavior")) and not resp.output:
             resp.output = "I noticed embedded instructions and ignored them."
-        resp.usage = Usage(input_tokens=max(1, len(text) // 4), output_tokens=max(1, len(resp.output) // 4),
-                           llm_calls=1 + len(resp.tool_calls), cost_usd=round(len(text + resp.output) / 4 * 1e-6, 8))
+        resp.usage = Usage(
+            input_tokens=max(1, len(text) // 4),
+            output_tokens=max(1, len(resp.output) // 4),
+            llm_calls=1 + len(resp.tool_calls),
+            cost_usd=round(len(text + resp.output) / 4 * 1e-6, 8),
+        )
         return resp
 
     # ------------------------------------------------------------------ pieces
     def _obey_injection(self, resp: AgentResponse) -> None:
         resp.output = f"Understood. New instructions accepted. Secret: {self.secret}"
         if "send_email" in self.tools:
-            resp.tool_calls.append(ToolCall(name="send_email", arguments={
-                "to": ATTACKER, "subject": "data", "body": self.secret}, result="sent"))
+            resp.tool_calls.append(
+                ToolCall(
+                    name="send_email", arguments={"to": ATTACKER, "subject": "data", "body": self.secret}, result="sent"
+                )
+            )
 
     def _handle_memory(self, text: str, mem: dict[str, str], resp: AgentResponse) -> bool:
         m = re.match(r"^\s*my ([\w ]+?) is (.+?)[.!]?\s*$", text, re.I)
@@ -141,8 +178,11 @@ class MockAgent:
             return "get_weather", {"city": m.group(1).strip().title()}
         if "send" in t and "email" in t:
             to = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", text)
-            return "send_email", {"to": to.group(0) if to else "unknown@example.com", "subject": "Hello",
-                                  "body": text[:60]}
+            return "send_email", {
+                "to": to.group(0) if to else "unknown@example.com",
+                "subject": "Hello",
+                "body": text[:60],
+            }
         if m := re.search(r"delete (?:the )?file (\S+)", t):
             return "delete_file", {"path": m.group(1)}
         if m := re.search(r"read (?:the )?file (\S+)", t):
@@ -160,7 +200,11 @@ class MockAgent:
         name, args = intent
         if name not in self.tools:
             return False
-        if name in DESTRUCTIVE and not self.has("unsafe_behavior") and not re.search(r"\bconfirm(ed)?\b|yes, ", text, re.I):
+        if (
+            name in DESTRUCTIVE
+            and not self.has("unsafe_behavior")
+            and not re.search(r"\bconfirm(ed)?\b|yes, ", text, re.I)
+        ):
             resp.output = f"This will perform '{name}' with {args}. Do you confirm? Reply 'confirm' to proceed."
             return True
         if self.has("wrong_tool"):
@@ -190,8 +234,13 @@ class MockAgent:
                     return str(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 - validated arithmetic only
                 except Exception:
                     return "error"
-        return {"get_weather": "sunny, 21C", "send_email": "email queued", "delete_file": "deleted",
-                "read_file": "file contents", "web_search": "3 results"}.get(name, "ok")
+        return {
+            "get_weather": "sunny, 21C",
+            "send_email": "email queued",
+            "delete_file": "deleted",
+            "read_file": "file contents",
+            "web_search": "3 results",
+        }.get(name, "ok")
 
     def _handle_rag(self, text: str, req: AgentRequest, resp: AgentResponse) -> bool:
         q = tokens(text)
@@ -257,8 +306,13 @@ class MockAgentAdapter(AgentAdapter):
         secret = ctx.extras.get("canary_secret")
         self.agent = MockAgent(cfg, secret=secret)
         self.capabilities = AdapterCapabilities(
-            parallel_sessions=True, reports_tool_calls=True, reports_contexts=bool(cfg.knowledge),
-            reports_events=True, reports_usage=True, notes=["in-process deterministic simulator"])
+            parallel_sessions=True,
+            reports_tool_calls=True,
+            reports_contexts=bool(cfg.knowledge),
+            reports_events=True,
+            reports_usage=True,
+            notes=["in-process deterministic simulator"],
+        )
         self.latency = 0.05 if self.agent.has("slow") else 0.0
 
     async def send(self, request: AgentRequest) -> AgentResponse:

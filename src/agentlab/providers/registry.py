@@ -38,7 +38,7 @@ def _register_builtins() -> None:
         from agentlab.providers.anthropic_provider import AnthropicProvider
 
         items["anthropic"] = AnthropicProvider
-    except Exception:  # pragma: no cover - module import never fails without the SDK
+    except Exception:  # pragma: no cover - module import never fails without the SDK  # noqa: S110
         pass
     for k, v in items.items():
         PROVIDER_TYPES.register(k, v, replace=True)
@@ -79,7 +79,7 @@ class ProviderManager:
         return self._instances[name]
 
     def describe(self) -> list[dict[str, object]]:
-        out = []
+        out: list[dict[str, object]] = []
         for p in self.config.providers:
             try:
                 inst = self.get(p.name)
@@ -87,9 +87,17 @@ class ProviderManager:
                 err = None
             except Exception as exc:
                 caps, err = [], str(exc)
-            out.append({"name": p.name, "type": p.type, "base_url": p.base_url, "model": p.model,
-                        "capabilities": caps, "configured_error": err,
-                        "api_key_ref": p.api_key_ref})  # reference only, never a value
+            out.append(
+                {
+                    "name": p.name,
+                    "type": p.type,
+                    "base_url": p.base_url,
+                    "model": p.model,
+                    "capabilities": caps,
+                    "configured_error": err,
+                    "api_key_ref": p.api_key_ref,
+                }
+            )  # reference only, never a value
         return out
 
     async def discover_models(self, name: str) -> list[ModelInfo]:

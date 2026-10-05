@@ -40,18 +40,26 @@ DEFAULT_PRICING: dict[str, Pricing] = {
 
 class AnthropicProvider(LLMProvider):
     type_name = "anthropic"
-    default_capabilities = frozenset({
-        Capability.CHAT, Capability.STREAMING, Capability.STRUCTURED_OUTPUT, Capability.JSON_SCHEMA,
-        Capability.TOOL_CALLING, Capability.MULTIMODAL, Capability.MODEL_DISCOVERY,
-    })
+    default_capabilities = frozenset(
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.STRUCTURED_OUTPUT,
+            Capability.JSON_SCHEMA,
+            Capability.TOOL_CALLING,
+            Capability.MULTIMODAL,
+            Capability.MODEL_DISCOVERY,
+        }
+    )
 
     def __init__(self, config, credentials=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(config, credentials)
         try:
             import anthropic
         except ImportError as exc:  # pragma: no cover
-            raise ProviderError("the 'anthropic' package is required for the anthropic provider "
-                                "(pip install anthropic)") from exc
+            raise ProviderError(
+                "the 'anthropic' package is required for the anthropic provider (pip install anthropic)"
+            ) from exc
         self._anthropic = anthropic
         kwargs: dict[str, Any] = {"api_key": self.api_key(), "timeout": config.timeout, "max_retries": 0}
         if config.base_url:
@@ -80,8 +88,9 @@ class AnthropicProvider(LLMProvider):
                 out.append({"type": "text", "text": p.text or ""})
             elif p.type == "image":
                 if p.data_b64:
-                    out.append({"type": "image", "source": {"type": "base64", "media_type": p.media_type,
-                                                            "data": p.data_b64}})
+                    out.append(
+                        {"type": "image", "source": {"type": "base64", "media_type": p.media_type, "data": p.data_b64}}
+                    )
                 elif p.url:
                     out.append({"type": "image", "source": {"type": "url", "url": p.url}})
         return out
@@ -95,17 +104,26 @@ class AnthropicProvider(LLMProvider):
                 continue
             if m.role == "tool":
                 block = {"type": "tool_result", "tool_use_id": m.tool_call_id or "", "content": m.text()}
-                if messages and messages[-1]["role"] == "user" and isinstance(messages[-1]["content"], list) \
-                        and messages[-1]["content"] and messages[-1]["content"][-1].get("type") == "tool_result":
+                if (
+                    messages
+                    and messages[-1]["role"] == "user"
+                    and isinstance(messages[-1]["content"], list)
+                    and messages[-1]["content"]
+                    and messages[-1]["content"][-1].get("type") == "tool_result"
+                ):
                     messages[-1]["content"].append(block)
                 else:
                     messages.append({"role": "user", "content": [block]})
                 continue
             content = self._blocks(m)
             if m.tool_calls:
-                blocks = content if isinstance(content, list) else ([{"type": "text", "text": content}] if content else [])
-                blocks += [{"type": "tool_use", "id": c.id or f"toolu_{i}", "name": c.name, "input": c.arguments}
-                           for i, c in enumerate(m.tool_calls)]
+                blocks = (
+                    content if isinstance(content, list) else ([{"type": "text", "text": content}] if content else [])
+                )
+                blocks += [
+                    {"type": "tool_use", "id": c.id or f"toolu_{i}", "name": c.name, "input": c.arguments}
+                    for i, c in enumerate(m.tool_calls)
+                ]
                 content = blocks
             messages.append({"role": m.role, "content": content})
         payload: dict[str, Any] = {"model": model, "max_tokens": request.max_tokens, "messages": messages}
@@ -118,8 +136,9 @@ class AnthropicProvider(LLMProvider):
         if request.json_schema is not None:
             payload["output_config"] = {"format": {"type": "json_schema", "schema": request.json_schema}}
         if request.tools:
-            payload["tools"] = [{"name": t.name, "description": t.description, "input_schema": t.parameters}
-                                for t in request.tools]
+            payload["tools"] = [
+                {"name": t.name, "description": t.description, "input_schema": t.parameters} for t in request.tools
+            ]
             if request.tool_choice == "required":
                 if self.config.options.get("allow_forced_tool_choice"):
                     payload["tool_choice"] = {"type": "any"}
@@ -143,8 +162,9 @@ class AnthropicProvider(LLMProvider):
         if isinstance(exc, a.APIConnectionError | a.APITimeoutError):
             return ProviderError(f"{self.name}: connection problem: {exc}", retryable=True)
         if isinstance(exc, a.APIStatusError):
-            return ProviderError(f"{self.name}: HTTP {exc.status_code}: {str(exc)[:300]}",
-                                 retryable=exc.status_code >= 500)
+            return ProviderError(
+                f"{self.name}: HTTP {exc.status_code}: {str(exc)[:300]}", retryable=exc.status_code >= 500
+            )
         return ProviderError(f"{self.name}: {exc}")
 
     async def _complete(self, request: CompletionRequest, model: str) -> CompletionResponse:
@@ -154,9 +174,14 @@ class AnthropicProvider(LLMProvider):
         except self._anthropic.BadRequestError as exc:
             if "output_config" in payload and "schema" in str(exc).lower():
                 payload.pop("output_config")
-                payload["messages"] = [*payload["messages"], {
-                    "role": "user", "content": "Respond with a single JSON object only that validates against "
-                    f"this JSON Schema: {request.json_schema}"}]
+                payload["messages"] = [
+                    *payload["messages"],
+                    {
+                        "role": "user",
+                        "content": "Respond with a single JSON object only that validates against "
+                        f"this JSON Schema: {request.json_schema}",
+                    },
+                ]
                 degraded.append("json_schema")
                 try:
                     msg = await self._client.messages.create(**payload)
@@ -167,15 +192,26 @@ class AnthropicProvider(LLMProvider):
         except Exception as exc:
             raise self._map_error(exc) from exc
         text = "".join(b.text for b in msg.content if b.type == "text")
-        calls = [LLMToolCall(id=b.id, name=b.name, arguments=dict(b.input or {}))
-                 for b in msg.content if b.type == "tool_use"]
+        calls = [
+            LLMToolCall(id=b.id, name=b.name, arguments=dict(b.input or {}))
+            for b in msg.content
+            if b.type == "tool_use"
+        ]
         u = msg.usage
-        input_tokens = (u.input_tokens or 0) + (getattr(u, "cache_read_input_tokens", 0) or 0) \
+        input_tokens = (
+            (u.input_tokens or 0)
+            + (getattr(u, "cache_read_input_tokens", 0) or 0)
             + (getattr(u, "cache_creation_input_tokens", 0) or 0)
+        )
         return CompletionResponse(
-            text=text, tool_calls=calls, provider=self.name, model=msg.model,
+            text=text,
+            tool_calls=calls,
+            provider=self.name,
+            model=msg.model,
             usage=TokenUsage(input_tokens=input_tokens, output_tokens=u.output_tokens or 0),
-            finish_reason=msg.stop_reason, request_id=getattr(msg, "_request_id", None), degraded=degraded,
+            finish_reason=msg.stop_reason,
+            request_id=getattr(msg, "_request_id", None),
+            degraded=degraded,
         )
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
@@ -193,11 +229,16 @@ class AnthropicProvider(LLMProvider):
         try:
             async for m in self._client.models.list(limit=1000):
                 caps = set(self.default_capabilities)
-                out.append(ModelInfo(
-                    id=m.id, name=getattr(m, "display_name", None), provider=self.name,
-                    context_length=getattr(m, "max_input_tokens", None), capabilities=sorted(caps),
-                    pricing=DEFAULT_PRICING.get(m.id),
-                ))
+                out.append(
+                    ModelInfo(
+                        id=m.id,
+                        name=getattr(m, "display_name", None),
+                        provider=self.name,
+                        context_length=getattr(m, "max_input_tokens", None),
+                        capabilities=sorted(caps),
+                        pricing=DEFAULT_PRICING.get(m.id),
+                    )
+                )
         except Exception as exc:
             raise self._map_error(exc) from exc
         return out

@@ -18,8 +18,15 @@ PG = os.environ.get("AGENTLAB_TEST_POSTGRES_URL")
 
 
 def case(i, cat="functional"):
-    return TestCase(id=f"FUNC-{i:03d}", name="n", category=cat, objective="o", input="hi",
-                    assertions=[AssertionSpec(type="contains", params={"value": "x"})], risk_level=RiskClass.SAFE)
+    return TestCase(
+        id=f"FUNC-{i:03d}",
+        name="n",
+        category=cat,
+        objective="o",
+        input="hi",
+        assertions=[AssertionSpec(type="contains", params={"value": "x"})],
+        risk_level=RiskClass.SAFE,
+    )
 
 
 def test_migrations_create_schema_matching_models(tmp_path):
@@ -30,10 +37,32 @@ def test_migrations_create_schema_matching_models(tmp_path):
         diff = compare_metadata(MigrationContext.configure(conn), orm.Base.metadata)
     assert diff == [], f"models and migrations drifted: {diff}"
     names = set(inspect(eng).get_table_names())
-    for expected in ("projects", "targets", "repositories", "agent_profiles", "credential_profiles", "documents",
-                     "document_versions", "skills", "test_suites", "test_cases", "test_runs", "test_results",
-                     "traces", "artifacts", "evaluators", "evaluations", "findings", "scorecards", "reports",
-                     "model_providers", "model_configurations", "browser_sessions", "reviews", "events"):
+    for expected in (
+        "projects",
+        "targets",
+        "repositories",
+        "agent_profiles",
+        "credential_profiles",
+        "documents",
+        "document_versions",
+        "skills",
+        "test_suites",
+        "test_cases",
+        "test_runs",
+        "test_results",
+        "traces",
+        "artifacts",
+        "evaluators",
+        "evaluations",
+        "findings",
+        "scorecards",
+        "reports",
+        "model_providers",
+        "model_configurations",
+        "browser_sessions",
+        "reviews",
+        "events",
+    ):
         assert expected in names
 
 
@@ -51,8 +80,17 @@ def test_migrations_and_store_on_postgres():
     t = store.add_target(p["id"], TargetSpec(name="t", mock={"behaviors": ["success"]}))
     suite = store.save_suite(p["id"], t["id"], "s", "full", [case(1)])
     run = store.create_run(p["id"], t["id"], suite["id"], "full", {"a": 1}, {})
-    store.save_result(TestResult(run_id=run["id"], test_id="FUNC-001", test_name="n", category="functional",
-                                 score_category="functional_quality", status=TestStatus.PASSED, score=1.0))
+    store.save_result(
+        TestResult(
+            run_id=run["id"],
+            test_id="FUNC-001",
+            test_name="n",
+            category="functional",
+            score_category="functional_quality",
+            status=TestStatus.PASSED,
+            score=1.0,
+        )
+    )
     assert store.list_results(run["id"])[0].status == TestStatus.PASSED
 
 
@@ -72,14 +110,32 @@ def test_store_roundtrip_and_versioning():
     _, cases = store.get_suite(s1["id"])
     assert [c.id for c in cases] == ["FUNC-001", "FUNC-002"]
     run = store.create_run(p["id"], t["id"], s1["id"], "full", {"agentlab": "0.1"}, {"max_cost_usd": 1})
-    res = TestResult(run_id=run["id"], test_id="FUNC-001", test_name="n", category="functional",
-                     score_category="functional_quality", status=TestStatus.BLOCKED, blocked_reason="no creds")
+    res = TestResult(
+        run_id=run["id"],
+        test_id="FUNC-001",
+        test_name="n",
+        category="functional",
+        score_category="functional_quality",
+        status=TestStatus.BLOCKED,
+        blocked_reason="no creds",
+    )
     store.save_result(res)
     res.status = TestStatus.PASSED
     store.save_result(res)  # upsert by (run, test)
     assert [r.status for r in store.list_results(run["id"])] == [TestStatus.PASSED]
-    f = Finding(run_id=run["id"], test_id="FUNC-001", title="x", category="functional", severity=Severity.HIGH,
-                confidence=0.9, expected="a", observed="b", impact="c", reproduction="d", recommendation="e")
+    f = Finding(
+        run_id=run["id"],
+        test_id="FUNC-001",
+        title="x",
+        category="functional",
+        severity=Severity.HIGH,
+        confidence=0.9,
+        expected="a",
+        observed="b",
+        impact="c",
+        reproduction="d",
+        recommendation="e",
+    )
     store.save_findings(run["id"], [f])
     store.save_findings(run["id"], [f])
     assert len(store.list_findings(run["id"])) == 1
@@ -87,7 +143,9 @@ def test_store_roundtrip_and_versioning():
     d2 = store.add_document(p["id"], "policy.md", "text/markdown", "a" * 64, 10, None, {})
     d3 = store.add_document(p["id"], "policy.md", "text/markdown", "b" * 64, 12, None, {})
     assert d["new_version"] and not d2["new_version"] and d3["version"] == 2
-    store.add_review(run["id"], "finding", f.id, "false_positive", "alice", "why", {"severity": "high"}, {"status": "fp"})
+    store.add_review(
+        run["id"], "finding", f.id, "false_positive", "alice", "why", {"severity": "high"}, {"status": "fp"}
+    )
     assert store.get_run(run["id"])["status"] == "pending"
     assert store.list_findings(run["id"])[0].severity == Severity.HIGH  # original never mutated by review
 

@@ -51,12 +51,14 @@ class Database:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = create_engine(url, **kwargs)
         if url.startswith("sqlite"):
+
             @event.listens_for(self.engine, "connect")
             def _pragmas(dbapi_conn, _):  # type: ignore[no-untyped-def]
                 cur = dbapi_conn.cursor()
                 cur.execute("PRAGMA foreign_keys=ON")
                 cur.execute("PRAGMA journal_mode=WAL")
                 cur.close()
+
         self._sessions = sessionmaker(self.engine, expire_on_commit=False, future=True)
         self._lock = threading.RLock()
 
@@ -90,8 +92,9 @@ class Store:
         self.db = db
 
     # ----------------------------------------------------------------- projects / targets
-    def create_project(self, name: str, description: str = "", objective: str = "",
-                       settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    def create_project(
+        self, name: str, description: str = "", objective: str = "", settings: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         with self.db.session() as s:
             if s.scalar(select(orm.Project).where(orm.Project.name == name)):
                 raise UserError(f"project '{name}' already exists")
@@ -120,8 +123,9 @@ class Store:
     def add_target(self, project_id: str, spec: TargetSpec) -> dict[str, Any]:
         kind = (spec.interfaces() or ["unknown"])[0]
         with self.db.session() as s:
-            existing = s.scalar(select(orm.Target).where(orm.Target.project_id == project_id,
-                                                          orm.Target.name == spec.name))
+            existing = s.scalar(
+                select(orm.Target).where(orm.Target.project_id == project_id, orm.Target.name == spec.name)
+            )
             data = spec.model_dump(mode="json")
             if existing:
                 existing.spec, existing.kind, existing.target_version = data, kind, spec.version
@@ -147,11 +151,25 @@ class Store:
                 q = q.where(orm.Target.project_id == project_id)
             return [row_to_dict(r) for r in s.scalars(q)]
 
-    def save_repository(self, target_id: str, *, url: str | None, ref: str | None, commit: str | None,
-                        analysis: dict[str, Any], snapshot_artifact_id: str | None = None) -> dict[str, Any]:
+    def save_repository(
+        self,
+        target_id: str,
+        *,
+        url: str | None,
+        ref: str | None,
+        commit: str | None,
+        analysis: dict[str, Any],
+        snapshot_artifact_id: str | None = None,
+    ) -> dict[str, Any]:
         with self.db.session() as s:
-            row = orm.Repository(target_id=target_id, url=url, ref=ref, commit=commit, analysis=analysis,
-                                 snapshot_artifact_id=snapshot_artifact_id)
+            row = orm.Repository(
+                target_id=target_id,
+                url=url,
+                ref=ref,
+                commit=commit,
+                analysis=analysis,
+                snapshot_artifact_id=snapshot_artifact_id,
+            )
             s.add(row)
             s.flush()
             return row_to_dict(row)
@@ -164,27 +182,48 @@ class Store:
                 row = orm.CredentialProfileRow(name=profile.name, kind=profile.kind, project_id=project_id)
                 s.add(row)
             row.kind, row.scopes, row.test_only = profile.kind, profile.scopes, profile.test_only
-            row.expires_at, row.secret_version, row.description = profile.expires_at, profile.secret_version, profile.description
+            row.expires_at, row.secret_version, row.description = (
+                profile.expires_at,
+                profile.secret_version,
+                profile.description,
+            )
 
     def list_credential_meta(self) -> list[dict[str, Any]]:
         with self.db.session() as s:
             return [row_to_dict(r) for r in s.scalars(select(orm.CredentialProfileRow))]
 
     # ----------------------------------------------------------------- documents
-    def add_document(self, project_id: str, name: str, media_type: str, sha256: str, size: int,
-                     artifact_id: str | None, parsed: dict[str, Any]) -> dict[str, Any]:
+    def add_document(
+        self,
+        project_id: str,
+        name: str,
+        media_type: str,
+        sha256: str,
+        size: int,
+        artifact_id: str | None,
+        parsed: dict[str, Any],
+    ) -> dict[str, Any]:
         with self.db.session() as s:
             doc = s.scalar(select(orm.Document).where(orm.Document.project_id == project_id, orm.Document.name == name))
             if doc is None:
                 doc = orm.Document(project_id=project_id, name=name, media_type=media_type)
                 s.add(doc)
                 s.flush()
-            last = s.scalar(select(orm.DocumentVersion).where(orm.DocumentVersion.document_id == doc.id)
-                            .order_by(orm.DocumentVersion.version.desc()))
+            last = s.scalar(
+                select(orm.DocumentVersion)
+                .where(orm.DocumentVersion.document_id == doc.id)
+                .order_by(orm.DocumentVersion.version.desc())
+            )
             if last is not None and last.sha256 == sha256:
                 return {"document_id": doc.id, "version_id": last.id, "version": last.version, "new_version": False}
-            ver = orm.DocumentVersion(document_id=doc.id, sha256=sha256, size=size, artifact_id=artifact_id,
-                                      parsed=parsed, version=(last.version + 1) if last else 1)
+            ver = orm.DocumentVersion(
+                document_id=doc.id,
+                sha256=sha256,
+                size=size,
+                artifact_id=artifact_id,
+                parsed=parsed,
+                version=(last.version + 1) if last else 1,
+            )
             s.add(ver)
             s.flush()
             doc.current_version_id = ver.id
@@ -223,16 +262,23 @@ class Store:
     def save_profile(self, target_id: str, run_id: str | None, profile: AgentProfile) -> dict[str, Any]:
         data = profile.model_dump(mode="json")
         with self.db.session() as s:
-            row = orm.AgentProfileRow(target_id=target_id, run_id=run_id, profile=data,
-                                      fingerprint=canonical_hash({"types": data["types"], "tools": data["tools"]}))
+            row = orm.AgentProfileRow(
+                target_id=target_id,
+                run_id=run_id,
+                profile=data,
+                fingerprint=canonical_hash({"types": data["types"], "tools": data["tools"]}),
+            )
             s.add(row)
             s.flush()
             return row_to_dict(row)
 
     def latest_profile(self, target_id: str) -> AgentProfile | None:
         with self.db.session() as s:
-            row = s.scalar(select(orm.AgentProfileRow).where(orm.AgentProfileRow.target_id == target_id)
-                           .order_by(orm.AgentProfileRow.created_at.desc()))
+            row = s.scalar(
+                select(orm.AgentProfileRow)
+                .where(orm.AgentProfileRow.target_id == target_id)
+                .order_by(orm.AgentProfileRow.created_at.desc())
+            )
             return AgentProfile.model_validate(row.profile) if row else None
 
     # ----------------------------------------------------------------- suites
@@ -244,20 +290,42 @@ class Store:
             stable.append(d)
         return canonical_hash(stable)
 
-    def save_suite(self, project_id: str, target_id: str | None, name: str, kind: str, tests: list[TestCase],
-                   plan: dict[str, Any] | None = None) -> dict[str, Any]:
+    def save_suite(
+        self,
+        project_id: str,
+        target_id: str | None,
+        name: str,
+        kind: str,
+        tests: list[TestCase],
+        plan: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         h = self.suite_hash(tests)
         with self.db.session() as s:
-            prior = s.scalars(select(orm.TestSuiteRow).where(orm.TestSuiteRow.project_id == project_id,
-                                                              orm.TestSuiteRow.name == name)).all()
+            prior = s.scalars(
+                select(orm.TestSuiteRow).where(orm.TestSuiteRow.project_id == project_id, orm.TestSuiteRow.name == name)
+            ).all()
             version = max((p.version for p in prior), default=0) + 1
-            row = orm.TestSuiteRow(project_id=project_id, target_id=target_id, name=name, kind=kind, suite_hash=h,
-                                   plan=plan or {}, version=version)
+            row = orm.TestSuiteRow(
+                project_id=project_id,
+                target_id=target_id,
+                name=name,
+                kind=kind,
+                suite_hash=h,
+                plan=plan or {},
+                version=version,
+            )
             s.add(row)
             s.flush()
             for t in tests:
-                s.add(orm.TestCaseRow(suite_id=row.id, test_key=t.id, category=t.category,
-                                      risk_level=t.risk_level.value, definition=t.model_dump(mode="json")))
+                s.add(
+                    orm.TestCaseRow(
+                        suite_id=row.id,
+                        test_key=t.id,
+                        category=t.category,
+                        risk_level=t.risk_level.value,
+                        definition=t.model_dump(mode="json"),
+                    )
+                )
             s.flush()
             return row_to_dict(row)
 
@@ -277,11 +345,27 @@ class Store:
             return [row_to_dict(r) for r in s.scalars(q)]
 
     # ----------------------------------------------------------------- runs
-    def create_run(self, project_id: str, target_id: str | None, suite_id: str | None, mode: str,
-                   manifest: dict[str, Any], limits: dict[str, Any], run_id: str | None = None) -> dict[str, Any]:
+    def create_run(
+        self,
+        project_id: str,
+        target_id: str | None,
+        suite_id: str | None,
+        mode: str,
+        manifest: dict[str, Any],
+        limits: dict[str, Any],
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
         with self.db.session() as s:
-            row = orm.TestRunRow(id=run_id or new_id(), project_id=project_id, target_id=target_id, suite_id=suite_id,
-                                 mode=mode, manifest=manifest, limits=limits, status="pending")
+            row = orm.TestRunRow(
+                id=run_id or new_id(),
+                project_id=project_id,
+                target_id=target_id,
+                suite_id=suite_id,
+                mode=mode,
+                manifest=manifest,
+                limits=limits,
+                status="pending",
+            )
             s.add(row)
             s.flush()
             return row_to_dict(row)
@@ -315,11 +399,15 @@ class Store:
     def save_result(self, result: TestResult) -> None:
         data = result.model_dump(mode="json")
         with self.db.session() as s:
-            row = s.scalar(select(orm.TestResultRow).where(orm.TestResultRow.run_id == result.run_id,
-                                                           orm.TestResultRow.test_key == result.test_id))
+            row = s.scalar(
+                select(orm.TestResultRow).where(
+                    orm.TestResultRow.run_id == result.run_id, orm.TestResultRow.test_key == result.test_id
+                )
+            )
             if row is None:
-                row = orm.TestResultRow(id=result.id, run_id=result.run_id, test_key=result.test_id,
-                                        category=result.category)
+                row = orm.TestResultRow(
+                    id=result.id, run_id=result.run_id, test_key=result.test_id, category=result.category
+                )
                 s.add(row)
             row.status = result.status.value
             row.score, row.confidence = result.score, result.confidence
@@ -332,30 +420,54 @@ class Store:
 
     def list_results(self, run_id: str) -> list[TestResult]:
         with self.db.session() as s:
-            rows = s.scalars(select(orm.TestResultRow).where(orm.TestResultRow.run_id == run_id)
-                             .order_by(orm.TestResultRow.test_key)).all()
+            rows = s.scalars(
+                select(orm.TestResultRow).where(orm.TestResultRow.run_id == run_id).order_by(orm.TestResultRow.test_key)
+            ).all()
             return [TestResult.model_validate(r.result) for r in rows]
 
     def save_trace(self, trace: Trace, artifact_id: str | None) -> None:
         with self.db.session() as s:
-            s.add(orm.TraceRow(id=trace.id, run_id=trace.run_id, test_key=trace.test_id, attempt=trace.attempt,
-                               event_count=len(trace.events), artifact_id=artifact_id,
-                               summary={"types": sorted({e.type.value for e in trace.events})}))
+            s.add(
+                orm.TraceRow(
+                    id=trace.id,
+                    run_id=trace.run_id,
+                    test_key=trace.test_id,
+                    attempt=trace.attempt,
+                    event_count=len(trace.events),
+                    artifact_id=artifact_id,
+                    summary={"types": sorted({e.type.value for e in trace.events})},
+                )
+            )
 
     def list_traces(self, run_id: str) -> list[dict[str, Any]]:
         with self.db.session() as s:
-            return [row_to_dict(r) for r in s.scalars(select(orm.TraceRow).where(orm.TraceRow.run_id == run_id)
-                                                      .order_by(orm.TraceRow.test_key, orm.TraceRow.attempt))]
+            return [
+                row_to_dict(r)
+                for r in s.scalars(
+                    select(orm.TraceRow)
+                    .where(orm.TraceRow.run_id == run_id)
+                    .order_by(orm.TraceRow.test_key, orm.TraceRow.attempt)
+                )
+            ]
 
     def add_event(self, ev: Event) -> None:
         with self.db.session() as s:
             if s.get(orm.EventRow, ev.event_id) is None:
-                s.add(orm.EventRow(event_id=ev.event_id, run_id=ev.run_id, test_id=ev.test_id,
-                                   timestamp=ev.timestamp, type=ev.type.value, payload=ev.payload,
-                                   redaction_status=ev.redaction_status.value))
+                s.add(
+                    orm.EventRow(
+                        event_id=ev.event_id,
+                        run_id=ev.run_id,
+                        test_id=ev.test_id,
+                        timestamp=ev.timestamp,
+                        type=ev.type.value,
+                        payload=ev.payload,
+                        redaction_status=ev.redaction_status.value,
+                    )
+                )
 
-    def list_events(self, run_id: str, *, after_ts: datetime | None = None, limit: int = 1000,
-                    types: list[str] | None = None) -> list[dict[str, Any]]:
+    def list_events(
+        self, run_id: str, *, after_ts: datetime | None = None, limit: int = 1000, types: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         with self.db.session() as s:
             q = select(orm.EventRow).where(orm.EventRow.run_id == run_id).order_by(orm.EventRow.timestamp).limit(limit)
             if after_ts:
@@ -370,9 +482,19 @@ class Store:
             for f in findings:
                 if s.get(orm.FindingRow, f.id):
                     continue
-                s.add(orm.FindingRow(id=f.id, run_id=run_id, test_key=f.test_id, severity=f.severity.value,
-                                     category=f.category, title=f.title[:300], is_security=f.is_security,
-                                     confidence=f.confidence, finding=f.model_dump(mode="json")))
+                s.add(
+                    orm.FindingRow(
+                        id=f.id,
+                        run_id=run_id,
+                        test_key=f.test_id,
+                        severity=f.severity.value,
+                        category=f.category,
+                        title=f.title[:300],
+                        is_security=f.is_security,
+                        confidence=f.confidence,
+                        finding=f.model_dump(mode="json"),
+                    )
+                )
 
     def list_findings(self, run_id: str) -> list[Finding]:
         with self.db.session() as s:
@@ -381,13 +503,23 @@ class Store:
 
     def save_scorecard(self, run_id: str, sc: Scorecard) -> None:
         with self.db.session() as s:
-            s.add(orm.ScorecardRow(run_id=run_id, profile=sc.profile, overall=sc.overall,
-                                   confidence=sc.overall_confidence, scorecard=sc.model_dump(mode="json")))
+            s.add(
+                orm.ScorecardRow(
+                    run_id=run_id,
+                    profile=sc.profile,
+                    overall=sc.overall,
+                    confidence=sc.overall_confidence,
+                    scorecard=sc.model_dump(mode="json"),
+                )
+            )
 
     def latest_scorecard(self, run_id: str) -> Scorecard | None:
         with self.db.session() as s:
-            row = s.scalar(select(orm.ScorecardRow).where(orm.ScorecardRow.run_id == run_id)
-                           .order_by(orm.ScorecardRow.created_at.desc()))
+            row = s.scalar(
+                select(orm.ScorecardRow)
+                .where(orm.ScorecardRow.run_id == run_id)
+                .order_by(orm.ScorecardRow.created_at.desc())
+            )
             return Scorecard.model_validate(row.scorecard) if row else None
 
     def save_report(self, run_id: str, formats: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
@@ -407,38 +539,72 @@ class Store:
 
     def latest_report(self, run_id: str) -> dict[str, Any] | None:
         with self.db.session() as s:
-            row = s.scalar(select(orm.ReportRow).where(orm.ReportRow.run_id == run_id)
-                           .order_by(orm.ReportRow.created_at.desc()))
+            row = s.scalar(
+                select(orm.ReportRow).where(orm.ReportRow.run_id == run_id).order_by(orm.ReportRow.created_at.desc())
+            )
             return row_to_dict(row) if row else None
 
     # ----------------------------------------------------------------- artifacts / browser / evaluations
     def register_artifact(self, ref: ArtifactRef, uri: str = "") -> None:
         with self.db.session() as s:
-            s.add(orm.ArtifactRow(sha256=ref.sha256, kind=ref.kind, media_type=ref.media_type, size=ref.size,
-                                  sensitivity=ref.sensitivity, run_id=ref.run_id, test_key=ref.test_key,
-                                  name=ref.name, uri=uri, meta=ref.meta))
+            s.add(
+                orm.ArtifactRow(
+                    sha256=ref.sha256,
+                    kind=ref.kind,
+                    media_type=ref.media_type,
+                    size=ref.size,
+                    sensitivity=ref.sensitivity,
+                    run_id=ref.run_id,
+                    test_key=ref.test_key,
+                    name=ref.name,
+                    uri=uri,
+                    meta=ref.meta,
+                )
+            )
 
     def list_artifacts(self, run_id: str) -> list[dict[str, Any]]:
         with self.db.session() as s:
             return [row_to_dict(r) for r in s.scalars(select(orm.ArtifactRow).where(orm.ArtifactRow.run_id == run_id))]
 
-    def save_browser_session(self, run_id: str, test_key: str, browser: str, trace_artifact_id: str | None,
-                             video_artifact_id: str | None, screenshots: list[str], actions: list[Any],
-                             meta: dict[str, Any]) -> None:
+    def save_browser_session(
+        self,
+        run_id: str,
+        test_key: str,
+        browser: str,
+        trace_artifact_id: str | None,
+        video_artifact_id: str | None,
+        screenshots: list[str],
+        actions: list[Any],
+        meta: dict[str, Any],
+    ) -> None:
         with self.db.session() as s:
-            s.add(orm.BrowserSessionRow(run_id=run_id, test_key=test_key, browser=browser,
-                                        trace_artifact_id=trace_artifact_id, video_artifact_id=video_artifact_id,
-                                        screenshot_artifact_ids=screenshots, actions=actions, meta=meta))
+            s.add(
+                orm.BrowserSessionRow(
+                    run_id=run_id,
+                    test_key=test_key,
+                    browser=browser,
+                    trace_artifact_id=trace_artifact_id,
+                    video_artifact_id=video_artifact_id,
+                    screenshot_artifact_ids=screenshots,
+                    actions=actions,
+                    meta=meta,
+                )
+            )
 
     def list_browser_sessions(self, run_id: str) -> list[dict[str, Any]]:
         with self.db.session() as s:
-            return [row_to_dict(r) for r in s.scalars(select(orm.BrowserSessionRow)
-                                                      .where(orm.BrowserSessionRow.run_id == run_id))]
+            return [
+                row_to_dict(r)
+                for r in s.scalars(select(orm.BrowserSessionRow).where(orm.BrowserSessionRow.run_id == run_id))
+            ]
 
     def ensure_evaluator(self, name: str, type_: str, version: str, config: dict[str, Any]) -> str:
         with self.db.session() as s:
-            row = s.scalar(select(orm.EvaluatorRow).where(orm.EvaluatorRow.name == name,
-                                                          orm.EvaluatorRow.evaluator_version == version))
+            row = s.scalar(
+                select(orm.EvaluatorRow).where(
+                    orm.EvaluatorRow.name == name, orm.EvaluatorRow.evaluator_version == version
+                )
+            )
             if row is None:
                 row = orm.EvaluatorRow(name=name, type=type_, evaluator_version=version, config=config)
                 s.add(row)
@@ -451,20 +617,42 @@ class Store:
                 s.add(orm.EvaluationRow(result_id=result_id, **it))
 
     # ----------------------------------------------------------------- reviews
-    def add_review(self, run_id: str, subject_type: str, subject_id: str, decision: str, reviewer: str, reason: str,
-                   original: dict[str, Any], reviewed: dict[str, Any], comment: str = "") -> dict[str, Any]:
+    def add_review(
+        self,
+        run_id: str,
+        subject_type: str,
+        subject_id: str,
+        decision: str,
+        reviewer: str,
+        reason: str,
+        original: dict[str, Any],
+        reviewed: dict[str, Any],
+        comment: str = "",
+    ) -> dict[str, Any]:
         with self.db.session() as s:
-            row = orm.ReviewRow(run_id=run_id, subject_type=subject_type, subject_id=subject_id, decision=decision,
-                                reviewer=reviewer, reason=reason, original=original, reviewed=reviewed,
-                                comment=comment)
+            row = orm.ReviewRow(
+                run_id=run_id,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                decision=decision,
+                reviewer=reviewer,
+                reason=reason,
+                original=original,
+                reviewed=reviewed,
+                comment=comment,
+            )
             s.add(row)
             s.flush()
             return row_to_dict(row)
 
     def list_reviews(self, run_id: str) -> list[dict[str, Any]]:
         with self.db.session() as s:
-            return [row_to_dict(r) for r in s.scalars(select(orm.ReviewRow).where(orm.ReviewRow.run_id == run_id)
-                                                      .order_by(orm.ReviewRow.created_at))]
+            return [
+                row_to_dict(r)
+                for r in s.scalars(
+                    select(orm.ReviewRow).where(orm.ReviewRow.run_id == run_id).order_by(orm.ReviewRow.created_at)
+                )
+            ]
 
 
 def open_store(url: str, *, migrate: bool = True) -> Store:

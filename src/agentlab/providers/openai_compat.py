@@ -49,8 +49,11 @@ def to_openai_messages(messages: list[Message]) -> list[dict[str, Any]]:
         msg: dict[str, Any] = {"role": m.role, "content": _content(m)}
         if m.tool_calls:
             msg["tool_calls"] = [
-                {"id": c.id or f"call_{i}", "type": "function",
-                 "function": {"name": c.name, "arguments": json.dumps(c.arguments)}}
+                {
+                    "id": c.id or f"call_{i}",
+                    "type": "function",
+                    "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+                }
                 for i, c in enumerate(m.tool_calls)
             ]
         if m.role == "tool":
@@ -81,20 +84,30 @@ class OpenAICompatibleProvider(LLMProvider):
         return h
 
     def build_body(self, request: CompletionRequest, model: str, stream: bool = False) -> dict[str, Any]:
-        body: dict[str, Any] = {"model": model, "messages": to_openai_messages(request.messages),
-                                "max_tokens": request.max_tokens}
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": to_openai_messages(request.messages),
+            "max_tokens": request.max_tokens,
+        }
         if request.temperature is not None:
             body["temperature"] = request.temperature
         if request.stop:
             body["stop"] = request.stop
         if request.json_schema is not None:
-            body["response_format"] = {"type": "json_schema", "json_schema": {
-                "name": request.schema_name, "schema": request.json_schema, "strict": False}}
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": request.schema_name, "schema": request.json_schema, "strict": False},
+            }
         elif request.metadata.get("_json_mode"):
             body["response_format"] = {"type": "json_object"}
         if request.tools:
-            body["tools"] = [{"type": "function", "function": {
-                "name": t.name, "description": t.description, "parameters": t.parameters}} for t in request.tools]
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
+                }
+                for t in request.tools
+            ]
             if request.tool_choice:
                 body["tool_choice"] = request.tool_choice
         if stream:
@@ -133,17 +146,24 @@ class OpenAICompatibleProvider(LLMProvider):
         if isinstance(usage.get("cost"), int | float):  # OpenRouter reports actual cost
             cost = float(usage["cost"])
         return CompletionResponse(
-            text=content or "", tool_calls=calls, provider=self.name, model=data.get("model", model),
-            usage=TokenUsage(input_tokens=usage.get("prompt_tokens", 0) or 0,
-                             output_tokens=usage.get("completion_tokens", 0) or 0),
-            finish_reason=choice.get("finish_reason"), request_id=data.get("id"), cost_usd=cost,
+            text=content or "",
+            tool_calls=calls,
+            provider=self.name,
+            model=data.get("model", model),
+            usage=TokenUsage(
+                input_tokens=usage.get("prompt_tokens", 0) or 0, output_tokens=usage.get("completion_tokens", 0) or 0
+            ),
+            finish_reason=choice.get("finish_reason"),
+            request_id=data.get("id"),
+            cost_usd=cost,
         )
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
         model = self.model_name(request)
         url = f"{self.base_url}/chat/completions"
-        async with self._client.stream("POST", url, headers=self.headers(),
-                                       json=self.build_body(request, model, stream=True)) as r:
+        async with self._client.stream(
+            "POST", url, headers=self.headers(), json=self.build_body(request, model, stream=True)
+        ) as r:
             if r.status_code >= 400:
                 body = (await r.aread()).decode(errors="replace")
                 raise_for_status(self.name, r.status_code, body, dict(r.headers))
@@ -163,9 +183,11 @@ class OpenAICompatibleProvider(LLMProvider):
                         yield delta
 
     async def embed(self, texts: list[str], model: str | None = None) -> list[list[float]]:
-        r = await self._client.post(f"{self.base_url}/embeddings", headers=self.headers(),
-                                    json={"model": model or self.config.options.get("embedding_model")
-                                          or self.model_name(), "input": texts})
+        r = await self._client.post(
+            f"{self.base_url}/embeddings",
+            headers=self.headers(),
+            json={"model": model or self.config.options.get("embedding_model") or self.model_name(), "input": texts},
+        )
         raise_for_status(self.name, r.status_code, r.text, dict(r.headers))
         return [d["embedding"] for d in r.json()["data"]]
 
@@ -175,8 +197,12 @@ class OpenAICompatibleProvider(LLMProvider):
         return [self._model_info(m) for m in r.json().get("data", [])]
 
     def _model_info(self, m: dict[str, Any]) -> ModelInfo:
-        return ModelInfo(id=m["id"], name=m.get("name") or m["id"], provider=self.name,
-                         capabilities=sorted(self.default_capabilities))
+        return ModelInfo(
+            id=m["id"],
+            name=m.get("name") or m["id"],
+            provider=self.name,
+            capabilities=sorted(self.default_capabilities),
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -186,10 +212,17 @@ class OpenAIProvider(OpenAICompatibleProvider):
     type_name = "openai"
     default_base_url = "https://api.openai.com/v1"
     requires_key = True
-    default_capabilities = frozenset({
-        Capability.CHAT, Capability.STREAMING, Capability.STRUCTURED_OUTPUT, Capability.JSON_SCHEMA,
-        Capability.TOOL_CALLING, Capability.EMBEDDINGS, Capability.MODEL_DISCOVERY,
-    })
+    default_capabilities = frozenset(
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.STRUCTURED_OUTPUT,
+            Capability.JSON_SCHEMA,
+            Capability.TOOL_CALLING,
+            Capability.EMBEDDINGS,
+            Capability.MODEL_DISCOVERY,
+        }
+    )
 
 
 class OpenRouterProvider(OpenAICompatibleProvider):
@@ -216,12 +249,19 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         pricing = None
         p = m.get("pricing") or {}
         try:
-            pricing = Pricing(input_per_mtok=float(p.get("prompt", 0)) * 1e6,
-                              output_per_mtok=float(p.get("completion", 0)) * 1e6)
+            pricing = Pricing(
+                input_per_mtok=float(p.get("prompt", 0)) * 1e6, output_per_mtok=float(p.get("completion", 0)) * 1e6
+            )
         except (TypeError, ValueError):
             pricing = None
-        return ModelInfo(id=m["id"], name=m.get("name"), context_length=m.get("context_length"),
-                         capabilities=sorted(caps), pricing=pricing, provider=self.name)
+        return ModelInfo(
+            id=m["id"],
+            name=m.get("name"),
+            context_length=m.get("context_length"),
+            capabilities=sorted(caps),
+            pricing=pricing,
+            provider=self.name,
+        )
 
     def build_body(self, request: CompletionRequest, model: str, stream: bool = False) -> dict[str, Any]:
         body = super().build_body(request, model, stream)

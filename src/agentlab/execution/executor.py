@@ -93,10 +93,19 @@ class TestExecutor:
     # ------------------------------------------------------------------ public
     async def run_test(self, test: TestCase) -> TestResult:
         d = self.d
-        base = dict(run_id=d.run_id, test_id=test.id, test_name=test.name, category=test.category,
-                    score_category=test.score_category)
-        d.bus.emit(d.run_id, EventType.TEST_STARTED, {"name": test.name, "category": test.category,
-                                                      "objective": test.objective, "skill": test.skill}, test.id)
+        base: dict[str, Any] = dict(
+            run_id=d.run_id,
+            test_id=test.id,
+            test_name=test.name,
+            category=test.category,
+            score_category=test.score_category,
+        )
+        d.bus.emit(
+            d.run_id,
+            EventType.TEST_STARTED,
+            {"name": test.name, "category": test.category, "objective": test.objective, "skill": test.skill},
+            test.id,
+        )
         if d.cancel.cancelled:
             return self._finish(TestResult(**base, status=TestStatus.SKIPPED, blocked_reason="run was cancelled"), test)
         try:
@@ -107,19 +116,42 @@ class TestExecutor:
         decision = d.gate.decide(test)
         if decision.blocked:
             kind = ErrorKind.POLICY_BLOCK if decision.block_kind == "policy" else None
-            return self._finish(TestResult(**base, status=TestStatus.BLOCKED, blocked_reason=decision.blocked_reason,
-                                           error_kind=kind), test)
-        if test.judge and not test.assertions and not any(t.assertions for t in test.all_turns()) \
-                and not test.expected_tool_calls and not (d.judge and d.judge.enabled):
-            return self._finish(TestResult(**base, status=TestStatus.BLOCKED, blocked_reason=(
-                "all of this test's criteria need an LLM judge but none is configured (judge criteria: "
-                f"{[c.metric for c in test.judge]})")), test)
+            return self._finish(
+                TestResult(**base, status=TestStatus.BLOCKED, blocked_reason=decision.blocked_reason, error_kind=kind),
+                test,
+            )
+        if (
+            test.judge
+            and not test.assertions
+            and not any(t.assertions for t in test.all_turns())
+            and not test.expected_tool_calls
+            and not (d.judge and d.judge.enabled)
+        ):
+            return self._finish(
+                TestResult(
+                    **base,
+                    status=TestStatus.BLOCKED,
+                    blocked_reason=(
+                        "all of this test's criteria need an LLM judge but none is configured (judge criteria: "
+                        f"{[c.metric for c in test.judge]})"
+                    ),
+                ),
+                test,
+            )
 
         adapter = self._adapter_for(test)
         if adapter is None:
-            return self._finish(TestResult(**base, status=TestStatus.BLOCKED, blocked_reason=(
-                f"no usable interface for this test (wanted {test.required_interfaces or 'any'}, "
-                f"available {self.d.runtime.available()}; errors: {self.d.runtime.errors or 'none'})")), test)
+            return self._finish(
+                TestResult(
+                    **base,
+                    status=TestStatus.BLOCKED,
+                    blocked_reason=(
+                        f"no usable interface for this test (wanted {test.required_interfaces or 'any'}, "
+                        f"available {self.d.runtime.available()}; errors: {self.d.runtime.errors or 'none'})"
+                    ),
+                ),
+                test,
+            )
 
         reps = self._repetitions(test, decision.risk)
         started = utcnow()
@@ -165,14 +197,24 @@ class TestExecutor:
             return max(1, ev.reliability_repetitions)
         return max(1, ev.repetitions_by_risk.get(risk.value, ev.repetitions))
 
-    async def _attempt(self, test: TestCase, adapter: AgentAdapter, n: int) -> tuple[AttemptResult, str | None, list[str]]:
+    async def _attempt(
+        self, test: TestCase, adapter: AgentAdapter, n: int
+    ) -> tuple[AttemptResult, str | None, list[str]]:
         d = self.d
         trace = TraceRecorder(d.run_id, test.id, n, d.bus)
         budget = d.limits.budget_for(test)
         engine = pick_engine(test, d.engines)
-        env = AttemptEnv(run_id=d.run_id, attempt=n, adapter=adapter, trace=trace, budget=budget, limits=d.limits,
-                         cancel=d.cancel, resolver=d.resolver,
-                         extras={"artifacts": d.artifacts, "config": d.config, "runtime": d.runtime, **d.extras})
+        env = AttemptEnv(
+            run_id=d.run_id,
+            attempt=n,
+            adapter=adapter,
+            trace=trace,
+            budget=budget,
+            limits=d.limits,
+            cancel=d.cancel,
+            resolver=d.resolver,
+            extras={"artifacts": d.artifacts, "config": d.config, "runtime": d.runtime, **d.extras},
+        )
         t0 = time.perf_counter()
         outcome = AttemptOutcome()
         err: AgentLabError | None = None
@@ -211,16 +253,27 @@ class TestExecutor:
             deterministic += run_trajectory(test, outcome, d.resolver, d.profile, self.known_sources, trace)
             stopped_status = outcome.stopped.status if outcome.stopped else None
             if outcome.stopped and test.context.get("limit_is_finding"):
-                deterministic.append(AssertionResult(
-                    type="limit_exceeded", passed=False, score=0.0, message=(
-                        f"agent did not terminate within the configured budget: {outcome.stopped}"),
-                    evidence={"status": outcome.stopped.status.value}, required=True))
+                deterministic.append(
+                    AssertionResult(
+                        type="limit_exceeded",
+                        passed=False,
+                        score=0.0,
+                        message=(f"agent did not terminate within the configured budget: {outcome.stopped}"),
+                        evidence={"status": outcome.stopped.status.value},
+                        required=True,
+                    )
+                )
                 stopped_status = None  # for runaway-behaviour tests the limit *is* the observation
             if not outcome.timed_out and stopped_status is None:
                 judges, notes = await run_judge(test, outcome, deterministic, d.judge, trace)
             has_det = bool(deterministic) or bool(test.expected_tool_calls)
-            status, note = decide_attempt_status(deterministic, judges, has_deterministic=has_det,
-                                                 timed_out=outcome.timed_out, stopped_status=stopped_status)
+            status, note = decide_attempt_status(
+                deterministic,
+                judges,
+                has_deterministic=has_det,
+                timed_out=outcome.timed_out,
+                stopped_status=stopped_status,
+            )
             if note:
                 notes.append(note)
                 error_text, error_kind = note, ErrorKind.EVALUATOR_ERROR
@@ -236,22 +289,38 @@ class TestExecutor:
         if notes:
             traj["notes"] = notes
         attempt = AttemptResult(
-            attempt=n, status=status, assertions=deterministic, judge=judges, trajectory=traj, latency_ms=latency,
-            tokens=budget.tokens, cost_usd=round(budget.cost, 8), steps=budget.steps, error=error_text,
-            error_kind=error_kind, outputs=[r.output for r in outcome.responses])
+            attempt=n,
+            status=status,
+            assertions=deterministic,
+            judge=judges,
+            trajectory=traj,
+            latency_ms=latency,
+            tokens=budget.tokens,
+            cost_usd=round(budget.cost, 8),
+            steps=budget.steps,
+            error=error_text,
+            error_kind=error_kind,
+            outputs=[r.output for r in outcome.responses],
+        )
         trace_id, artifact_ids = self._persist_trace(test, trace, outcome, attempt)
         attempt.trace_id = trace_id
         return attempt, trace_id, artifact_ids
 
-    def _persist_trace(self, test: TestCase, trace: TraceRecorder, outcome: AttemptOutcome,
-                       attempt: AttemptResult) -> tuple[str | None, list[str]]:
+    def _persist_trace(
+        self, test: TestCase, trace: TraceRecorder, outcome: AttemptOutcome, attempt: AttemptResult
+    ) -> tuple[str | None, list[str]]:
         d = self.d
         ids = list(outcome.artifacts)
         art_id = None
         if d.artifacts is not None:
-            ref = d.artifacts.put_json(trace.trace.model_dump(mode="json"), kind="trace",
-                                       name=f"{test.id}-attempt{trace.trace.attempt}.trace.json", run_id=d.run_id,
-                                       test_key=test.id, sensitivity="restricted")
+            ref = d.artifacts.put_json(
+                trace.trace.model_dump(mode="json"),
+                kind="trace",
+                name=f"{test.id}-attempt{trace.trace.attempt}.trace.json",
+                run_id=d.run_id,
+                test_key=test.id,
+                sensitivity="restricted",
+            )
             art_id = ref.id
             ids.append(ref.id)
             if d.store is not None:
@@ -263,8 +332,16 @@ class TestExecutor:
             d.store.save_trace(trace.trace, art_id)
         return trace.trace.id, ids
 
-    def _assemble(self, test: TestCase, base: dict[str, Any], attempts: list[AttemptResult], trace_ids: list[str],
-                  artifact_ids: list[str], started: Any, error_kind: ErrorKind | None) -> TestResult:
+    def _assemble(
+        self,
+        test: TestCase,
+        base: dict[str, Any],
+        attempts: list[AttemptResult],
+        trace_ids: list[str],
+        artifact_ids: list[str],
+        started: Any,
+        error_kind: ErrorKind | None,
+    ) -> TestResult:
         threshold = self.d.config.evaluation.pass_threshold
         status = aggregate_status(attempts, threshold)
         stats = compute_reliability(attempts)
@@ -275,11 +352,20 @@ class TestExecutor:
         elif status == TestStatus.PASSED and stats.flaky:
             score = min(score, 0.5 + 0.5 * stats.pass_rate)
         res = TestResult(
-            **base, status=status, score=round(score, 4), attempts=attempts, reliability=stats if attempts else None,
-            error_kind=error_kind, started_at=started, finished_at=utcnow(),
+            **base,
+            status=status,
+            score=round(score, 4),
+            attempts=attempts,
+            reliability=stats if attempts else None,
+            error_kind=error_kind,
+            started_at=started,
+            finished_at=utcnow(),
             latency_ms=round(mean(a.latency_ms for a in attempts), 2) if attempts else 0.0,
-            tokens=sum(a.tokens for a in attempts), cost_usd=round(sum(a.cost_usd for a in attempts), 8),
-            evidence=sorted(set(artifact_ids)), trace_ids=trace_ids)
+            tokens=sum(a.tokens for a in attempts),
+            cost_usd=round(sum(a.cost_usd for a in attempts), 8),
+            evidence=sorted(set(artifact_ids)),
+            trace_ids=trace_ids,
+        )
         res.confidence = compute_confidence(test, attempts, stats)
         if status in {TestStatus.FAILED, TestStatus.TIMEOUT} or status.is_stopped:
             sev, rca = assess(test, res, production=self.d.runtime.spec.safety.production)
@@ -295,13 +381,28 @@ class TestExecutor:
         if result.finished_at is None:
             result.finished_at = utcnow()
         if result.status.is_stopped:
-            d.bus.emit(d.run_id, EventType.LIMIT_REACHED, {"status": result.status.value,
-                                                           "reason": result.blocked_reason}, test.id)
-        d.bus.emit(d.run_id, EventType.TEST_COMPLETED, {
-            "status": result.status.value, "score": result.score, "confidence": result.confidence,
-            "severity": result.severity.value if result.severity else None, "reason": result.blocked_reason,
-            "latency_ms": result.latency_ms, "tokens": result.tokens, "cost_usd": result.cost_usd,
-            "root_cause": result.root_cause.value if result.root_cause else None}, test.id)
+            d.bus.emit(
+                d.run_id,
+                EventType.LIMIT_REACHED,
+                {"status": result.status.value, "reason": result.blocked_reason},
+                test.id,
+            )
+        d.bus.emit(
+            d.run_id,
+            EventType.TEST_COMPLETED,
+            {
+                "status": result.status.value,
+                "score": result.score,
+                "confidence": result.confidence,
+                "severity": result.severity.value if result.severity else None,
+                "reason": result.blocked_reason,
+                "latency_ms": result.latency_ms,
+                "tokens": result.tokens,
+                "cost_usd": result.cost_usd,
+                "root_cause": result.root_cause.value if result.root_cause else None,
+            },
+            test.id,
+        )
         if d.store is not None:
             d.store.save_result(result)
         return result

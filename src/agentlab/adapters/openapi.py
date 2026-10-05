@@ -58,15 +58,20 @@ def analyze_openapi(spec: dict[str, Any]) -> OpenApiAnalysis:
         t = sch.get("type", "")
         schemes[name] = f"{t}:{sch.get('scheme') or sch.get('in') or ''}".strip(":")
     out = OpenApiAnalysis(
-        title=(spec.get("info") or {}).get("title", ""), version=(spec.get("info") or {}).get("version", ""),
-        servers=[s.get("url", "") for s in spec.get("servers") or []], security_schemes=schemes)
+        title=(spec.get("info") or {}).get("title", ""),
+        version=(spec.get("info") or {}).get("version", ""),
+        servers=[s.get("url", "") for s in spec.get("servers") or []],
+        security_schemes=schemes,
+    )
     global_sec = [next(iter(r)) for r in spec.get("security") or [] if r]
     for path, item in (spec.get("paths") or {}).items():
         for method, op in (item or {}).items():
             if method.lower() not in {"get", "post", "put", "patch", "delete"} or not isinstance(op, dict):
                 continue
-            body = _resolve(spec, (((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {})
-                            .get("schema", {}))
+            body = _resolve(
+                spec,
+                (((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get("schema", {}),
+            )
             props = (body or {}).get("properties", {}) or {}
             props = {k: _resolve(spec, v) for k, v in props.items()}
             input_field = next((f for f in INPUT_FIELDS if f in props), None)
@@ -89,10 +94,20 @@ def analyze_openapi(spec: dict[str, Any]) -> OpenApiAnalysis:
                     score += 1.0
                 if any(f in resp_fields for f in OUTPUT_FIELDS):
                     score += 0.5
-            out.endpoints.append(Endpoint(
-                method=method.upper(), path=path, summary=op.get("summary", "") or op.get("operationId", ""),
-                input_field=input_field, session_field=session_field, request_schema=body or {},
-                response_fields=resp_fields, streaming=streaming, auth=sec, chat_score=score))
+            out.endpoints.append(
+                Endpoint(
+                    method=method.upper(),
+                    path=path,
+                    summary=op.get("summary", "") or op.get("operationId", ""),
+                    input_field=input_field,
+                    session_field=session_field,
+                    request_schema=body or {},
+                    response_fields=resp_fields,
+                    streaming=streaming,
+                    auth=sec,
+                    chat_score=score,
+                )
+            )
     return out
 
 
@@ -103,8 +118,12 @@ def suggest_api_config(analysis: OpenApiAnalysis, base_url: str) -> ApiConfig | 
     template: dict[str, Any] = {ep.input_field: "{{input}}"}
     if ep.session_field:
         template[ep.session_field] = "{{session_id}}"
-    cfg = ApiConfig(url=base_url.rstrip("/") + ep.path, method="POST", request_template=template,
-                    protocol="sse" if ep.streaming else "rest")
+    cfg = ApiConfig(
+        url=base_url.rstrip("/") + ep.path,
+        method="POST",
+        request_template=template,
+        protocol="sse" if ep.streaming else "rest",
+    )
     out_field = next((f for f in OUTPUT_FIELDS if f in ep.response_fields), None)
     if out_field:
         cfg.response.output = f"$.{out_field}"

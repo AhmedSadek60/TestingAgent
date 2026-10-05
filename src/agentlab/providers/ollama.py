@@ -28,10 +28,15 @@ from agentlab.providers.base import (
 
 class OllamaProvider(LLMProvider):
     type_name = "ollama"
-    default_capabilities = frozenset({
-        Capability.CHAT, Capability.STREAMING, Capability.STRUCTURED_OUTPUT, Capability.JSON_SCHEMA,
-        Capability.MODEL_DISCOVERY,
-    })
+    default_capabilities = frozenset(
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.STRUCTURED_OUTPUT,
+            Capability.JSON_SCHEMA,
+            Capability.MODEL_DISCOVERY,
+        }
+    )
 
     def __init__(self, config, credentials=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(config, credentials)
@@ -57,14 +62,17 @@ class OllamaProvider(LLMProvider):
                 if imgs:
                     entry["images"] = imgs
             if m.tool_calls:
-                entry["tool_calls"] = [{"function": {"name": c.name, "arguments": c.arguments}}
-                                       for c in m.tool_calls]
+                entry["tool_calls"] = [{"function": {"name": c.name, "arguments": c.arguments}} for c in m.tool_calls]
             out.append(entry)
         return out
 
     def _body(self, request: CompletionRequest, model: str, stream: bool) -> dict[str, Any]:
-        body: dict[str, Any] = {"model": model, "messages": self._messages(request.messages), "stream": stream,
-                                "options": {"num_predict": request.max_tokens}}
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": self._messages(request.messages),
+            "stream": stream,
+            "options": {"num_predict": request.max_tokens},
+        }
         if request.temperature is not None:
             body["options"]["temperature"] = request.temperature
         if request.json_schema is not None:
@@ -72,33 +80,46 @@ class OllamaProvider(LLMProvider):
         elif request.metadata.get("_json_mode"):
             body["format"] = "json"
         if request.tools:
-            body["tools"] = [{"type": "function", "function": {
-                "name": t.name, "description": t.description, "parameters": t.parameters}} for t in request.tools]
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
+                }
+                for t in request.tools
+            ]
         return body
 
     async def _complete(self, request: CompletionRequest, model: str) -> CompletionResponse:
         try:
-            r = await self._client.post(f"{self.base_url}/api/chat", headers=self._headers(),
-                                        json=self._body(request, model, stream=False))
+            r = await self._client.post(
+                f"{self.base_url}/api/chat", headers=self._headers(), json=self._body(request, model, stream=False)
+            )
         except httpx.HTTPError as exc:
-            raise ProviderError(f"{self.name}: cannot reach Ollama at {self.base_url}: {exc}",
-                                retryable=True) from exc
+            raise ProviderError(f"{self.name}: cannot reach Ollama at {self.base_url}: {exc}", retryable=True) from exc
         raise_for_status(self.name, r.status_code, r.text, dict(r.headers))
         data = r.json()
         msg = data.get("message") or {}
-        calls = [LLMToolCall(name=c["function"]["name"], arguments=c["function"].get("arguments") or {})
-                 for c in msg.get("tool_calls") or []]
+        calls = [
+            LLMToolCall(name=c["function"]["name"], arguments=c["function"].get("arguments") or {})
+            for c in msg.get("tool_calls") or []
+        ]
         return CompletionResponse(
-            text=msg.get("content", ""), tool_calls=calls, provider=self.name, model=data.get("model", model),
-            usage=TokenUsage(input_tokens=data.get("prompt_eval_count", 0) or 0,
-                             output_tokens=data.get("eval_count", 0) or 0),
-            finish_reason=data.get("done_reason"), cost_usd=0.0,
+            text=msg.get("content", ""),
+            tool_calls=calls,
+            provider=self.name,
+            model=data.get("model", model),
+            usage=TokenUsage(
+                input_tokens=data.get("prompt_eval_count", 0) or 0, output_tokens=data.get("eval_count", 0) or 0
+            ),
+            finish_reason=data.get("done_reason"),
+            cost_usd=0.0,
         )
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
         model = self.model_name(request)
-        async with self._client.stream("POST", f"{self.base_url}/api/chat", headers=self._headers(),
-                                       json=self._body(request, model, stream=True)) as r:
+        async with self._client.stream(
+            "POST", f"{self.base_url}/api/chat", headers=self._headers(), json=self._body(request, model, stream=True)
+        ) as r:
             if r.status_code >= 400:
                 raise_for_status(self.name, r.status_code, (await r.aread()).decode(), dict(r.headers))
             async for line in r.aiter_lines():
@@ -112,8 +133,11 @@ class OllamaProvider(LLMProvider):
                     break
 
     async def embed(self, texts: list[str], model: str | None = None) -> list[list[float]]:
-        r = await self._client.post(f"{self.base_url}/api/embed", headers=self._headers(),
-                                    json={"model": model or self.model_name(), "input": texts})
+        r = await self._client.post(
+            f"{self.base_url}/api/embed",
+            headers=self._headers(),
+            json={"model": model or self.model_name(), "input": texts},
+        )
         raise_for_status(self.name, r.status_code, r.text, dict(r.headers))
         return r.json()["embeddings"]
 
@@ -144,8 +168,9 @@ class OllamaProvider(LLMProvider):
         out = []
         for m in r.json().get("models", []):
             caps = await self._show(m["name"])
-            out.append(ModelInfo(id=m["name"], name=m.get("model", m["name"]), capabilities=sorted(caps),
-                                 provider=self.name))
+            out.append(
+                ModelInfo(id=m["name"], name=m.get("model", m["name"]), capabilities=sorted(caps), provider=self.name)
+            )
         return out
 
     async def aclose(self) -> None:

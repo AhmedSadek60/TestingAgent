@@ -17,13 +17,13 @@ from agentlab.evaluation.severity import SECURITY_TYPES, SeverityDecision, decid
 
 IMPACT: dict[str, str] = {
     "no_canary_leak": "A protected value was disclosed in the user-visible channel; a real secret in the same position "
-                      "would be exposed to whoever can talk to the agent.",
+    "would be exposed to whoever can talk to the agent.",
     "no_secret_leak": "A credential-like secret was exposed in the agent's output and could be reused by an attacker.",
     "no_destructive_without_confirmation": "Destructive or externally visible actions can be triggered without human "
-                                           "approval, so unauthorised side effects are possible.",
+    "approval, so unauthorised side effects are possible.",
     "no_external_recipient": "Messages or data can be sent to unauthorised external recipients.",
     "no_injection_followed": "Untrusted content can steer the agent (goal hijacking), enabling data exfiltration and "
-                             "unauthorised tool use.",
+    "unauthorised tool use.",
     "no_injection_indicators_in_output": "Instructions embedded in untrusted data are being reproduced or acted upon.",
     "tool_allowlist": "The agent can use tools outside the set that is authorised for this task.",
     "tool_not_called": "A tool that must not be used in this scenario was invoked.",
@@ -33,9 +33,9 @@ IMPACT: dict[str, str] = {
     "cites_source": "Answers are not attributed to their sources, which prevents verification.",
     "retrieved_source": "The retrieval step does not surface the document needed to answer correctly.",
     "tool_called": "The task is not completed (or is completed with the wrong capability) because the expected tool "
-                   "was not used.",
+    "was not used.",
     "trajectory:tool_selection": "Tasks are handled with the wrong tool, or with unnecessary tools, which can cause wrong "
-                                 "results and unintended side effects.",
+    "results and unintended side effects.",
     "trajectory:tool_arguments": "Tools receive incorrect inputs, producing wrong results or unintended side effects.",
     "trajectory:unnecessary_actions": "Redundant tool calls waste time and cost and can repeat side effects.",
     "trajectory:error_recovery": "A tool failure is neither handled nor reported to the user.",
@@ -56,24 +56,24 @@ IMPACT: dict[str, str] = {
 
 RECOMMEND: dict[str, str] = {
     "no_canary_leak": "Keep secrets out of the model context entirely (hold them server-side behind tools); never put them in "
-                      "the system prompt; add an output filter for secret patterns and re-run this test.",
+    "the system prompt; add an output filter for secret patterns and re-run this test.",
     "no_secret_leak": "Remove the secret from prompts/context, rotate it, and add output redaction as defence in depth.",
     "no_destructive_without_confirmation": "Enforce human confirmation in code (not only in the prompt) before destructive or "
-                                           "external tools run; return a confirmation request and execute only on explicit approval.",
+    "external tools run; return a confirmation request and execute only on explicit approval.",
     "no_external_recipient": "Restrict recipients to an allow-list/domain and require confirmation for anything external.",
     "no_injection_followed": "Treat retrieved and tool content as data: delimit it, strip instruction-like text, give the "
-                             "agent least-privilege tools, and add a policy check before side-effecting calls.",
+    "agent least-privilege tools, and add a policy check before side-effecting calls.",
     "no_injection_indicators_in_output": "Add an output check for injected-instruction echoes and isolate untrusted content.",
     "tool_allowlist": "Bind each task to an explicit tool allow-list and reject calls outside it at the executor layer.",
     "tool_not_called": "Gate the tool behind an explicit user intent or permission check.",
     "grounded": "Require answers to be derived from retrieved passages and to abstain when no relevant context is found; "
-                "add a groundedness guard before returning an answer.",
+    "add a groundedness guard before returning an answer.",
     "abstains": "Teach the agent to say it does not know when retrieval returns nothing relevant; add an abstention test to CI.",
     "citations_valid": "Only emit citations that map to retrieved document identifiers and verify them before responding.",
     "retrieved_source": "Inspect chunking, embeddings and the retrieval query; check the document was ingested and is not filtered out.",
     "tool_called": "Improve the tool description and selection criteria, add examples, or route this intent deterministically.",
     "trajectory:tool_selection": "Tighten tool descriptions so intents map unambiguously to one tool; add few-shot examples; "
-                                 "consider deterministic routing for high-risk tools.",
+    "consider deterministic routing for high-risk tools.",
     "trajectory:tool_arguments": "Validate tool arguments against a JSON schema before execution and return actionable errors to the model.",
     "trajectory:unnecessary_actions": "Add duplicate-call detection and a per-request tool budget.",
     "trajectory:error_recovery": "Handle tool errors explicitly: retry with changes or tell the user what failed.",
@@ -115,15 +115,27 @@ def _failed_judges(attempts: list[AttemptResult]) -> list[JudgeResult]:
     return [j for a in attempts for j in a.judge if not j.passed]
 
 
-def assess(test: TestCase, result: TestResult, *, production: bool = False) -> tuple[SeverityDecision, RootCauseAnalysis]:
+def assess(
+    test: TestCase, result: TestResult, *, production: bool = False
+) -> tuple[SeverityDecision, RootCauseAnalysis]:
     """Compute root cause and severity for a non-passing result (shared by executor and findings)."""
     rca = classify_root_cause(test, result.attempts, result.status, result.error_kind)
     failed = _failed(result.attempts)
     judge_only = not failed and bool(_failed_judges(result.attempts))
     side_effects = any(a.trajectory.get("side_effects") for a in result.attempts)
-    sev = decide_severity(test, failed, stats=result.reliability, confidence=result.confidence,
-                          judge_only=judge_only, production=production, has_side_effects=side_effects)
-    if rca.cause in {RootCause.INFRASTRUCTURE, RootCause.EXTERNAL_DEPENDENCY, RootCause.TIMEOUT} and sev.severity.rank > 2:
+    sev = decide_severity(
+        test,
+        failed,
+        stats=result.reliability,
+        confidence=result.confidence,
+        judge_only=judge_only,
+        production=production,
+        has_side_effects=side_effects,
+    )
+    if (
+        rca.cause in {RootCause.INFRASTRUCTURE, RootCause.EXTERNAL_DEPENDENCY, RootCause.TIMEOUT}
+        and sev.severity.rank > 2
+    ):
         sev.severity = Severity.MEDIUM
         sev.adjustments.append(f"capped at MEDIUM: likely cause is {rca.cause.value}, not agent behaviour")
     return sev, rca
@@ -147,16 +159,19 @@ def _reproduction(test: TestCase, target_name: str) -> str:
         who = f" (session '{t.session}')" if t.session != "default" else ""
         steps.append(f"{i}. Send{who}: {t.input[:300]!r}")
     if not steps and test.browser_steps:
-        steps = [f"{i}. Browser step: {s.action} {s.target or s.value or ''}".rstrip()
-                 for i, s in enumerate(test.browser_steps, 1)]
+        steps = [
+            f"{i}. Browser step: {s.action} {s.target or s.value or ''}".rstrip()
+            for i, s in enumerate(test.browser_steps, 1)
+        ]
     steps.append(f"Run: agentlab test --target {target_name} --only {test.id}")
     if test.context.get("fixtures"):
         steps.append("Fixtures required: " + ", ".join(map(str, test.context["fixtures"])))
     return "\n".join(steps)
 
 
-def build_finding(run_id: str, test: TestCase, result: TestResult, target_name: str, *,
-                  production: bool = False) -> Finding | None:
+def build_finding(
+    run_id: str, test: TestCase, result: TestResult, target_name: str, *, production: bool = False
+) -> Finding | None:
     if result.status not in {TestStatus.FAILED, TestStatus.TIMEOUT}:
         return None
     failed = _failed(result.attempts)
@@ -168,13 +183,19 @@ def build_finding(run_id: str, test: TestCase, result: TestResult, target_name: 
         facts.append(f"[{f.type}] {f.message}")
     for a in result.attempts[:1]:
         if a.trajectory.get("tool_calls"):
-            facts.append("Observed tool calls: " + ", ".join(
-                f"{c['name']}({', '.join(f'{k}={v!r}' for k, v in list(c.get('arguments', {}).items())[:3])})"
-                for c in a.trajectory["tool_calls"][:6]))
+            facts.append(
+                "Observed tool calls: "
+                + ", ".join(
+                    f"{c['name']}({', '.join(f'{k}={v!r}' for k, v in list(c.get('arguments', {}).items())[:3])})"
+                    for c in a.trajectory["tool_calls"][:6]
+                )
+            )
     if result.reliability and result.reliability.repetitions > 1:
         r = result.reliability
-        facts.append(f"Passed {r.passes}/{r.repetitions} repetitions (pass rate {r.pass_rate:.0%}"
-                     f"{', flaky' if r.flaky else ', deterministic failure' if r.deterministic_failure else ''}).")
+        facts.append(
+            f"Passed {r.passes}/{r.repetitions} repetitions (pass rate {r.pass_rate:.0%}"
+            f"{', flaky' if r.flaky else ', deterministic failure' if r.deterministic_failure else ''})."
+        )
     if result.error_kind:
         facts.append(f"Error kind: {result.error_kind.value}")
     inferences = [rca.statement()]
@@ -183,30 +204,61 @@ def build_finding(run_id: str, test: TestCase, result: TestResult, target_name: 
     judgments = []
     for j in judges[:3]:
         top = j.votes[0].reasoning if j.votes else (j.error or "")
-        judgments.append(f"Judge ({', '.join(v.judge for v in j.votes) or 'n/a'}) scored '{j.metric}' {j.score:.2f} "
-                         f"(confidence {j.confidence:.2f}, agreement {j.agreement:.2f}): {top[:240]}")
+        judgments.append(
+            f"Judge ({', '.join(v.judge for v in j.votes) or 'n/a'}) scored '{j.metric}' {j.score:.2f} "
+            f"(confidence {j.confidence:.2f}, agreement {j.agreement:.2f}): {top[:240]}"
+        )
     observed = "; ".join(f.message for f in failed[:3]) or (
-        "; ".join(f"{j.metric} score {j.score:.2f} below threshold" for j in judges[:3]) or
-        f"test ended with status {result.status.value}")
+        "; ".join(f"{j.metric} score {j.score:.2f} below threshold" for j in judges[:3])
+        or f"test ended with status {result.status.value}"
+    )
     expected = test.expected_behavior or test.objective
-    impact = IMPACT.get(primary, IMPACT.get(primary.split(":")[0], "")) or \
-        "The agent's behaviour deviates from the specified behaviour for this scenario."
-    rec = RECOMMEND.get(primary) or RECOMMEND.get(primary.split(":")[0]) or BY_CAUSE.get(
-        rca.cause, "Compare the observed behaviour with the expected behaviour and adjust the agent's instructions or logic.")
+    impact = (
+        IMPACT.get(primary, IMPACT.get(primary.split(":")[0], ""))
+        or "The agent's behaviour deviates from the specified behaviour for this scenario."
+    )
+    rec = (
+        RECOMMEND.get(primary)
+        or RECOMMEND.get(primary.split(":")[0])
+        or BY_CAUSE.get(
+            rca.cause,
+            "Compare the observed behaviour with the expected behaviour and adjust the agent's instructions or logic.",
+        )
+    )
     if rca.cause in BY_CAUSE and BY_CAUSE[rca.cause] not in rec:
         rec = f"{rec} Also: {BY_CAUSE[rca.cause]}"
-    is_sec = bool(sev.signals) or test.category.lower() in {"security", "safety"} or any(f.type in SECURITY_TYPES for f in failed)
+    is_sec = (
+        bool(sev.signals)
+        or test.category.lower() in {"security", "safety"}
+        or any(f.type in SECURITY_TYPES for f in failed)
+    )
     return Finding(
-        run_id=run_id, test_id=test.id, title=_title(test, failed, judges, result.status), category=test.category,
-        severity=sev.severity, confidence=result.confidence, expected=expected, observed=observed, impact=impact,
-        evidence=[*result.evidence, *[f"trace:{t}" for t in result.trace_ids]], reproduction=_reproduction(test, target_name),
-        recommendation=rec, root_cause=rca.cause, root_cause_confidence=rca.confidence, is_security=is_sec, facts=facts,
-        inferences=inferences, judgments=judgments, severity_breakdown=sev.to_dict(),
-        fact_kind="observed" if failed else "judgment")
+        run_id=run_id,
+        test_id=test.id,
+        title=_title(test, failed, judges, result.status),
+        category=test.category,
+        severity=sev.severity,
+        confidence=result.confidence,
+        expected=expected,
+        observed=observed,
+        impact=impact,
+        evidence=[*result.evidence, *[f"trace:{t}" for t in result.trace_ids]],
+        reproduction=_reproduction(test, target_name),
+        recommendation=rec,
+        root_cause=rca.cause,
+        root_cause_confidence=rca.confidence,
+        is_security=is_sec,
+        facts=facts,
+        inferences=inferences,
+        judgments=judgments,
+        severity_breakdown=sev.to_dict(),
+        fact_kind="observed" if failed else "judgment",
+    )
 
 
-def generate_findings(run_id: str, tests: list[TestCase], results: list[TestResult], target_name: str, *,
-                      production: bool = False) -> list[Finding]:
+def generate_findings(
+    run_id: str, tests: list[TestCase], results: list[TestResult], target_name: str, *, production: bool = False
+) -> list[Finding]:
     by_id = {t.id: t for t in tests}
     out: list[Finding] = []
     for r in results:
@@ -231,18 +283,29 @@ def cross_test_findings(run_id: str, findings: list[Finding], min_group: int = 3
         if len(group) < min_group:
             continue
         sev = max((g.severity for g in group), key=lambda s: s.rank)
-        out.append(Finding(
-            run_id=run_id, test_id="CROSS-" + primary.replace(":", "-").upper(),
-            title=f"Systemic pattern: {len(group)} tests failed on '{primary}' (likely {cause.replace('_', ' ')})",
-            category="cross-test-analysis", severity=sev, confidence=round(min(g.confidence for g in group), 3),
-            expected="Behaviour consistent with the specification across scenarios.",
-            observed=f"{len(group)} different scenarios failed the same check: " + ", ".join(g.test_id for g in group[:10]),
-            impact="A repeated failure across scenarios suggests a design-level defect rather than an isolated case.",
-            evidence=sorted({e for g in group for e in g.evidence})[:20],
-            reproduction="Run the listed tests: " + ", ".join(g.test_id for g in group[:10]),
-            recommendation=group[0].recommendation, root_cause=group[0].root_cause,
-            root_cause_confidence=min(0.8, group[0].root_cause_confidence + 0.1),
-            is_security=any(g.is_security for g in group), facts=[f"{g.test_id}: {g.observed[:160]}" for g in group[:10]],
-            inferences=[f"The same defect class appears in {len(group)} independent tests, so it is likely systemic."],
-            severity_breakdown={"derived_from": [g.test_id for g in group], "severity": sev.value}))
+        out.append(
+            Finding(
+                run_id=run_id,
+                test_id="CROSS-" + primary.replace(":", "-").upper(),
+                title=f"Systemic pattern: {len(group)} tests failed on '{primary}' (likely {cause.replace('_', ' ')})",
+                category="cross-test-analysis",
+                severity=sev,
+                confidence=round(min(g.confidence for g in group), 3),
+                expected="Behaviour consistent with the specification across scenarios.",
+                observed=f"{len(group)} different scenarios failed the same check: "
+                + ", ".join(g.test_id for g in group[:10]),
+                impact="A repeated failure across scenarios suggests a design-level defect rather than an isolated case.",
+                evidence=sorted({e for g in group for e in g.evidence})[:20],
+                reproduction="Run the listed tests: " + ", ".join(g.test_id for g in group[:10]),
+                recommendation=group[0].recommendation,
+                root_cause=group[0].root_cause,
+                root_cause_confidence=min(0.8, group[0].root_cause_confidence + 0.1),
+                is_security=any(g.is_security for g in group),
+                facts=[f"{g.test_id}: {g.observed[:160]}" for g in group[:10]],
+                inferences=[
+                    f"The same defect class appears in {len(group)} independent tests, so it is likely systemic."
+                ],
+                severity_breakdown={"derived_from": [g.test_id for g in group], "severity": sev.value},
+            )
+        )
     return out

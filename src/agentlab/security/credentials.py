@@ -30,7 +30,15 @@ from agentlab.core.models.base import Model
 from agentlab.security.redactor import SecretRedactor, get_redactor
 
 CredentialKind = Literal[
-    "api_key", "bearer", "basic", "headers", "cookies", "oauth_token", "browser_state", "client_cert", "env",
+    "api_key",
+    "bearer",
+    "basic",
+    "headers",
+    "cookies",
+    "oauth_token",
+    "browser_state",
+    "client_cert",
+    "env",
 ]
 
 
@@ -125,10 +133,12 @@ class CredentialManager:
     def _persist(self) -> None:
         if self.store is None:
             return
-        self.store.save({
-            "profiles": {n: p.model_dump(mode="json") for n, p in self._profiles.items()},
-            "secrets": self._secrets,
-        })
+        self.store.save(
+            {
+                "profiles": {n: p.model_dump(mode="json") for n, p in self._profiles.items()},
+                "secrets": self._secrets,
+            }
+        )
 
     # ---- profile management -----------------------------------------------
     def add(self, profile: CredentialProfile, secrets: dict[str, str] | None = None) -> CredentialProfile:
@@ -186,9 +196,7 @@ class CredentialManager:
                 return
             if host == scope or host.endswith("." + scope.lstrip("*.")):
                 return
-        raise CredentialError(
-            f"credential profile '{profile.name}' is not scoped for host '{host}'"
-        )
+        raise CredentialError(f"credential profile '{profile.name}' is not scoped for host '{host}'")
 
     def fields(self, name: str, url: str | None = None) -> dict[str, str]:
         profile = self.get_profile(name)

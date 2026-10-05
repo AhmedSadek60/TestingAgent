@@ -187,8 +187,10 @@ class TestResultRow(Entity):
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     result: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)  # full original TestResult
     run: Mapped[TestRunRow] = relationship(back_populates="results")
-    __table_args__ = (UniqueConstraint("run_id", "test_key", name="uq_result_run_key"),
-                      Index("ix_result_run_status", "run_id", "status"))
+    __table_args__ = (
+        UniqueConstraint("run_id", "test_key", name="uq_result_run_key"),
+        Index("ix_result_run_status", "run_id", "status"),
+    )
 
 
 class TraceRow(Entity):

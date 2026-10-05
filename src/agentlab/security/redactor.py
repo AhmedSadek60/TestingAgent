@@ -16,7 +16,7 @@ import base64
 import re
 import threading
 import urllib.parse
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +57,15 @@ class RedactionResult:
     hits: dict[str, int]
 
 
+def _keep_assignment(label: str) -> Callable[[re.Match[str]], str]:
+    """Replacement that keeps ``name = `` and quotes of a password assignment but hides the value."""
+
+    def repl(m: re.Match[str]) -> str:
+        return f"{m.group(1)}{m.group(2)}{m.group(3)}[REDACTED:{label}]"
+
+    return repl
+
+
 class SecretRedactor:
     """Thread-safe redactor. One instance is shared per process (see :func:`get_redactor`)."""
 
@@ -65,9 +74,7 @@ class SecretRedactor:
     def __init__(self, extra_patterns: Iterable[str] = ()) -> None:
         self._lock = threading.Lock()
         self._values: dict[str, str] = {}
-        self._patterns: dict[str, re.Pattern[str]] = {
-            k: re.compile(v) for k, v in BUILTIN_PATTERNS.items()
-        }
+        self._patterns: dict[str, re.Pattern[str]] = {k: re.compile(v) for k, v in BUILTIN_PATTERNS.items()}
         for i, p in enumerate(extra_patterns):
             self.add_pattern(f"custom_{i}", p)
 
@@ -100,7 +107,7 @@ class SecretRedactor:
                 text = text.replace(secret, f"[REDACTED:{label}]")
         for label, pat in patterns:
             if label == "password_assignment":
-                text, n = pat.subn(lambda m: f"{m.group(1)}{m.group(2)}{m.group(3)}[REDACTED:{label}]", text)
+                text, n = pat.subn(_keep_assignment(label), text)
             else:
                 text, n = pat.subn(f"[REDACTED:{label}]", text)
             if n:

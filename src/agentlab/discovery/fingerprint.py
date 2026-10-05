@@ -30,11 +30,20 @@ from agentlab.repository.models import RepositoryAnalysis
 from agentlab.repository.signals import infer_side_effects
 
 KEYWORDS: dict[AgentType, list[tuple[str, float]]] = {
-    AgentType.RAG: [(r"\b(rag|retriev\w+|knowledge ?base|uploaded (docs|documents|pdfs?)|from (the )?(documents|docs|pdfs?))\b", 0.6)],
+    AgentType.RAG: [
+        (
+            r"\b(rag|retriev\w+|knowledge ?base|uploaded (docs|documents|pdfs?)|from (the )?(documents|docs|pdfs?))\b",
+            0.6,
+        )
+    ],
     AgentType.TOOL_CALLING: [(r"\b(tools?|function[- ]calling|calls? (apis?|functions?))\b", 0.45)],
-    AgentType.BROWSER: [(r"\b(browser|web ?ui|navigates? (the )?web|click(s|ing)? (buttons?|links?)|playwright|selenium)\b", 0.6)],
+    AgentType.BROWSER: [
+        (r"\b(browser|web ?ui|navigates? (the )?web|click(s|ing)? (buttons?|links?)|playwright|selenium)\b", 0.6)
+    ],
     AgentType.COMPUTER_USE: [(r"\b(computer[- ]use|desktop automation|gui agent)\b", 0.7)],
-    AgentType.CODING: [(r"\b(coding agent|edits? (a )?repositor\w+|writes? code|fix(es)? (bugs|issues)|pull requests?)\b", 0.7)],
+    AgentType.CODING: [
+        (r"\b(coding agent|edits? (a )?repositor\w+|writes? code|fix(es)? (bugs|issues)|pull requests?)\b", 0.7)
+    ],
     AgentType.MULTI_AGENT: [(r"\b(multi[- ]agent|sub-?agents?|supervisor|orchestrator|delegat\w+|handoffs?)\b", 0.6)],
     AgentType.MCP: [(r"\b(mcp|model context protocol)\b", 0.7)],
     AgentType.PLANNING: [(r"\b(plan(s|ning)?|decompos\w+|multi-step)\b", 0.4)],
@@ -70,8 +79,16 @@ CAP_TO_TYPE: dict[str, list[tuple[AgentType, float]]] = {
 
 CAPABILITY_TESTABILITY: dict[str, tuple[str, str, str]] = {
     # capability -> (AgentType-ish detection key, required interface hint, note when untestable)
-    "tool_calling": ("tools", "any", "needs tool-call visibility (API events, MCP or LLM adapter) to judge tool selection"),
-    "rag": ("rag", "any", "groundedness is judged from retrieved contexts and citations when exposed; otherwise from answers"),
+    "tool_calling": (
+        "tools",
+        "any",
+        "needs tool-call visibility (API events, MCP or LLM adapter) to judge tool selection",
+    ),
+    "rag": (
+        "rag",
+        "any",
+        "groundedness is judged from retrieved contexts and citations when exposed; otherwise from answers",
+    ),
     "memory": ("memory", "any", "needs sessions or multi-turn conversation"),
     "planning": ("planning", "any", "judged from observable plan steps or tool trajectories"),
     "browser": ("browser", "web", "needs a web interface and Playwright/Chromium"),
@@ -134,7 +151,13 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
             _add(ev, AgentType.RAG, "target config", f"{len(spec.mock.knowledge)} knowledge document(s)", 0.8)
     if spec.llm:
         if spec.llm.tools:
-            _add(ev, AgentType.TOOL_CALLING, "target config", f"LLM target declares tools {[t.name for t in spec.llm.tools]}", 0.85)
+            _add(
+                ev,
+                AgentType.TOOL_CALLING,
+                "target config",
+                f"LLM target declares tools {[t.name for t in spec.llm.tools]}",
+                0.85,
+            )
         if spec.llm.knowledge:
             _add(ev, AgentType.RAG, "target config", "knowledge documents are placed in the model context", 0.7)
     # --- repository
@@ -142,11 +165,12 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
         for cap, on in repo.capabilities.items():
             if on:
                 for t, w in CAP_TO_TYPE.get(cap, []):
-                    srcs = ", ".join(sorted({s.location.ref() for s in repo.signals if s.location and cap in s.detail})[:2])
+                    srcs = ", ".join(
+                        sorted({s.location.ref() for s in repo.signals if s.location and cap in s.detail})[:2]
+                    )
                     _add(ev, t, "repository", f"capability '{cap}' detected" + (f" ({srcs})" if srcs else ""), w)
-        if repo.tools:
-            if any(t.parameters.get("properties") for t in repo.tools):
-                _add(ev, AgentType.FUNCTION_CALLING, "repository", "tools defined with typed parameter schemas", 0.6)
+        if repo.tools and any(t.parameters.get("properties") for t in repo.tools):
+            _add(ev, AgentType.FUNCTION_CALLING, "repository", "tools defined with typed parameter schemas", 0.6)
         names = " ".join(d.name.lower() + " " + (d.role or "").lower() for d in repo.agent_definitions)
         if re.search(r"supervisor|orchestrator|router|triage|manager", names):
             _add(ev, AgentType.SUPERVISOR, "repository", "agent named like a supervisor/router/triage", 0.7)
@@ -162,7 +186,8 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
     if inp.docs:
         _add(ev, AgentType.DOCUMENT, "documents", f"{len(inp.docs)} document(s) supplied", 0.3)
         if any(d.name.lower().endswith((".pdf", ".docx", ".md", ".txt")) for d in inp.docs) and (
-                repo is None or repo.capabilities.get("rag") or "rag" in text.lower()):
+            repo is None or repo.capabilities.get("rag") or "rag" in text.lower()
+        ):
             _add(ev, AgentType.RAG, "documents", "knowledge documents supplied for evaluation", 0.3)
     # --- OpenAPI / interfaces
     if inp.openapi and inp.openapi.endpoints:
@@ -195,7 +220,13 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
         if "browser_action" in probe.event_types:
             _add(ev, AgentType.BROWSER, "probe", "observed browser actions", 0.9)
         if probe.self_reported_tools:
-            _add(ev, AgentType.TOOL_CALLING, "probe (self-reported)", f"agent claims tools {probe.self_reported_tools[:4]}", 0.3)
+            _add(
+                ev,
+                AgentType.TOOL_CALLING,
+                "probe (self-reported)",
+                f"agent claims tools {probe.self_reported_tools[:4]}",
+                0.3,
+            )
         if not probe.tools_seen and not probe.contexts_seen and any(o.output for o in probe.observations):
             _add(ev, AgentType.CHATBOT, "probe", "answers conversationally without observable tools or retrieval", 0.55)
         if probe.streaming:
@@ -203,16 +234,34 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
     # --- baseline: any conversational interface is at least a chatbot
     if inp.available_interfaces and not ev.get(AgentType.CHATBOT):
         _add(ev, AgentType.CHATBOT, "interface", "exposes a conversational interface", 0.4)
-    if any(t in ev for t in (AgentType.TOOL_CALLING, AgentType.RAG)) and not ev.get(AgentType.CONVERSATIONAL) and \
-            (probe is None or probe.reachable):
+    if (
+        any(t in ev for t in (AgentType.TOOL_CALLING, AgentType.RAG))
+        and not ev.get(AgentType.CONVERSATIONAL)
+        and (probe is None or probe.reachable)
+    ):
         _add(ev, AgentType.CONVERSATIONAL, "interface", "natural-language interface", 0.3)
 
     scores = [TypeScore(type=t, confidence=noisy_or([e.weight for e in evs]), evidence=evs) for t, evs in ev.items()]
-    strong = [s for s in scores if s.confidence >= 0.6 and s.type not in {AgentType.CHATBOT, AgentType.CONVERSATIONAL,
-                                                                             AgentType.API, AgentType.HYBRID}]
+    strong = [
+        s
+        for s in scores
+        if s.confidence >= 0.6
+        and s.type not in {AgentType.CHATBOT, AgentType.CONVERSATIONAL, AgentType.API, AgentType.HYBRID}
+    ]
     if len(strong) >= 3:
-        scores.append(TypeScore(type=AgentType.HYBRID, confidence=min(0.95, 0.6 + 0.1 * len(strong)), evidence=[Evidence(
-            source="fingerprint", detail="combines " + ", ".join(sorted(s.type.value for s in strong)), weight=0.8)]))
+        scores.append(
+            TypeScore(
+                type=AgentType.HYBRID,
+                confidence=min(0.95, 0.6 + 0.1 * len(strong)),
+                evidence=[
+                    Evidence(
+                        source="fingerprint",
+                        detail="combines " + ", ".join(sorted(s.type.value for s in strong)),
+                        weight=0.8,
+                    )
+                ],
+            )
+        )
     return sorted(scores, key=lambda s: -s.confidence)
 
 
@@ -230,29 +279,55 @@ def build_tools(inp: FingerprintInputs) -> list[ToolInfo]:
     for d in spec.declared_tools:
         n = d.get("name")
         if n:
-            add(ToolInfo(name=n, description=d.get("description", ""), parameters=d.get("parameters", {}),
-                         source="target config", side_effects=d.get("side_effects") or infer_side_effects(n, d.get("description", "")),
-                         requires_confirmation=d.get("requires_confirmation")))
+            add(
+                ToolInfo(
+                    name=n,
+                    description=d.get("description", ""),
+                    parameters=d.get("parameters", {}),
+                    source="target config",
+                    side_effects=d.get("side_effects") or infer_side_effects(n, d.get("description", "")),
+                    requires_confirmation=d.get("requires_confirmation"),
+                )
+            )
     if spec.mock:
         for n in spec.mock.tools:
             add(ToolInfo(name=n, source="target config (mock)", side_effects=infer_side_effects(n, "")))
     if spec.llm:
-        for t in spec.llm.tools:
-            add(ToolInfo(name=t.name, description=t.description, parameters=t.parameters, source="target config (llm)",
-                         side_effects=t.side_effects if t.side_effects != "none" else infer_side_effects(t.name, t.description)))
+        for lt in spec.llm.tools:
+            add(
+                ToolInfo(
+                    name=lt.name,
+                    description=lt.description,
+                    parameters=lt.parameters,
+                    source="target config (llm)",
+                    side_effects=lt.side_effects
+                    if lt.side_effects != "none"
+                    else infer_side_effects(lt.name, lt.description),
+                )
+            )
     if inp.repo:
-        for t in inp.repo.tools:
-            add(ToolInfo(name=t.name, description=t.description, parameters=t.parameters, source=f"repository {t.location.ref()}",
-                         side_effects=t.side_effects, requires_confirmation=t.requires_confirmation))
-    for t in inp.mcp_tools:
-        add(t)
+        for rt in inp.repo.tools:
+            add(
+                ToolInfo(
+                    name=rt.name,
+                    description=rt.description,
+                    parameters=rt.parameters,
+                    source=f"repository {rt.location.ref()}",
+                    side_effects=rt.side_effects,
+                    requires_confirmation=rt.requires_confirmation,
+                )
+            )
+    for mt in inp.mcp_tools:
+        add(mt)
     if inp.probe:
         for n in inp.probe.tools_seen:
             add(ToolInfo(name=n, source="observed during probing", side_effects=infer_side_effects(n, "")))
     return sorted(tools.values(), key=lambda t: t.name)
 
 
-def build_capability_matrix(types: list[TypeScore], inp: FingerprintInputs, tools: list[ToolInfo]) -> list[CapabilityEntry]:
+def build_capability_matrix(
+    types: list[TypeScore], inp: FingerprintInputs, tools: list[ToolInfo]
+) -> list[CapabilityEntry]:
     by = {s.type: s.confidence for s in types}
     ifaces = set(inp.available_interfaces)
     out: list[CapabilityEntry] = []
@@ -261,46 +336,102 @@ def build_capability_matrix(types: list[TypeScore], inp: FingerprintInputs, tool
         out.append(CapabilityEntry(capability=cap, detected=detected, testable=testable, reason=reason))
 
     conv = bool(ifaces & {"mock", "llm", "api", "web", "command", "mcp"})
-    entry("conversation", bool(by.get(AgentType.CHATBOT) or by.get(AgentType.CONVERSATIONAL)), Support.SUPPORTED if conv else Support.UNSUPPORTED,
-          "reachable through a configured interface" if conv else "no interface that accepts messages is available")
-    entry("tool_calling", by.get(AgentType.TOOL_CALLING, 0) >= 0.5,
-          Support.SUPPORTED if (ifaces & {"mock", "llm", "api", "mcp"}) else Support.PARTIAL,
-          f"{len(tools)} tool(s) in inventory; tool calls are only observable if the interface reports them")
-    entry("rag", by.get(AgentType.RAG, 0) >= 0.5, Support.SUPPORTED if conv else Support.UNSUPPORTED,
-          "groundedness uses retrieved contexts/citations when exposed, otherwise answer-vs-document checks")
-    entry("memory", by.get(AgentType.MEMORY, 0) >= 0.5, Support.SUPPORTED if conv else Support.UNSUPPORTED,
-          "tested with multi-turn and cross-session conversations")
-    entry("planning", by.get(AgentType.PLANNING, 0) >= 0.5, Support.PARTIAL,
-          "judged from observable plan steps and tool trajectories, never hidden reasoning")
-    entry("multi_agent", by.get(AgentType.MULTI_AGENT, 0) >= 0.5, Support.PARTIAL if conv else Support.UNSUPPORTED,
-          "topology from repository analysis; delegation from handoff events when exposed")
-    entry("browser", by.get(AgentType.BROWSER, 0) >= 0.5 or "web" in ifaces,
-          Support.SUPPORTED if ("web" in ifaces and inp.browser_available) else Support.UNSUPPORTED,
-          "Playwright + Chromium available" if "web" in ifaces and inp.browser_available else
-          "requires a web interface and an installed Playwright browser")
-    entry("mcp", by.get(AgentType.MCP, 0) >= 0.5, Support.SUPPORTED if "mcp" in ifaces else (
-        Support.PARTIAL if inp.repo and inp.repo.mcp else Support.UNSUPPORTED),
-          "MCP client adapter available" if "mcp" in ifaces else "no MCP endpoint configured; only static analysis possible")
-    entry("coding", by.get(AgentType.CODING, 0) >= 0.5,
-          Support.SUPPORTED if ("command" in ifaces and inp.docker_available) else Support.UNSUPPORTED,
-          "disposable Docker workspace" if inp.docker_available else "Docker is unavailable; coding agents are never run on the host")
-    entry("multimodal", by.get(AgentType.MULTIMODAL, 0) >= 0.5, Support.PARTIAL if ifaces else Support.UNSUPPORTED,
-          "needs attachment support in the adapter; image understanding is judged only with a multimodal judge")
-    entry("voice", by.get(AgentType.VOICE, 0) >= 0.5, Support.UNSUPPORTED, "voice/audio testing is not implemented in this build")
-    entry("long_running", by.get(AgentType.LONG_RUNNING, 0) >= 0.5, Support.PARTIAL,
-          "bounded by max_execution_time and step limits; background jobs are not polled")
+    entry(
+        "conversation",
+        bool(by.get(AgentType.CHATBOT) or by.get(AgentType.CONVERSATIONAL)),
+        Support.SUPPORTED if conv else Support.UNSUPPORTED,
+        "reachable through a configured interface" if conv else "no interface that accepts messages is available",
+    )
+    entry(
+        "tool_calling",
+        by.get(AgentType.TOOL_CALLING, 0) >= 0.5,
+        Support.SUPPORTED if (ifaces & {"mock", "llm", "api", "mcp"}) else Support.PARTIAL,
+        f"{len(tools)} tool(s) in inventory; tool calls are only observable if the interface reports them",
+    )
+    entry(
+        "rag",
+        by.get(AgentType.RAG, 0) >= 0.5,
+        Support.SUPPORTED if conv else Support.UNSUPPORTED,
+        "groundedness uses retrieved contexts/citations when exposed, otherwise answer-vs-document checks",
+    )
+    entry(
+        "memory",
+        by.get(AgentType.MEMORY, 0) >= 0.5,
+        Support.SUPPORTED if conv else Support.UNSUPPORTED,
+        "tested with multi-turn and cross-session conversations",
+    )
+    entry(
+        "planning",
+        by.get(AgentType.PLANNING, 0) >= 0.5,
+        Support.PARTIAL,
+        "judged from observable plan steps and tool trajectories, never hidden reasoning",
+    )
+    entry(
+        "multi_agent",
+        by.get(AgentType.MULTI_AGENT, 0) >= 0.5,
+        Support.PARTIAL if conv else Support.UNSUPPORTED,
+        "topology from repository analysis; delegation from handoff events when exposed",
+    )
+    entry(
+        "browser",
+        by.get(AgentType.BROWSER, 0) >= 0.5 or "web" in ifaces,
+        Support.SUPPORTED if ("web" in ifaces and inp.browser_available) else Support.UNSUPPORTED,
+        "Playwright + Chromium available"
+        if "web" in ifaces and inp.browser_available
+        else "requires a web interface and an installed Playwright browser",
+    )
+    entry(
+        "mcp",
+        by.get(AgentType.MCP, 0) >= 0.5,
+        Support.SUPPORTED
+        if "mcp" in ifaces
+        else (Support.PARTIAL if inp.repo and inp.repo.mcp else Support.UNSUPPORTED),
+        "MCP client adapter available"
+        if "mcp" in ifaces
+        else "no MCP endpoint configured; only static analysis possible",
+    )
+    entry(
+        "coding",
+        by.get(AgentType.CODING, 0) >= 0.5,
+        Support.SUPPORTED if ("command" in ifaces and inp.docker_available) else Support.UNSUPPORTED,
+        "disposable Docker workspace"
+        if inp.docker_available
+        else "Docker is unavailable; coding agents are never run on the host",
+    )
+    entry(
+        "multimodal",
+        by.get(AgentType.MULTIMODAL, 0) >= 0.5,
+        Support.PARTIAL if ifaces else Support.UNSUPPORTED,
+        "needs attachment support in the adapter; image understanding is judged only with a multimodal judge",
+    )
+    entry(
+        "voice",
+        by.get(AgentType.VOICE, 0) >= 0.5,
+        Support.UNSUPPORTED,
+        "voice/audio testing is not implemented in this build",
+    )
+    entry(
+        "long_running",
+        by.get(AgentType.LONG_RUNNING, 0) >= 0.5,
+        Support.PARTIAL,
+        "bounded by max_execution_time and step limits; background jobs are not polled",
+    )
     return out
 
 
 def attack_surfaces(types: list[TypeScore], inp: FingerprintInputs, tools: list[ToolInfo]) -> list[str]:
     by = {s.type: s.confidence for s in types}
-    out = ["Direct user input to the conversational interface (prompt injection, instruction override, secret extraction)"]
+    out = [
+        "Direct user input to the conversational interface (prompt injection, instruction override, secret extraction)"
+    ]
     if by.get(AgentType.RAG, 0) >= 0.5:
         out.append("Retrieved documents (indirect prompt injection, poisoned or conflicting sources)")
     if tools:
         risky = [t.name for t in tools if t.side_effects in {"write", "external", "destructive"}]
-        out.append("Tool inputs and outputs (unauthorised use, argument manipulation, poisoned tool results)"
-                   + (f"; side-effecting tools: {risky[:6]}" if risky else ""))
+        out.append(
+            "Tool inputs and outputs (unauthorised use, argument manipulation, poisoned tool results)"
+            + (f"; side-effecting tools: {risky[:6]}" if risky else "")
+        )
     if by.get(AgentType.MCP, 0) >= 0.5:
         out.append("MCP servers (malicious tool descriptions, poisoned output, cross-server escalation)")
     if by.get(AgentType.MEMORY, 0) >= 0.5:
@@ -308,7 +439,9 @@ def attack_surfaces(types: list[TypeScore], inp: FingerprintInputs, tools: list[
     if by.get(AgentType.BROWSER, 0) >= 0.5:
         out.append("Web content seen by the browser agent (injected page instructions, unsafe actions)")
     if by.get(AgentType.CODING, 0) >= 0.5:
-        out.append("Repository content and commands (malicious README/issues, secret exposure, unsafe command execution)")
+        out.append(
+            "Repository content and commands (malicious README/issues, secret exposure, unsafe command execution)"
+        )
     if by.get(AgentType.MULTI_AGENT, 0) >= 0.5:
         out.append("Inter-agent messages (impersonation, privilege escalation, delegation loops)")
     if inp.spec.api or inp.spec.web:
@@ -320,8 +453,14 @@ def attack_surfaces(types: list[TypeScore], inp: FingerprintInputs, tools: list[
 
 def expected_limitations(types: list[TypeScore], inp: FingerprintInputs) -> list[str]:
     lims = []
-    if inp.probe and not inp.probe.tools_seen and any(s.type == AgentType.TOOL_CALLING and s.confidence >= 0.5 for s in types):
-        lims.append("Tool calls are not observable through the interface, so tool selection/arguments can only be judged from answers")
+    if (
+        inp.probe
+        and not inp.probe.tools_seen
+        and any(s.type == AgentType.TOOL_CALLING and s.confidence >= 0.5 for s in types)
+    ):
+        lims.append(
+            "Tool calls are not observable through the interface, so tool selection/arguments can only be judged from answers"
+        )
     if inp.spec.interfaces() == ["api"] and not (inp.openapi and inp.openapi.endpoints):
         lims.append("No OpenAPI contract was found; request/response mapping was taken from configuration")
     if not inp.docker_available:
@@ -382,47 +521,92 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
             graph.add_edge("target", "kb")
     data_sources: list[DataSource] = []
     for d in inp.docs:
-        data_sources.append(DataSource(name=d.name, kind="document", source="uploaded", details={
-            "pages": d.pages, "items": len(d.items), "version": d.version}))
+        data_sources.append(
+            DataSource(
+                name=d.name,
+                kind="document",
+                source="uploaded",
+                details={"pages": d.pages, "items": len(d.items), "version": d.version},
+            )
+        )
     if spec.mock and spec.mock.knowledge:
         for n in spec.mock.knowledge:
             data_sources.append(DataSource(name=n, kind="knowledge", source="target config"))
     if repo:
         for v in repo.vector_databases:
             data_sources.append(DataSource(name=v, kind="vector_store", source="repository"))
-        for d in repo.databases:
-            data_sources.append(DataSource(name=d, kind="database", source="repository"))
+        for db in repo.databases:
+            data_sources.append(DataSource(name=db, kind="database", source="repository"))
     by = {s.type: s.confidence for s in types}
     probe = inp.probe
     profile = AgentProfile(
         target_name=spec.name,
-        summary=spec.description or spec.objective or (f"{spec.name}: " + ", ".join(
-            f"{s.type.value} ({s.confidence:.2f})" for s in types[:4])),
-        modes=evaluation_modes(inp), types=types, interfaces=sorted(set(inp.available_interfaces) | set(spec.interfaces())),
-        authentication=authentication_model(inp), tools=tools, data_sources=data_sources,
-        memory={"detected": by.get(AgentType.MEMORY, 0) >= 0.5, "session_recall_observed": bool(probe and probe.session_memory),
-                "systems": repo.memory_systems if repo else []},
-        rag={"detected": by.get(AgentType.RAG, 0) >= 0.5, "vector_stores": repo.vector_databases if repo else [],
-             "contexts_observed": probe.contexts_seen if probe else 0,
-             "sanitisation_layer": bool(repo and repo.capabilities.get("guardrails"))},
-        browser={"detected": by.get(AgentType.BROWSER, 0) >= 0.5, "frameworks": repo.browser_frameworks if repo else [],
-                 "web_interface": spec.web.url if spec.web else None},
-        multi_agent={"detected": by.get(AgentType.MULTI_AGENT, 0) >= 0.5,
-                     "agents": sorted({d.name for d in repo.agent_definitions}) if repo else [],
-                     "handoffs_observed": bool(probe and "handoff" in probe.event_types)},
-        mcp={"detected": by.get(AgentType.MCP, 0) >= 0.5, "servers": [m.name for m in repo.mcp] if repo else [],
-             "tools": [t.name for t in inp.mcp_tools]},
-        models=repo.models if repo else [], frameworks=repo.frameworks if repo else [], languages=repo.languages if repo else {},
-        expected_workflows=[], limitations=expected_limitations(types, inp), attack_surfaces=attack_surfaces(types, inp, tools),
-        capability_matrix=build_capability_matrix(types, inp, tools), architecture=graph,
-        knowledge_items=sum(len(d.items) for d in inp.docs), documents=[d.name for d in inp.docs],
-        repository={"name": repo.root_name, "commit": repo.commit, "url": repo.url, "files": repo.file_count,
-                    "providers": repo.model_providers, "deployment": repo.deployment, "env": repo.env_requirements,
-                    "tests": len(repo.tests), "entry_points": [e.path for e in repo.entry_points][:6],
-                    "warnings": repo.warnings[:10], "guidance_files": [g.path for g in repo.guidance_files]} if repo else {},
-        raw_signals={"probe": probe.model_dump() if probe else None,
-                     "openapi": inp.openapi.model_dump() if inp.openapi else None,
-                     "repo_signals": [s.model_dump() for s in (repo.signals[:40] if repo else [])]})
+        summary=spec.description
+        or spec.objective
+        or (f"{spec.name}: " + ", ".join(f"{s.type.value} ({s.confidence:.2f})" for s in types[:4])),
+        modes=evaluation_modes(inp),
+        types=types,
+        interfaces=sorted(set(inp.available_interfaces) | set(spec.interfaces())),
+        authentication=authentication_model(inp),
+        tools=tools,
+        data_sources=data_sources,
+        memory={
+            "detected": by.get(AgentType.MEMORY, 0) >= 0.5,
+            "session_recall_observed": bool(probe and probe.session_memory),
+            "systems": repo.memory_systems if repo else [],
+        },
+        rag={
+            "detected": by.get(AgentType.RAG, 0) >= 0.5,
+            "vector_stores": repo.vector_databases if repo else [],
+            "contexts_observed": probe.contexts_seen if probe else 0,
+            "sanitisation_layer": bool(repo and repo.capabilities.get("guardrails")),
+        },
+        browser={
+            "detected": by.get(AgentType.BROWSER, 0) >= 0.5,
+            "frameworks": repo.browser_frameworks if repo else [],
+            "web_interface": spec.web.url if spec.web else None,
+        },
+        multi_agent={
+            "detected": by.get(AgentType.MULTI_AGENT, 0) >= 0.5,
+            "agents": sorted({d.name for d in repo.agent_definitions}) if repo else [],
+            "handoffs_observed": bool(probe and "handoff" in probe.event_types),
+        },
+        mcp={
+            "detected": by.get(AgentType.MCP, 0) >= 0.5,
+            "servers": [m.name for m in repo.mcp] if repo else [],
+            "tools": [t.name for t in inp.mcp_tools],
+        },
+        models=repo.models if repo else [],
+        frameworks=repo.frameworks if repo else [],
+        languages=repo.languages if repo else {},
+        expected_workflows=[],
+        limitations=expected_limitations(types, inp),
+        attack_surfaces=attack_surfaces(types, inp, tools),
+        capability_matrix=build_capability_matrix(types, inp, tools),
+        architecture=graph,
+        knowledge_items=sum(len(d.items) for d in inp.docs),
+        documents=[d.name for d in inp.docs],
+        repository={
+            "name": repo.root_name,
+            "commit": repo.commit,
+            "url": repo.url,
+            "files": repo.file_count,
+            "providers": repo.model_providers,
+            "deployment": repo.deployment,
+            "env": repo.env_requirements,
+            "tests": len(repo.tests),
+            "entry_points": [e.path for e in repo.entry_points][:6],
+            "warnings": repo.warnings[:10],
+            "guidance_files": [g.path for g in repo.guidance_files],
+        }
+        if repo
+        else {},
+        raw_signals={
+            "probe": probe.model_dump() if probe else None,
+            "openapi": inp.openapi.model_dump() if inp.openapi else None,
+            "repo_signals": [s.model_dump() for s in (repo.signals[:40] if repo else [])],
+        },
+    )
     profile.strategy = strategy_for(profile)
     return profile
 
@@ -430,17 +614,28 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
 def strategy_for(p: AgentProfile) -> list[str]:
     s = ["Run discovery-safe functional tests first (normal, invalid, empty, ambiguous, long and repeated inputs)."]
     for t, line in [
-        (AgentType.RAG, "RAG: groundedness, citations, unsupported questions, conflicting/outdated documents, document injection."),
-        (AgentType.TOOL_CALLING, "Tools: selection, arguments, necessity, failure handling, confirmation and authorisation per tool."),
+        (
+            AgentType.RAG,
+            "RAG: groundedness, citations, unsupported questions, conflicting/outdated documents, document injection.",
+        ),
+        (
+            AgentType.TOOL_CALLING,
+            "Tools: selection, arguments, necessity, failure handling, confirmation and authorisation per tool.",
+        ),
         (AgentType.MEMORY, "Memory: recall, update, session/user isolation, poisoning."),
         (AgentType.PLANNING, "Planning: decomposition, ordering, replanning, loop and step limits."),
         (AgentType.MULTI_AGENT, "Multi-agent: routing, handoffs, role boundaries, delegation cycles."),
         (AgentType.MCP, "MCP: tool discovery, malicious tool descriptions, poisoned outputs, permission boundaries."),
         (AgentType.BROWSER, "Browser: navigation and form flows, expected vs actual actions, unsafe actions."),
-        (AgentType.CODING, "Coding: disposable workspace, diff correctness, unrelated changes, secret handling, injected instructions."),
+        (
+            AgentType.CODING,
+            "Coding: disposable workspace, diff correctness, unrelated changes, secret handling, injected instructions.",
+        ),
     ]:
         if p.has_type(t, 0.5):
             s.append(line)
-    s.append("Security: prompt injection, secret/canary leakage, excessive agency, runaway loops - synthetic canaries only.")
+    s.append(
+        "Security: prompt injection, secret/canary leakage, excessive agency, runaway loops - synthetic canaries only."
+    )
     s.append("Reliability: repeat risky tests; report pass rate and flakiness instead of a single PASS.")
     return s

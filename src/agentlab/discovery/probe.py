@@ -56,10 +56,15 @@ class ProbeResult(Model):
 
 
 _TOPICS = {
-    "documents": r"\b(document|pdf|knowledge base|policy|policies|handbook|faq)\b", "email": r"\b(e-?mail|inbox)\b",
-    "calendar": r"\b(calendar|meeting|schedule)\b", "search": r"\b(search|look ?up|browse|web)\b",
-    "calculation": r"\b(calculat|math|arithmetic)\b", "code": r"\b(code|programming|repository|repo|git)\b",
-    "weather": r"\bweather\b", "orders": r"\b(order|shipping|refund)\b", "files": r"\b(file|folder|upload)\b",
+    "documents": r"\b(document|pdf|knowledge base|policy|policies|handbook|faq)\b",
+    "email": r"\b(e-?mail|inbox)\b",
+    "calendar": r"\b(calendar|meeting|schedule)\b",
+    "search": r"\b(search|look ?up|browse|web)\b",
+    "calculation": r"\b(calculat|math|arithmetic)\b",
+    "code": r"\b(code|programming|repository|repo|git)\b",
+    "weather": r"\bweather\b",
+    "orders": r"\b(order|shipping|refund)\b",
+    "files": r"\b(file|folder|upload)\b",
 }
 
 
@@ -71,8 +76,9 @@ def _percentile(xs: list[float], q: float) -> float:
 
 
 class Prober:
-    def __init__(self, adapter: AgentAdapter, *, timeout: float = 45.0, rag_question: str | None = None,
-                 max_probes: int = 7) -> None:
+    def __init__(
+        self, adapter: AgentAdapter, *, timeout: float = 45.0, rag_question: str | None = None, max_probes: int = 7
+    ) -> None:
         self.adapter = adapter
         self.timeout = timeout
         self.rag_question = rag_question
@@ -81,17 +87,26 @@ class Prober:
     async def _ask(self, name: str, text: str, session: str) -> ProbeObservation:
         t0 = time.perf_counter()
         try:
-            resp = await asyncio.wait_for(self.adapter.send(AgentRequest(input=text, session_id=session,
-                                                                         metadata={"probe": name})), self.timeout)
+            resp = await asyncio.wait_for(
+                self.adapter.send(AgentRequest(input=text, session_id=session, metadata={"probe": name})), self.timeout
+            )
         except TimeoutError:
             return ProbeObservation(name=name, input=text, error=f"no response within {self.timeout:g}s")
         except AgentLabError as exc:
             return ProbeObservation(name=name, input=text, error=f"{exc.kind.value}: {str(exc)[:200]}")
         return ProbeObservation(
-            name=name, input=text, output=resp.output[:1500], tool_calls=[c.name for c in resp.tool_calls],
-            tool_args=[c.arguments for c in resp.tool_calls][:6], contexts=[c.source for c in resp.contexts],
-            event_types=sorted({e.type for e in resp.events}), citations=resp.citations[:6], error=resp.error,
-            latency_ms=resp.latency_ms or round((time.perf_counter() - t0) * 1000, 2), status_code=resp.status_code)
+            name=name,
+            input=text,
+            output=resp.output[:1500],
+            tool_calls=[c.name for c in resp.tool_calls],
+            tool_args=[c.arguments for c in resp.tool_calls][:6],
+            contexts=[c.source for c in resp.contexts],
+            event_types=sorted({e.type for e in resp.events}),
+            citations=resp.citations[:6],
+            error=resp.error,
+            latency_ms=resp.latency_ms or round((time.perf_counter() - t0) * 1000, 2),
+            status_code=resp.status_code,
+        )
 
     async def run(self) -> ProbeResult:
         res = ProbeResult()
@@ -99,7 +114,11 @@ class Prober:
         sess2 = await self.adapter.new_session()
         plan: list[tuple[str, str, str]] = [
             ("greeting", "Hello!", sess1),
-            ("capabilities", "What can you help me with? Briefly list your capabilities and any tools you can use.", sess1),
+            (
+                "capabilities",
+                "What can you help me with? Briefly list your capabilities and any tools you can use.",
+                sess1,
+            ),
             ("memory_set", "My favorite number is 7421. Please remember it.", sess2),
             ("memory_get", "What is my favorite number?", sess2),
             ("tool_math", "What is 17 * 23?", sess1),

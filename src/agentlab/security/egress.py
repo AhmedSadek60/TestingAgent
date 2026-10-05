@@ -17,8 +17,13 @@ METADATA_HOSTS = {"169.254.169.254", "metadata.google.internal", "metadata", "fd
 
 
 class EgressPolicy:
-    def __init__(self, *, block_metadata: bool = True, allow_private: bool = True,
-                 allowed_schemes: tuple[str, ...] = ("http", "https", "ws", "wss")) -> None:
+    def __init__(
+        self,
+        *,
+        block_metadata: bool = True,
+        allow_private: bool = True,
+        allowed_schemes: tuple[str, ...] = ("http", "https", "ws", "wss"),
+    ) -> None:
         self.block_metadata = block_metadata
         self.allow_private = allow_private
         self.allowed_schemes = allowed_schemes

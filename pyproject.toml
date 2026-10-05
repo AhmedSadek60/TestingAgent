@@ -68,13 +68,14 @@ markers = [
 filterwarnings = ["ignore::DeprecationWarning:jsonpath_ng.*"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
+extend-exclude = ["fixtures/repositories", "fixtures/rag", "web/node_modules"]
 target-version = "py312"
 src = ["src", "tests", "fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
-ignore = ["S101", "S603", "S607", "B008", "S311", "UP042"]
+ignore = ["S101", "S603", "S607", "B008", "S311", "UP042", "UP046", "E501", "SIM105", "SIM108"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]

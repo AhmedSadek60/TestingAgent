@@ -49,8 +49,21 @@ class BrowserStep(Model):
     """Declarative browser step executed by the BrowserExecutionEngine."""
 
     action: Literal[
-        "goto", "click", "fill", "press", "select", "check", "upload", "expect_text", "expect_url",
-        "expect_visible", "wait", "screenshot", "download", "dialog_accept", "dialog_dismiss",
+        "goto",
+        "click",
+        "fill",
+        "press",
+        "select",
+        "check",
+        "upload",
+        "expect_text",
+        "expect_url",
+        "expect_visible",
+        "wait",
+        "screenshot",
+        "download",
+        "dialog_accept",
+        "dialog_dismiss",
         "chat",
     ]
     target: str | None = None

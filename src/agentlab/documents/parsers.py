@@ -58,6 +58,7 @@ def register(*extensions: str) -> Callable[[ParserFn], ParserFn]:
         for ext in extensions:
             DOCUMENT_PARSERS.register(ext, fn, replace=True)
         return fn
+
     return deco
 
 
@@ -100,7 +101,7 @@ def parse_markdown(data: bytes, name: str) -> Parsed:
                 out.metadata = yaml.safe_load(body[3:end]) or {}
             except yaml.YAMLError:
                 pass
-            body = body[end + 4:]
+            body = body[end + 4 :]
     stack: list[str] = []
     in_code = False
     buf: list[str] = []
@@ -112,8 +113,14 @@ def parse_markdown(data: bytes, name: str) -> Parsed:
         if buf:
             txt = "\n".join(buf).strip()
             if txt:
-                out.blocks.append(Block(txt, section=" > ".join(stack) or None, kind=kind,
-                                        location=f"lines {start_line}-{start_line + len(buf) - 1}"))
+                out.blocks.append(
+                    Block(
+                        txt,
+                        section=" > ".join(stack) or None,
+                        kind=kind,
+                        location=f"lines {start_line}-{start_line + len(buf) - 1}",
+                    )
+                )
             buf = []
 
     for ln, line in enumerate(lines, 1):
@@ -137,7 +144,9 @@ def parse_markdown(data: bytes, name: str) -> Parsed:
             level = len(h.group(1))
             stack[:] = stack[: level - 1] + [h.group(2).strip()]
             out.headings.append(Heading(level=level, text=h.group(2).strip()))
-            out.blocks.append(Block(h.group(2).strip(), section=" > ".join(stack), kind="heading", location=f"line {ln}"))
+            out.blocks.append(
+                Block(h.group(2).strip(), section=" > ".join(stack), kind="heading", location=f"line {ln}")
+            )
             start_line = ln + 1
             continue
         if not line.strip():
@@ -150,8 +159,11 @@ def parse_markdown(data: bytes, name: str) -> Parsed:
     flush()
     for b in out.blocks:
         if b.kind == "paragraph" and "|" in b.text and re.search(r"^\s*\|?\s*:?-{3,}", b.text, re.M):
-            rows = [[c.strip() for c in r.strip().strip("|").split("|")] for r in b.text.split("\n")
-                    if r.strip() and not re.match(r"^\s*\|?\s*:?-{3,}", r)]
+            rows = [
+                [c.strip() for c in r.strip().strip("|").split("|")]
+                for r in b.text.split("\n")
+                if r.strip() and not re.match(r"^\s*\|?\s*:?-{3,}", r)
+            ]
             if rows:
                 out.tables.append(TableData(section=b.section, header=rows[0], rows=rows[1:]))
                 b.kind = "table"
@@ -170,8 +182,9 @@ def parse_csv(data: bytes, name: str) -> Parsed:
     header, body = rows[0], rows[1:]
     out.tables.append(TableData(header=header, rows=body[:5000]))
     for i, r in enumerate(body[:2000], 2):
-        out.blocks.append(Block("; ".join(f"{h}: {v}" for h, v in zip(header, r, strict=False)), kind="row",
-                                location=f"row {i}"))
+        out.blocks.append(
+            Block("; ".join(f"{h}: {v}" for h, v in zip(header, r, strict=False)), kind="row", location=f"row {i}")
+        )
     return out
 
 
@@ -216,8 +229,11 @@ def parse_yaml(data: bytes, name: str) -> Parsed:
 
 # --------------------------------------------------------------------------------- html
 class _Html(HTMLParser):
-    HIDDEN_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0|"
-                              r"color\s*:\s*(#fff(?:fff)?|white)\b|height\s*:\s*0|left\s*:\s*-\d{3,}", re.I)
+    HIDDEN_STYLE = re.compile(
+        r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0|"
+        r"color\s*:\s*(#fff(?:fff)?|white)\b|height\s*:\s*0|left\s*:\s*-\d{3,}",
+        re.I,
+    )
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -267,8 +283,9 @@ class _Html(HTMLParser):
             self._row = []
         elif tag == "table":
             if self._rows:
-                self.tables.append(TableData(section=" > ".join(self._section) or None, header=self._rows[0],
-                                             rows=self._rows[1:]))
+                self.tables.append(
+                    TableData(section=" > ".join(self._section) or None, header=self._rows[0], rows=self._rows[1:])
+                )
             self._in_table = False
         else:
             self._flush()
@@ -311,8 +328,14 @@ def parse_html(data: bytes, name: str) -> Parsed:
     p = _Html()
     p.feed(_decode(data))
     p._flush()
-    out = Parsed(blocks=p.blocks, headings=p.headings, tables=p.tables, hidden=p.hidden, active=p.active,
-                 metadata={"title": p.title})
+    out = Parsed(
+        blocks=p.blocks,
+        headings=p.headings,
+        tables=p.tables,
+        hidden=p.hidden,
+        active=p.active,
+        metadata={"title": p.title},
+    )
     for i, b in enumerate(out.blocks, 1):
         b.location = f"block {i}"
     return out
@@ -332,7 +355,7 @@ def parse_pdf(data: bytes, name: str) -> Parsed:
     if reader.is_encrypted:
         out.unsupported = "encrypted PDF: not decrypted (no password handling)"
         return out
-    meta = reader.metadata or {}
+    meta: dict[str, Any] = dict(reader.metadata or {})
     out.metadata = {k.lstrip("/").lower(): str(v)[:200] for k, v in meta.items() if v}
     root = reader.trailer.get("/Root", {})
     try:
@@ -359,7 +382,10 @@ def parse_pdf(data: bytes, name: str) -> Parsed:
             stripped = line.strip()
             if not stripped:
                 groups.append([])
-            elif re.match(r"^(\d+(\.\d+)*[.)]?\s+[A-Z][\w ,&\-]{2,70}|[A-Z][A-Z0-9 &\-]{4,60})$", stripped) and len(stripped) < 80:
+            elif (
+                re.match(r"^(\d+(\.\d+)*[.)]?\s+[A-Z][\w ,&\-]{2,70}|[A-Z][A-Z0-9 &\-]{4,60})$", stripped)
+                and len(stripped) < 80
+            ):
                 groups.append([stripped])
                 groups.append([])
             else:
@@ -369,12 +395,17 @@ def parse_pdf(data: bytes, name: str) -> Parsed:
             if not g:
                 continue
             i += 1
-            para = "\n".join(g)
             first = g[0]
-            if len(g) == 1 and re.match(r"^(\d+(\.\d+)*[.)]?\s+[A-Z][\w ,&\-]{2,70}|[A-Z][A-Z0-9 &\-]{4,60})$", first) and len(first) < 80:
+            if (
+                len(g) == 1
+                and re.match(r"^(\d+(\.\d+)*[.)]?\s+[A-Z][\w ,&\-]{2,70}|[A-Z][A-Z0-9 &\-]{4,60})$", first)
+                and len(first) < 80
+            ):
                 section = first
                 out.headings.append(Heading(level=1, text=first, page=pno))
-                out.blocks.append(Block(first, page=pno, section=section, kind="heading", location=f"page {pno}, paragraph {i}"))
+                out.blocks.append(
+                    Block(first, page=pno, section=section, kind="heading", location=f"page {pno}, paragraph {i}")
+                )
                 continue
             # split the group into runs of tabular (multi-space / tab separated) and prose lines
             runs: list[tuple[bool, list[str]]] = []
@@ -387,11 +418,22 @@ def parse_pdf(data: bytes, name: str) -> Parsed:
             for tab, run in runs:
                 if tab and len(run) >= 3:
                     rows = [re.split(r"\s{2,}|\t", ln.strip()) for ln in run]
-                    out.tables.append(TableData(page=pno, section=section, header=rows[0], rows=rows[1:], heuristic=True))
-                    out.blocks.append(Block("\n".join(run), page=pno, section=section, kind="table",
-                                            location=f"page {pno}, paragraph {i}"))
+                    out.tables.append(
+                        TableData(page=pno, section=section, header=rows[0], rows=rows[1:], heuristic=True)
+                    )
+                    out.blocks.append(
+                        Block(
+                            "\n".join(run),
+                            page=pno,
+                            section=section,
+                            kind="table",
+                            location=f"page {pno}, paragraph {i}",
+                        )
+                    )
                 else:
-                    out.blocks.append(Block(" ".join(run), page=pno, section=section, location=f"page {pno}, paragraph {i}"))
+                    out.blocks.append(
+                        Block(" ".join(run), page=pno, section=section, location=f"page {pno}, paragraph {i}")
+                    )
     if out.tables:
         out.warnings.append("PDF table extraction is heuristic (column alignment); verify table-derived facts manually")
     return out
@@ -411,8 +453,11 @@ def parse_docx(data: bytes, name: str) -> Parsed:
         raise ParserError(f"{name}: cannot read DOCX ({type(exc).__name__}: {exc})") from exc
     out = Parsed()
     cp = document.core_properties
-    out.metadata = {k: str(v) for k, v in {"title": cp.title, "author": cp.author, "created": cp.created,
-                                          "modified": cp.modified}.items() if v}
+    out.metadata = {
+        k: str(v)
+        for k, v in {"title": cp.title, "author": cp.author, "created": cp.created, "modified": cp.modified}.items()
+        if v
+    }
     out.warnings.append("DOCX has no stored page numbers; page references are unavailable")
     stack: list[str] = []
     for i, para in enumerate(document.paragraphs, 1):
@@ -435,14 +480,42 @@ def parse_docx(data: bytes, name: str) -> Parsed:
         rows = [[c.text.strip() for c in r.cells] for r in t.rows]
         if rows:
             out.tables.append(TableData(section=" > ".join(stack) or None, header=rows[0], rows=rows[1:]))
-            out.blocks.append(Block("\n".join(" | ".join(r) for r in rows), kind="table", section=" > ".join(stack) or None,
-                                    location="table"))
+            out.blocks.append(
+                Block(
+                    "\n".join(" | ".join(r) for r in rows),
+                    kind="table",
+                    section=" > ".join(stack) or None,
+                    location="table",
+                )
+            )
     return out
 
 
 # --------------------------------------------------------------------------------- source / images
-_SOURCE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".kt", ".go", ".rs", ".rb", ".php", ".cs", ".swift", ".c",
-               ".cpp", ".h", ".sh", ".sql", ".toml", ".ini", ".cfg", ".xml")
+_SOURCE_EXT = (
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".java",
+    ".kt",
+    ".go",
+    ".rs",
+    ".rb",
+    ".php",
+    ".cs",
+    ".swift",
+    ".c",
+    ".cpp",
+    ".h",
+    ".sh",
+    ".sql",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".xml",
+)
 
 
 @register(*_SOURCE_EXT)
@@ -451,7 +524,7 @@ def parse_source(data: bytes, name: str) -> Parsed:
     out = Parsed(metadata={"language_hint": name.rsplit(".", 1)[-1]})
     lines = text.split("\n")
     for start in range(0, len(lines), 40):
-        chunk = "\n".join(lines[start:start + 40]).strip()
+        chunk = "\n".join(lines[start : start + 40]).strip()
         if chunk:
             out.blocks.append(Block(chunk, kind="code", location=f"lines {start + 1}-{min(len(lines), start + 40)}"))
     return out
@@ -460,6 +533,7 @@ def parse_source(data: bytes, name: str) -> Parsed:
 @register(".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
 def parse_image(data: bytes, name: str) -> Parsed:
     out = Parsed(metadata={"bytes": len(data)})
-    out.unsupported = ("image content (diagrams, screenshots, OCR) requires a multimodal provider; "
-                       "stored as an artifact only")
+    out.unsupported = (
+        "image content (diagrams, screenshots, OCR) requires a multimodal provider; stored as an artifact only"
+    )
     return out

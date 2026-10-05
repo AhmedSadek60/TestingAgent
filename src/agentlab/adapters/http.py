@@ -66,7 +66,8 @@ def jp_all(expr: str | None, data: Any) -> list[Any]:
 def _norm_tool_call(raw: Any) -> ToolCall | None:
     if not isinstance(raw, dict):
         return None
-    fn = raw.get("function") if isinstance(raw.get("function"), dict) else raw
+    inner = raw.get("function")
+    fn: dict[str, Any] = inner if isinstance(inner, dict) else raw
     name = fn.get("name") or fn.get("tool") or fn.get("tool_name")
     if not name:
         return None
@@ -76,9 +77,13 @@ def _norm_tool_call(raw: Any) -> ToolCall | None:
             args = json.loads(args)
         except json.JSONDecodeError:
             args = {"_raw": args}
-    return ToolCall(name=str(name), arguments=args if isinstance(args, dict) else {"value": args},
-                    result=raw.get("result", raw.get("output")), status=str(raw.get("status", "success")),
-                    id=raw.get("id"))
+    return ToolCall(
+        name=str(name),
+        arguments=args if isinstance(args, dict) else {"value": args},
+        result=raw.get("result", raw.get("output")),
+        status=str(raw.get("status", "success")),
+        id=raw.get("id"),
+    )
 
 
 def _norm_context(raw: Any) -> RetrievedContext | None:
@@ -87,8 +92,13 @@ def _norm_context(raw: Any) -> RetrievedContext | None:
     if isinstance(raw, dict):
         content = raw.get("content") or raw.get("text") or raw.get("chunk") or ""
         source = raw.get("source") or raw.get("document") or raw.get("doc") or raw.get("title") or "unknown"
-        return RetrievedContext(source=str(source), content=str(content), page=raw.get("page"),
-                                section=raw.get("section"), score=raw.get("score"))
+        return RetrievedContext(
+            source=str(source),
+            content=str(content),
+            page=raw.get("page"),
+            section=raw.get("section"),
+            score=raw.get("score"),
+        )
     return None
 
 
@@ -101,12 +111,16 @@ class AgentApiAdapter(AgentAdapter):
             raise TargetError("api adapter requires target.api")
         self.cfg: ApiConfig = spec.api
         if self.cfg.protocol == "websocket":
-            raise UnsupportedCapability("WebSocket agent endpoints are not supported in this build; "
-                                        "use REST, SSE or GraphQL")
-        self.capabilities = AdapterCapabilities(streaming=self.cfg.protocol == "sse", reports_usage=True,
-                                                reports_tool_calls=bool(self.cfg.response.tool_calls),
-                                                reports_contexts=bool(self.cfg.response.contexts),
-                                                reports_events=bool(self.cfg.response.events))
+            raise UnsupportedCapability(
+                "WebSocket agent endpoints are not supported in this build; use REST, SSE or GraphQL"
+            )
+        self.capabilities = AdapterCapabilities(
+            streaming=self.cfg.protocol == "sse",
+            reports_usage=True,
+            reports_tool_calls=bool(self.cfg.response.tool_calls),
+            reports_contexts=bool(self.cfg.response.contexts),
+            reports_events=bool(self.cfg.response.events),
+        )
         self._client: httpx.AsyncClient | None = None
 
     async def open(self) -> None:
@@ -130,17 +144,26 @@ class AgentApiAdapter(AgentAdapter):
         return headers
 
     def _body(self, request: AgentRequest) -> Any:
-        values = {"input": request.input, "session_id": request.session_id,
-                  "attachments": [a.model_dump() for a in request.attachments]}
+        values = {
+            "input": request.input,
+            "session_id": request.session_id,
+            "attachments": [a.model_dump() for a in request.attachments],
+        }
         if self.cfg.protocol == "graphql":
-            return {"query": self.cfg.graphql_query or "", "variables": render_template(self.cfg.request_template, values)}
+            return {
+                "query": self.cfg.graphql_query or "",
+                "variables": render_template(self.cfg.request_template, values),
+            }
         return render_template(self.cfg.request_template, values)
 
     async def probe(self) -> dict[str, Any]:
         assert self._client is not None
         try:
-            r = await self._client.request("OPTIONS" if self.cfg.method == "POST" else "HEAD", self.cfg.url,
-                                           headers={k: v for k, v in self.cfg.headers.items()})
+            r = await self._client.request(
+                "OPTIONS" if self.cfg.method == "POST" else "HEAD",
+                self.cfg.url,
+                headers={k: v for k, v in self.cfg.headers.items()},
+            )
             return {"reachable": True, "status": r.status_code, "requires_auth": r.status_code in (401, 403)}
         except httpx.HTTPError as exc:
             return {"reachable": False, "error": str(exc)}
@@ -158,11 +181,16 @@ class AgentApiAdapter(AgentAdapter):
                 return await self._send_sse(url, headers, body, t0)
             r = await self._request(url, headers, body)
         except httpx.TimeoutException as exc:
-            return AgentResponse(error=f"timeout after {self.cfg.timeout_seconds}s", status_code=None,
-                                 latency_ms=(time.perf_counter() - t0) * 1000, raw=str(exc)[:200])
+            return AgentResponse(
+                error=f"timeout after {self.cfg.timeout_seconds}s",
+                status_code=None,
+                latency_ms=(time.perf_counter() - t0) * 1000,
+                raw=str(exc)[:200],
+            )
         except httpx.HTTPError as exc:
-            return AgentResponse(error=f"connection error: {type(exc).__name__}",
-                                 latency_ms=(time.perf_counter() - t0) * 1000)
+            return AgentResponse(
+                error=f"connection error: {type(exc).__name__}", latency_ms=(time.perf_counter() - t0) * 1000
+            )
         latency = (time.perf_counter() - t0) * 1000
         return self._to_response(r, latency)
 
@@ -221,14 +249,19 @@ class AgentApiAdapter(AgentAdapter):
             evs: list[Any] = []
             for e in jp_all(m.events, data):
                 evs.extend(e if isinstance(e, list) else [e])
-            resp.events = [AgentEvent(type=str(e.get("type", "event")), data={k: v for k, v in e.items() if k != "type"})
-                           for e in evs if isinstance(e, dict)]
+            resp.events = [
+                AgentEvent(type=str(e.get("type", "event")), data={k: v for k, v in e.items() if k != "type"})
+                for e in evs
+                if isinstance(e, dict)
+            ]
         usage = jp_first(m.usage, data) if m.usage else (data.get("usage") if isinstance(data, dict) else None)
         if isinstance(usage, dict):
             resp.usage = Usage(
                 input_tokens=int(usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0),
                 output_tokens=int(usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0),
-                llm_calls=int(usage.get("llm_calls", 1) or 1), cost_usd=float(usage.get("cost_usd", usage.get("cost", 0)) or 0))
+                llm_calls=int(usage.get("llm_calls", 1) or 1),
+                cost_usd=float(usage.get("cost_usd", usage.get("cost", 0)) or 0),
+            )
 
     @staticmethod
     def _auto_output(data: Any) -> Any:
@@ -311,8 +344,12 @@ class AgentApiAdapter(AgentAdapter):
         elif kind in ("handoff", "plan_step", "browser_action", "event"):
             resp.events.append(AgentEvent(type=kind, data={k: v for k, v in obj.items() if k != "type"}))
         elif kind == "usage":
-            resp.usage = Usage(input_tokens=int(obj.get("input_tokens", 0)), output_tokens=int(obj.get("output_tokens", 0)),
-                               llm_calls=int(obj.get("llm_calls", 1)), cost_usd=float(obj.get("cost_usd", 0)))
+            resp.usage = Usage(
+                input_tokens=int(obj.get("input_tokens", 0)),
+                output_tokens=int(obj.get("output_tokens", 0)),
+                llm_calls=int(obj.get("llm_calls", 1)),
+                cost_usd=float(obj.get("cost_usd", 0)),
+            )
         else:
             ch = obj.get("choices")
             if isinstance(ch, list) and ch:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import yaml
 from pydantic import Field
@@ -25,8 +25,10 @@ class Pricing(Model):
 
 class ProviderConfig(Model):
     name: str
-    type: str = Field(description="Adapter type: mock, openai, openai_compatible, openrouter, gemini, "
-                      "anthropic, ollama, lmstudio, vllm, llamacpp")
+    type: str = Field(
+        description="Adapter type: mock, openai, openai_compatible, openrouter, gemini, "
+        "anthropic, ollama, lmstudio, vllm, llamacpp"
+    )
     base_url: str | None = None
     api_key_ref: str | None = Field(default=None, description="env:NAME or secret:alias, never a raw key")
     model: str | None = None
@@ -84,7 +86,9 @@ class SecurityConfig(Model):
 
 class BrowserConfig(Model):
     enabled: bool = True
-    browsers: list[Literal["chromium", "firefox", "webkit"]] = Field(default_factory=lambda: ["chromium"])
+    browsers: list[Literal["chromium", "firefox", "webkit"]] = Field(
+        default_factory=lambda: cast(list[Literal["chromium", "firefox", "webkit"]], ["chromium"])
+    )
     headless: bool = True
     executable_path: str | None = None
     record_video: bool = False
@@ -149,9 +153,7 @@ class AgentLabConfig(Model):
         except yaml.YAMLError as exc:
             raise UserError(f"invalid YAML in {p}: {exc}") from exc
         if isinstance(data.get("providers"), list):
-            data["providers"] = [
-                {"name": x, "type": x} if isinstance(x, str) else x for x in data["providers"]
-            ]
+            data["providers"] = [{"name": x, "type": x} if isinstance(x, str) else x for x in data["providers"]]
         try:
             return cls.model_validate(data)
         except Exception as exc:

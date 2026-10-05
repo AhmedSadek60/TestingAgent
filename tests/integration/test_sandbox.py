@@ -78,8 +78,11 @@ async def test_container_removed_on_close():
     sb = await prov.create(SandboxSpec())
     cid = sb.id
     await sb.close()
-    r = subprocess.run(["docker", "ps", "-a", "--filter", f"name={cid}", "--format", "{{.Names}}"],  # noqa: S603,S607
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        ["docker", "ps", "-a", "--filter", f"name={cid}", "--format", "{{.Names}}"],  # noqa: S603,S607
+        capture_output=True,
+        text=True,
+    )
     assert cid not in r.stdout
 
 

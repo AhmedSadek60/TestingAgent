@@ -55,12 +55,20 @@ class Sandbox(ABC):
     id: str
 
     @abstractmethod
-    async def exec(self, command: list[str], *, timeout: float | None = None, env: dict[str, str] | None = None,
-                   stdin: bytes | None = None, workdir: str | None = None) -> ExecResult: ...
+    async def exec(
+        self,
+        command: list[str],
+        *,
+        timeout: float | None = None,
+        env: dict[str, str] | None = None,
+        stdin: bytes | None = None,
+        workdir: str | None = None,
+    ) -> ExecResult: ...
 
     @abstractmethod
-    async def put_dir(self, local: Path, dest: str | None = None, *, max_files: int = 5000,
-                      max_bytes: int = 100 * 1024 * 1024) -> int: ...
+    async def put_dir(
+        self, local: Path, dest: str | None = None, *, max_files: int = 5000, max_bytes: int = 100 * 1024 * 1024
+    ) -> int: ...
 
     @abstractmethod
     async def put_file(self, dest: str, data: bytes, mode: int = 0o644) -> None: ...

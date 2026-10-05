@@ -53,25 +53,37 @@ class TraceRecorder:
     def record_response(self, turn: int, session: str, response: AgentResponse) -> None:
         """Expand an agent response into fine-grained trace events."""
         for call in response.tool_calls:
-            self.record(EventType.TOOL_CALLED, {"turn": turn, "tool": call.name,
-                                                "arguments_redacted": call.arguments})
-            self.record(EventType.TOOL_RETURNED, {"turn": turn, "tool": call.name, "status": call.status,
-                                                  "result": _clip(call.result)})
+            self.record(EventType.TOOL_CALLED, {"turn": turn, "tool": call.name, "arguments_redacted": call.arguments})
+            self.record(
+                EventType.TOOL_RETURNED,
+                {"turn": turn, "tool": call.name, "status": call.status, "result": _clip(call.result)},
+            )
         for ctx in response.contexts:
-            self.record(EventType.RETRIEVAL, {"turn": turn, "source": ctx.source, "page": ctx.page,
-                                              "content": _clip(ctx.content)})
+            self.record(
+                EventType.RETRIEVAL,
+                {"turn": turn, "source": ctx.source, "page": ctx.page, "content": _clip(ctx.content)},
+            )
         for ev in response.events:
             et = {
-                "handoff": EventType.HANDOFF, "plan_step": EventType.PLAN_STEP,
-                "browser_action": EventType.BROWSER_ACTION, "llm_call": EventType.LLM_CALLED,
+                "handoff": EventType.HANDOFF,
+                "plan_step": EventType.PLAN_STEP,
+                "browser_action": EventType.BROWSER_ACTION,
+                "llm_call": EventType.LLM_CALLED,
             }.get(ev.type, EventType.AGENT_RESPONSE)
             self.record(et, {"turn": turn, "agent_event": ev.type, **ev.data})
-        self.record(EventType.AGENT_RESPONSE, {
-            "turn": turn, "session": session, "output": _clip(response.output),
-            "latency_ms": response.latency_ms, "status_code": response.status_code,
-            "tokens": {"input": response.usage.input_tokens, "output": response.usage.output_tokens},
-            "cost_usd": response.usage.cost_usd, "error": response.error,
-        })
+        self.record(
+            EventType.AGENT_RESPONSE,
+            {
+                "turn": turn,
+                "session": session,
+                "output": _clip(response.output),
+                "latency_ms": response.latency_ms,
+                "status_code": response.status_code,
+                "tokens": {"input": response.usage.input_tokens, "output": response.usage.output_tokens},
+                "cost_usd": response.usage.cost_usd,
+                "error": response.error,
+            },
+        )
 
 
 def _clip(value: Any, limit: int = 4000) -> Any:

@@ -20,8 +20,10 @@ import stat
 import tarfile
 import tempfile
 import zipfile
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import IO
 
 from agentlab.core.errors import PolicyBlocked, SandboxError, UserError
 from agentlab.core.models import RepositorySource
@@ -129,7 +131,7 @@ def extract_archive(archive: Path, dest: Path) -> tuple[int, int, dict[str, int]
                     skip("symlink")
                     continue
                 with zf.open(info) as fh:
-                    write(info.filename, iter(lambda fh=fh: fh.read(65536), b""), info.file_size, info.compress_size)
+                    write(info.filename, _chunks(fh), info.file_size, info.compress_size)
     elif tarfile.is_tarfile(archive):
         with tarfile.open(archive, "r:*") as tf:
             for m in tf:
@@ -141,10 +143,10 @@ def extract_archive(archive: Path, dest: Path) -> tuple[int, int, dict[str, int]
                 if not _safe_member(m.name):
                     skip("path traversal")
                     raise PolicyBlocked(f"archive member '{m.name}' has an unsafe path")
-                fh = tf.extractfile(m)
-                if fh is None:
+                member = tf.extractfile(m)
+                if member is None:
                     continue
-                write(m.name, iter(lambda fh=fh: fh.read(65536), b""), m.size, None)
+                write(m.name, _chunks(member), m.size, None)
     else:
         raise UserError(f"{archive.name} is not a supported archive (zip, tar, tar.gz, tar.bz2, tar.xz)")
     return files, total, skipped
@@ -173,8 +175,12 @@ def copy_tree(src: Path, dest: Path) -> tuple[int, int, dict[str, int]]:
                 continue
             size = p.stat().st_size
             rel = p.relative_to(src)
-            if ".git" in rel.parts and rel.parts[0] == ".git" and rel.as_posix() not in {".git/HEAD", ".git/packed-refs"} \
-                    and not rel.as_posix().startswith(".git/refs/"):
+            if (
+                ".git" in rel.parts
+                and rel.parts[0] == ".git"
+                and rel.as_posix() not in {".git/HEAD", ".git/packed-refs"}
+                and not rel.as_posix().startswith(".git/refs/")
+            ):
                 continue  # keep only what is needed to read the commit id
             if size > MAX_FILE_BYTES:
                 skipped["file too large"] = skipped.get("file too large", 0) + 1
@@ -192,11 +198,26 @@ def copy_tree(src: Path, dest: Path) -> tuple[int, int, dict[str, int]]:
 
 async def _git_clone(url: str, ref: str | None, dest: Path, token_header: str | None) -> None:
     env = {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(dest.parent), "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "/bin/true",
-        "GIT_LFS_SKIP_SMUDGE": "1", "GIT_ALLOW_PROTOCOL": "https", "LC_ALL": "C",
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(dest.parent),
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "/bin/true",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+        "GIT_ALLOW_PROTOCOL": "https",
+        "LC_ALL": "C",
     }
-    for k in ("HTTPS_PROXY", "https_proxy", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "GIT_SSL_CAINFO", "NO_PROXY", "no_proxy"):
+    for k in (
+        "HTTPS_PROXY",
+        "https_proxy",
+        "SSL_CERT_FILE",
+        "REQUESTS_CA_BUNDLE",
+        "GIT_SSL_CAINFO",
+        "NO_PROXY",
+        "no_proxy",
+    ):
         if k in os.environ:
             env[k] = os.environ[k]
     n = 0
@@ -206,22 +227,56 @@ async def _git_clone(url: str, ref: str | None, dest: Path, token_header: str | 
         n += 1
     if n:
         env["GIT_CONFIG_COUNT"] = str(n)
-    args = ["git", "-c", "core.hooksPath=/dev/null", "-c", "core.symlinks=false", "-c", "core.fsmonitor=false",
-            "-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "filter.lfs.smudge=",
-            "-c", "filter.lfs.process=", "-c", "filter.lfs.required=false", "-c", "submodule.recurse=false",
-            "clone", "--depth", "1", "--no-tags", "--single-branch", "--no-recurse-submodules", "--template=",
-            *(["--branch", ref] if ref else []), "--", url, str(dest)]
-    proc = await asyncio.create_subprocess_exec(*args, env=env, stdout=asyncio.subprocess.PIPE,
-                                                stderr=asyncio.subprocess.PIPE)
+    args = [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.symlinks=false",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "protocol.allow=never",
+        "-c",
+        "protocol.https.allow=always",
+        "-c",
+        "filter.lfs.smudge=",
+        "-c",
+        "filter.lfs.process=",
+        "-c",
+        "filter.lfs.required=false",
+        "-c",
+        "submodule.recurse=false",
+        "clone",
+        "--depth",
+        "1",
+        "--no-tags",
+        "--single-branch",
+        "--no-recurse-submodules",
+        "--template=",
+        *(["--branch", ref] if ref else []),
+        "--",
+        url,
+        str(dest),
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *args, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
     try:
         _out, err = await asyncio.wait_for(proc.communicate(), timeout=GIT_TIMEOUT)
     except TimeoutError as exc:
         proc.kill()
         raise SandboxError(f"git clone timed out after {GIT_TIMEOUT}s") from exc
     if proc.returncode != 0:
-        from agentlab.security.redactor import redact_text
+        from agentlab.security.redactor import get_redactor
 
-        raise UserError(f"git clone failed: {redact_text(err.decode('utf-8', 'replace'))[:300]}")
+        shown = get_redactor().redact_text(err.decode("utf-8", "replace"))[0]
+        raise UserError(f"git clone failed: {shown[:300]}")
+
+
+def _chunks(fh: IO[bytes], size: int = 65536) -> Iterator[bytes]:
+    while chunk := fh.read(size):
+        yield chunk
 
 
 class RepositoryIngestor:
@@ -240,7 +295,9 @@ class RepositoryIngestor:
                 self.egress.check(source.url)
                 repo.name = source.url.rstrip("/").split("/")[-1].removesuffix(".git") or "repository"
                 if source.url.startswith("git@"):
-                    raise UserError("ssh repository URLs are not supported; use https:// (credentials via a credential profile)")
+                    raise UserError(
+                        "ssh repository URLs are not supported; use https:// (credentials via a credential profile)"
+                    )
                 shutil.rmtree(dest)
                 await _git_clone(source.url, source.ref, dest, auth_header)
                 commit, ref = read_git_head(dest)

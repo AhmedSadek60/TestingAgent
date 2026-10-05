@@ -18,24 +18,58 @@ from agentlab.execution.engines import AttemptOutcome
 from agentlab.tracing import TraceRecorder
 
 
-def _ctx(test: TestCase, outcome: AttemptOutcome, idx: int, resolver: PlaceholderResolver,
-         profile: AgentProfile | None, known: set[str]) -> EvalContext:
-    return EvalContext(test=test, turn_index=idx, response=outcome.responses[idx], responses=outcome.responses,
-                       inputs=outcome.inputs, sessions=outcome.sessions, resolver=resolver, profile=profile,
-                       known_sources=known, state=outcome.state)
+def _ctx(
+    test: TestCase,
+    outcome: AttemptOutcome,
+    idx: int,
+    resolver: PlaceholderResolver,
+    profile: AgentProfile | None,
+    known: set[str],
+) -> EvalContext:
+    return EvalContext(
+        test=test,
+        turn_index=idx,
+        response=outcome.responses[idx],
+        responses=outcome.responses,
+        inputs=outcome.inputs,
+        sessions=outcome.sessions,
+        resolver=resolver,
+        profile=profile,
+        known_sources=known,
+        state=outcome.state,
+    )
 
 
 def _record(trace: TraceRecorder, res: AssertionResult) -> None:
-    trace.record(EventType.ASSERTION_EVALUATED, {
-        "assertion": res.type, "status": "passed" if res.passed else "failed", "score": res.score,
-        "message": res.message, "turn": res.turn_index, "required": res.required})
-    if not res.passed and res.type in {"no_canary_leak", "no_secret_leak", "no_injection_followed",
-                                       "no_destructive_without_confirmation", "no_external_recipient"}:
+    trace.record(
+        EventType.ASSERTION_EVALUATED,
+        {
+            "assertion": res.type,
+            "status": "passed" if res.passed else "failed",
+            "score": res.score,
+            "message": res.message,
+            "turn": res.turn_index,
+            "required": res.required,
+        },
+    )
+    if not res.passed and res.type in {
+        "no_canary_leak",
+        "no_secret_leak",
+        "no_injection_followed",
+        "no_destructive_without_confirmation",
+        "no_external_recipient",
+    }:
         trace.record(EventType.SECURITY_ALERT, {"assertion": res.type, "message": res.message})
 
 
-def run_assertions(test: TestCase, outcome: AttemptOutcome, resolver: PlaceholderResolver,
-                   profile: AgentProfile | None, known: set[str], trace: TraceRecorder) -> list[AssertionResult]:
+def run_assertions(
+    test: TestCase,
+    outcome: AttemptOutcome,
+    resolver: PlaceholderResolver,
+    profile: AgentProfile | None,
+    known: set[str],
+    trace: TraceRecorder,
+) -> list[AssertionResult]:
     results: list[AssertionResult] = []
     n = len(outcome.responses)
     if n == 0:
@@ -49,8 +83,15 @@ def run_assertions(test: TestCase, outcome: AttemptOutcome, resolver: Placeholde
         pairs.append((spec, spec.turn if spec.turn is not None else last))
     for spec, idx in pairs:
         if idx >= n:
-            res = AssertionResult(type=spec.type, passed=False, score=0.0, required=False, weight=spec.weight,
-                                  message=f"turn {idx + 1} was not reached (test stopped early)", turn_index=idx)
+            res = AssertionResult(
+                type=spec.type,
+                passed=False,
+                score=0.0,
+                required=False,
+                weight=spec.weight,
+                message=f"turn {idx + 1} was not reached (test stopped early)",
+                turn_index=idx,
+            )
         else:
             ctx = _ctx(test, outcome, idx, resolver, profile, known)
             res = evaluate_assertion(spec.type, spec.params, ctx)
@@ -67,8 +108,14 @@ def run_assertions(test: TestCase, outcome: AttemptOutcome, resolver: Placeholde
     return results
 
 
-def run_trajectory(test: TestCase, outcome: AttemptOutcome, resolver: PlaceholderResolver,
-                   profile: AgentProfile | None, known: set[str], trace: TraceRecorder) -> list[AssertionResult]:
+def run_trajectory(
+    test: TestCase,
+    outcome: AttemptOutcome,
+    resolver: PlaceholderResolver,
+    profile: AgentProfile | None,
+    known: set[str],
+    trace: TraceRecorder,
+) -> list[AssertionResult]:
     if not outcome.responses:
         return []
     wants = bool(test.expected_tool_calls) or "trajectory" in test.evaluation_metrics
@@ -81,28 +128,51 @@ def run_trajectory(test: TestCase, outcome: AttemptOutcome, resolver: Placeholde
     return results
 
 
-async def run_judge(test: TestCase, outcome: AttemptOutcome, deterministic: list[AssertionResult],
-                    judge: JudgeEngine | None, trace: TraceRecorder) -> tuple[list[JudgeResult], list[str]]:
+async def run_judge(
+    test: TestCase,
+    outcome: AttemptOutcome,
+    deterministic: list[AssertionResult],
+    judge: JudgeEngine | None,
+    trace: TraceRecorder,
+) -> tuple[list[JudgeResult], list[str]]:
     """Returns (results, notes). Notes explain why a requested criterion could not be judged."""
     if not test.judge:
         return [], []
     if judge is None or not judge.enabled:
         return [], [f"judge criteria {[c.metric for c in test.judge]} were not evaluated: no LLM judge configured"]
-    ev = JudgeEvidence(test, outcome.inputs, outcome.responses,
-                       [{"type": d.type, "passed": d.passed} for d in deterministic])
+    ev = JudgeEvidence(
+        test, outcome.inputs, outcome.responses, [{"type": d.type, "passed": d.passed} for d in deterministic]
+    )
     results: list[JudgeResult] = []
     for crit in test.judge:
         r = await judge.judge(test, crit, ev)
         results.append(r)
-        trace.record(EventType.JUDGE_EVALUATED, {
-            "metric": r.metric, "score": r.score, "passed": r.passed, "confidence": r.confidence,
-            "agreement": r.agreement, "uncertain": r.uncertain, "error": r.error, "strategy": r.strategy,
-            "judges": [v.judge for v in r.votes], "rubric": r.rubric[:400]})
+        trace.record(
+            EventType.JUDGE_EVALUATED,
+            {
+                "metric": r.metric,
+                "score": r.score,
+                "passed": r.passed,
+                "confidence": r.confidence,
+                "agreement": r.agreement,
+                "uncertain": r.uncertain,
+                "error": r.error,
+                "strategy": r.strategy,
+                "judges": [v.judge for v in r.votes],
+                "rubric": r.rubric[:400],
+            },
+        )
     return results, []
 
 
-def decide_attempt_status(deterministic: list[AssertionResult], judges: list[JudgeResult], *, has_deterministic: bool,
-                          timed_out: bool, stopped_status: TestStatus | None) -> tuple[TestStatus, str | None]:
+def decide_attempt_status(
+    deterministic: list[AssertionResult],
+    judges: list[JudgeResult],
+    *,
+    has_deterministic: bool,
+    timed_out: bool,
+    stopped_status: TestStatus | None,
+) -> tuple[TestStatus, str | None]:
     """Reduce evaluation results to an attempt status and an explanatory note."""
     if stopped_status is not None:
         return stopped_status, None
@@ -114,8 +184,10 @@ def decide_attempt_status(deterministic: list[AssertionResult], judges: list[Jud
     if required_fail or judge_fail:
         return TestStatus.FAILED, None
     if unusable and not has_deterministic:
-        return TestStatus.ERROR, ("LLM judge was unavailable or uncertain and no deterministic assertion could decide; "
-                                  "the verdict needs human review")
+        return TestStatus.ERROR, (
+            "LLM judge was unavailable or uncertain and no deterministic assertion could decide; "
+            "the verdict needs human review"
+        )
     return TestStatus.PASSED, None
 
 

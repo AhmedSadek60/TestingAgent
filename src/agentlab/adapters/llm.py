@@ -36,8 +36,11 @@ class LlmAgentAdapter(AgentAdapter):
         self.model = self.cfg.model or self.provider.config.model
         self._sessions: dict[str, list[Message]] = {}
         self.capabilities = AdapterCapabilities(
-            reports_tool_calls=bool(self.cfg.tools), reports_contexts=bool(self.cfg.knowledge), reports_usage=True,
-            notes=[f"model {self.provider.name}/{self.model}"])
+            reports_tool_calls=bool(self.cfg.tools),
+            reports_contexts=bool(self.cfg.knowledge),
+            reports_usage=True,
+            notes=[f"model {self.provider.name}/{self.model}"],
+        )
 
     async def open(self) -> None:
         if self.cfg.tools and not self.provider.supports(Capability.TOOL_CALLING, self.model):
@@ -48,14 +51,17 @@ class LlmAgentAdapter(AgentAdapter):
                 pass
             if not self.provider.supports(Capability.TOOL_CALLING, self.model):
                 raise UnsupportedCapability(
-                    f"model {self.provider.name}/{self.model} does not support tool calling; tool tests are blocked")
+                    f"model {self.provider.name}/{self.model} does not support tool calling; tool tests are blocked"
+                )
 
     def _system(self) -> Message:
         text = self.cfg.system_prompt
         if self.cfg.knowledge:
             docs = "\n\n".join(f"[document: {n}]\n{t}" for n, t in self.cfg.knowledge.items())
-            text += ("\n\nUse ONLY the following knowledge base documents to answer factual questions. If the answer is "
-                     f"not in them, say you do not know.\n\n{docs}")
+            text += (
+                "\n\nUse ONLY the following knowledge base documents to answer factual questions. If the answer is "
+                f"not in them, say you do not know.\n\n{docs}"
+            )
         return Message(role="system", content=text)
 
     async def end_session(self, session_id: str) -> None:
@@ -81,9 +87,15 @@ class LlmAgentAdapter(AgentAdapter):
         t0 = time.perf_counter()
         try:
             for _round in range(self.cfg.max_tool_rounds + 1):
-                resp = await self.provider.complete(CompletionRequest(
-                    messages=history, model=self.model, tools=tools if _round < self.cfg.max_tool_rounds else [],
-                    max_tokens=self.cfg.max_tokens, temperature=self.cfg.temperature))
+                resp = await self.provider.complete(
+                    CompletionRequest(
+                        messages=history,
+                        model=self.model,
+                        tools=tools if _round < self.cfg.max_tool_rounds else [],
+                        max_tokens=self.cfg.max_tokens,
+                        temperature=self.cfg.temperature,
+                    )
+                )
                 usage.input_tokens += resp.usage.input_tokens
                 usage.output_tokens += resp.usage.output_tokens
                 usage.llm_calls += 1
@@ -92,9 +104,16 @@ class LlmAgentAdapter(AgentAdapter):
                     out.output = resp.text
                     history.append(Message(role="assistant", content=resp.text))
                     break
-                history.append(Message(role="assistant", content=resp.text,
-                                       tool_calls=[LLMToolCall(id=c.id or f"call_{i}", name=c.name, arguments=c.arguments)
-                                                   for i, c in enumerate(resp.tool_calls)]))
+                history.append(
+                    Message(
+                        role="assistant",
+                        content=resp.text,
+                        tool_calls=[
+                            LLMToolCall(id=c.id or f"call_{i}", name=c.name, arguments=c.arguments)
+                            for i, c in enumerate(resp.tool_calls)
+                        ],
+                    )
+                )
                 for i, c in enumerate(resp.tool_calls):
                     defn = defs.get(c.name)
                     if defn is None:
@@ -103,7 +122,9 @@ class LlmAgentAdapter(AgentAdapter):
                     else:
                         result, status = self._tool_result(defn, c.arguments), "success"
                     out.tool_calls.append(ToolCall(name=c.name, arguments=c.arguments, result=result, status=status))
-                    history.append(Message(role="tool", content=str(result), tool_call_id=c.id or f"call_{i}", name=c.name))
+                    history.append(
+                        Message(role="tool", content=str(result), tool_call_id=c.id or f"call_{i}", name=c.name)
+                    )
             else:
                 out.output = out.output or ""
         except AgentLabError as exc:

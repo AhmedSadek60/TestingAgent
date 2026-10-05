@@ -107,12 +107,21 @@ class ConversationEngine(ExecutionEngine):
                     sessions[turn.session] = await adapter.new_session()
                 text = env.resolver.resolve(turn.input)
                 req = AgentRequest(
-                    input=text, session_id=sessions[turn.session],
+                    input=text,
+                    session_id=sessions[turn.session],
                     attachments=[load_attachment(a, fixtures) for a in turn.attachments],
                     credential=test.required_credentials[0] if test.required_credentials else None,
-                    metadata={"test_id": test.id, "turn": i, "attempt": env.attempt})
-                env.trace.record(EventType.AGENT_REQUEST, {"turn": i, "session": turn.session, "input": text,
-                                                           "attachments": [a.name for a in req.attachments]})
+                    metadata={"test_id": test.id, "turn": i, "attempt": env.attempt},
+                )
+                env.trace.record(
+                    EventType.AGENT_REQUEST,
+                    {
+                        "turn": i,
+                        "session": turn.session,
+                        "input": text,
+                        "attachments": [a.name for a in req.attachments],
+                    },
+                )
                 out.inputs.append(text)
                 out.sessions.append(turn.session)
                 t0 = time.perf_counter()
@@ -120,8 +129,10 @@ class ConversationEngine(ExecutionEngine):
                     resp = await asyncio.wait_for(adapter.send(req), timeout=max(0.05, env.budget.remaining_time()))
                 except TimeoutError:
                     out.timed_out = True
-                    env.trace.record(EventType.ERROR, {"turn": i, "kind": "TIMEOUT",
-                                                       "message": f"no response within {env.budget.timeout:g}s"})
+                    env.trace.record(
+                        EventType.ERROR,
+                        {"turn": i, "kind": "TIMEOUT", "message": f"no response within {env.budget.timeout:g}s"},
+                    )
                     break
                 except (CredentialError, PolicyBlocked, UserError):
                     raise
@@ -132,15 +143,21 @@ class ConversationEngine(ExecutionEngine):
                 out.responses.append(resp)
                 env.trace.record_response(i, turn.session, resp)
                 steps = 1 + len(resp.tool_calls)
-                env.limits.record(env.budget, tokens=resp.usage.total_tokens, cost=resp.usage.cost_usd, steps=steps,
-                                  category=test.category)
+                env.limits.record(
+                    env.budget,
+                    tokens=resp.usage.total_tokens,
+                    cost=resp.usage.cost_usd,
+                    steps=steps,
+                    category=test.category,
+                )
                 try:
                     LimitTracker.check_test(env.budget)
                     env.limits.check_run()
                 except LimitReached as lr:
                     out.stopped = lr
-                    env.trace.record(EventType.LIMIT_REACHED, {"status": lr.status.value, "message": str(lr),
-                                                               "scope": lr.scope})
+                    env.trace.record(
+                        EventType.LIMIT_REACHED, {"status": lr.status.value, "message": str(lr), "scope": lr.scope}
+                    )
                     break
         finally:
             for sid in sessions.values():

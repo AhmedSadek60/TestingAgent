@@ -45,8 +45,13 @@ def plan_groups(tests: list[TestCase]) -> list[list[TestCase]]:
 
 
 class Scheduler:
-    def __init__(self, executor: TestExecutor, *, max_parallel: int = 4,
-                 on_result: Callable[[TestResult], Awaitable[None] | None] | None = None) -> None:
+    def __init__(
+        self,
+        executor: TestExecutor,
+        *,
+        max_parallel: int = 4,
+        on_result: Callable[[TestResult], Awaitable[None] | None] | None = None,
+    ) -> None:
         self.executor = executor
         self.max_parallel = max(1, max_parallel)
         self.on_result = on_result

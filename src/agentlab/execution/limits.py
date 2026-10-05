@@ -91,12 +91,24 @@ class LimitTracker:
     # ------------------------------------------------------------------ budgets
     def budget_for(self, test: TestCase) -> TestBudget:
         return TestBudget(
-            max_cost=min(test.max_cost, self.limits.max_test_cost_usd), max_tokens=min(test.max_tokens, self.limits.max_tokens),
+            max_cost=min(test.max_cost, self.limits.max_test_cost_usd),
+            max_tokens=min(test.max_tokens, self.limits.max_tokens),
             max_steps=min(test.max_steps, self.limits.max_steps),
-            max_browser_actions=self.limits.max_browser_actions, timeout=test.timeout)
+            max_browser_actions=self.limits.max_browser_actions,
+            timeout=test.timeout,
+        )
 
-    def record(self, budget: TestBudget | None, *, tokens: int = 0, cost: float = 0.0, steps: int = 0,
-               browser_actions: int = 0, category: str | None = None, model: str | None = None) -> None:
+    def record(
+        self,
+        budget: TestBudget | None,
+        *,
+        tokens: int = 0,
+        cost: float = 0.0,
+        steps: int = 0,
+        browser_actions: int = 0,
+        category: str | None = None,
+        model: str | None = None,
+    ) -> None:
         with self._lock:
             self.cost += cost
             self.tokens += tokens
@@ -118,32 +130,51 @@ class LimitTracker:
         lim = self.limits
         elapsed = time.monotonic() - self.started
         if self.cost > lim.max_cost_usd:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_COST,
-                               f"run cost ${self.cost:.4f} exceeds max_cost_usd ${lim.max_cost_usd:g}", "run")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_COST,
+                f"run cost ${self.cost:.4f} exceeds max_cost_usd ${lim.max_cost_usd:g}",
+                "run",
+            )
         if self.tokens > lim.max_tokens:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_COST,
-                               f"run used {self.tokens} tokens; max_tokens is {lim.max_tokens}", "run")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_COST, f"run used {self.tokens} tokens; max_tokens is {lim.max_tokens}", "run"
+            )
         if elapsed > lim.max_execution_time_seconds:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_TIMEOUT,
-                               f"run time {elapsed:.0f}s exceeds max_execution_time_seconds "
-                               f"{lim.max_execution_time_seconds:g}", "run")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_TIMEOUT,
+                f"run time {elapsed:.0f}s exceeds max_execution_time_seconds {lim.max_execution_time_seconds:g}",
+                "run",
+            )
 
     @staticmethod
     def check_test(b: TestBudget) -> None:
         if b.cost > b.max_cost:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_COST, f"test cost ${b.cost:.4f} exceeds max_cost ${b.max_cost:g}")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_COST, f"test cost ${b.cost:.4f} exceeds max_cost ${b.max_cost:g}"
+            )
         if b.tokens > b.max_tokens:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_COST, f"test used {b.tokens} tokens; max_tokens is {b.max_tokens}")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_COST, f"test used {b.tokens} tokens; max_tokens is {b.max_tokens}"
+            )
         if b.steps > b.max_steps:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_STEP_LIMIT,
-                               f"test used {b.steps} steps (turns + tool calls); max_steps is {b.max_steps}")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_STEP_LIMIT,
+                f"test used {b.steps} steps (turns + tool calls); max_steps is {b.max_steps}",
+            )
         if b.browser_actions > b.max_browser_actions:
-            raise LimitReached(TestStatus.STOPPED_DUE_TO_STEP_LIMIT,
-                               f"test performed {b.browser_actions} browser actions; limit is {b.max_browser_actions}")
+            raise LimitReached(
+                TestStatus.STOPPED_DUE_TO_STEP_LIMIT,
+                f"test performed {b.browser_actions} browser actions; limit is {b.max_browser_actions}",
+            )
 
     def summary(self) -> dict[str, object]:
-        return {"cost_usd": round(self.cost, 6), "tokens": self.tokens, "steps": self.steps,
-                "browser_actions": self.browser_actions, "elapsed_s": round(time.monotonic() - self.started, 2),
-                "cost_by_category": {k: round(v, 6) for k, v in self.by_category.items()},
-                "cost_by_model": {k: round(v, 6) for k, v in self.by_model.items()},
-                "limits": self.limits.model_dump()}
+        return {
+            "cost_usd": round(self.cost, 6),
+            "tokens": self.tokens,
+            "steps": self.steps,
+            "browser_actions": self.browser_actions,
+            "elapsed_s": round(time.monotonic() - self.started, 2),
+            "cost_by_category": {k: round(v, 6) for k, v in self.by_category.items()},
+            "cost_by_model": {k: round(v, 6) for k, v in self.by_model.items()},
+            "limits": self.limits.model_dump(),
+        }

@@ -186,11 +186,13 @@ class LLMProvider(ABC):
                 "Respond with a single JSON object only (no prose, no code fences) that validates "
                 f"against this JSON Schema:\n{json.dumps(request.json_schema)}"
             )
-            req = request.model_copy(update={
-                "messages": [*request.messages, Message(role="user", content=instruction)],
-                "json_schema": None,
-                "metadata": {**request.metadata, "_json_mode": Capability.STRUCTURED_OUTPUT in caps},
-            })
+            req = request.model_copy(
+                update={
+                    "messages": [*request.messages, Message(role="user", content=instruction)],
+                    "json_schema": None,
+                    "metadata": {**request.metadata, "_json_mode": Capability.STRUCTURED_OUTPUT in caps},
+                }
+            )
         attempts = 0
         start = time.perf_counter()
         while True:
@@ -203,7 +205,9 @@ class LLMProvider(ABC):
                 attempts += 1
                 if attempts > self.config.max_retries:
                     raise
-                await asyncio.sleep(min(exc.retry_after if exc.retry_after is not None else self._backoff(attempts), 30))
+                await asyncio.sleep(
+                    min(exc.retry_after if exc.retry_after is not None else self._backoff(attempts), 30)
+                )
             except ProviderError as exc:
                 attempts += 1
                 if not exc.retryable or attempts > self.config.max_retries:
@@ -231,7 +235,8 @@ class LLMProvider(ABC):
         except jsonschema.ValidationError as exc:
             raise ProviderError(
                 f"{self.name}/{resp.model} returned JSON that does not match the schema: {exc.message[:200]}",
-                retryable=True) from exc
+                retryable=True,
+            ) from exc
 
     @abstractmethod
     async def _complete(self, request: CompletionRequest, model: str) -> CompletionResponse: ...
@@ -292,7 +297,7 @@ def parse_json_loose(text: str) -> Any:
                 depth -= 1
                 if depth == 0:
                     try:
-                        return json.loads(text[start:i + 1])
+                        return json.loads(text[start : i + 1])
                     except json.JSONDecodeError:
                         break
         start = text.find("{", start + 1)
@@ -307,7 +312,9 @@ def raise_for_status(provider: str, status: int, body: str, headers: dict[str, s
         raise CredentialError(f"{provider}: authentication/authorisation failed (HTTP {status})")
     if status == 429:
         ra = (headers or {}).get("retry-after")
-        raise RateLimitError(f"{provider}: rate limited (429): {snippet}",
-                             retry_after=float(ra) if ra and ra.replace(".", "").isdigit() else None)
+        raise RateLimitError(
+            f"{provider}: rate limited (429): {snippet}",
+            retry_after=float(ra) if ra and ra.replace(".", "").isdigit() else None,
+        )
     retryable = status >= 500 or status in (408, 409)
     raise ProviderError(f"{provider}: HTTP {status}: {snippet}", retryable=retryable)

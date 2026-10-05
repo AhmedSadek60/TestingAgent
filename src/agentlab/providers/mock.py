@@ -57,10 +57,18 @@ def default_instance(schema: dict[str, Any], overrides: dict[str, Any] | None = 
 
 class MockProvider(LLMProvider):
     type_name = "mock"
-    default_capabilities = frozenset({
-        Capability.CHAT, Capability.STREAMING, Capability.STRUCTURED_OUTPUT, Capability.JSON_SCHEMA,
-        Capability.TOOL_CALLING, Capability.EMBEDDINGS, Capability.MODEL_DISCOVERY, Capability.MULTIMODAL,
-    })
+    default_capabilities = frozenset(
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.STRUCTURED_OUTPUT,
+            Capability.JSON_SCHEMA,
+            Capability.TOOL_CALLING,
+            Capability.EMBEDDINGS,
+            Capability.MODEL_DISCOVERY,
+            Capability.MULTIMODAL,
+        }
+    )
 
     def __init__(self, config, credentials=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(config, credentials)
@@ -120,8 +128,10 @@ class MockProvider(LLMProvider):
         elif isinstance(chosen, str):
             text = chosen
         elif isinstance(chosen, dict) and "tool_calls" in chosen:
-            calls = [LLMToolCall(id=f"mock_{i}", name=c["name"], arguments=c.get("arguments", {}))
-                     for i, c in enumerate(chosen["tool_calls"])]
+            calls = [
+                LLMToolCall(id=f"mock_{i}", name=c["name"], arguments=c.get("arguments", {}))
+                for i, c in enumerate(chosen["tool_calls"])
+            ]
             text = chosen.get("text", "")
         elif isinstance(chosen, dict | list):
             parsed = chosen
@@ -129,8 +139,14 @@ class MockProvider(LLMProvider):
         else:
             raise ProviderError(f"unsupported mock response type {type(chosen)}")
         return CompletionResponse(
-            text=text, tool_calls=calls, parsed=parsed, provider=self.name, model=model, finish_reason="stop",
-            usage=TokenUsage(input_tokens=self._tokens(prompt), output_tokens=self._tokens(text)), cost_usd=0.0,
+            text=text,
+            tool_calls=calls,
+            parsed=parsed,
+            provider=self.name,
+            model=model,
+            finish_reason="stop",
+            usage=TokenUsage(input_tokens=self._tokens(prompt), output_tokens=self._tokens(text)),
+            cost_usd=0.0,
         )
 
     async def embed(self, texts: list[str], model: str | None = None) -> list[list[float]]:
@@ -139,5 +155,8 @@ class MockProvider(LLMProvider):
         return HashingEmbedder().embed(texts)
 
     async def list_models(self) -> list[ModelInfo]:
-        return [ModelInfo(id=self.config.model or "mock-model", provider=self.name,
-                          capabilities=sorted(self.default_capabilities))]
+        return [
+            ModelInfo(
+                id=self.config.model or "mock-model", provider=self.name, capabilities=sorted(self.default_capabilities)
+            )
+        ]

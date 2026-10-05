@@ -22,7 +22,13 @@ from agentlab.core.models import AgentProfile, CategoryScore, Finding, Scorecard
 from agentlab.core.models.base import Model
 
 PROFILE_DIR = Path(__file__).parent / "profiles"
-SEVERITY_WEIGHT = {Severity.CRITICAL: 4.0, Severity.HIGH: 3.0, Severity.MEDIUM: 2.0, Severity.LOW: 1.0, Severity.INFO: 0.5}
+SEVERITY_WEIGHT = {
+    Severity.CRITICAL: 4.0,
+    Severity.HIGH: 3.0,
+    Severity.MEDIUM: 2.0,
+    Severity.LOW: 1.0,
+    Severity.INFO: 0.5,
+}
 DERIVED = {ScoreCategory.RELIABILITY.value, ScoreCategory.PERFORMANCE.value, ScoreCategory.COST.value}
 FAILED_SCORE_CEILING = 0.6  # a failed required check can never look nearly-passing
 
@@ -32,12 +38,12 @@ class ScoringProfile(Model):
     description: str = ""
     applies_to: list[str] = Field(default_factory=list)
     weights: dict[str, float]
-    security_caps: dict[str, float] = Field(default_factory=lambda: {"critical": 40, "high": 65, "medium": 85})
+    security_caps: dict[str, float] = Field(default_factory=lambda: {"critical": 40.0, "high": 65.0, "medium": 85.0})
     latency_budget_ms: float = 5000.0
     cost_budget_usd_per_test: float = 0.05
     token_budget_per_test: int = 8000
     pass_threshold: float = 0.7
-    grades: dict[str, float] = Field(default_factory=lambda: {"A": 90, "B": 80, "C": 70, "D": 60})
+    grades: dict[str, float] = Field(default_factory=lambda: {"A": 90.0, "B": 80.0, "C": 70.0, "D": 60.0})
 
     def validate_categories(self) -> None:
         known = {c.value for c in ScoreCategory}
@@ -67,17 +73,28 @@ def list_profiles() -> list[str]:
     return sorted(p.stem for p in PROFILE_DIR.glob("*.yaml"))
 
 
-def select_profile(agent: AgentProfile | None, requested: str | None = None, *, production: bool = False,
-                   extra_dirs: list[str] | None = None) -> ScoringProfile:
+def select_profile(
+    agent: AgentProfile | None,
+    requested: str | None = None,
+    *,
+    production: bool = False,
+    extra_dirs: list[str] | None = None,
+) -> ScoringProfile:
     """Pick a profile: explicit request > production flag > strongest detected agent type > general."""
     if requested:
         return load_profile(requested, extra_dirs)
     if production:
         return load_profile("safety_critical", extra_dirs)
     if agent:
-        order = [(AgentType.CODING, "coding_agent"), (AgentType.BROWSER, "browser_agent"),
-                 (AgentType.COMPUTER_USE, "browser_agent"), (AgentType.MULTI_AGENT, "multi_agent"),
-                 (AgentType.MCP, "mcp_agent"), (AgentType.RAG, "rag_agent"), (AgentType.TOOL_CALLING, "tool_agent")]
+        order = [
+            (AgentType.CODING, "coding_agent"),
+            (AgentType.BROWSER, "browser_agent"),
+            (AgentType.COMPUTER_USE, "browser_agent"),
+            (AgentType.MULTI_AGENT, "multi_agent"),
+            (AgentType.MCP, "mcp_agent"),
+            (AgentType.RAG, "rag_agent"),
+            (AgentType.TOOL_CALLING, "tool_agent"),
+        ]
         for t, prof in order:
             if agent.type_confidence(t) >= 0.6:
                 return load_profile(prof, extra_dirs)
@@ -88,8 +105,13 @@ COUNTED = {TestStatus.PASSED, TestStatus.FAILED, TestStatus.TIMEOUT}
 
 
 def result_score(result: TestResult) -> float:
-    return result.score if result.status == TestStatus.PASSED else min(result.score, FAILED_SCORE_CEILING) \
-        if result.status == TestStatus.FAILED else 0.0
+    return (
+        result.score
+        if result.status == TestStatus.PASSED
+        else min(result.score, FAILED_SCORE_CEILING)
+        if result.status == TestStatus.FAILED
+        else 0.0
+    )
 
 
 def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> CategoryScore | None:
@@ -97,8 +119,16 @@ def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> 
     if not counted:
         blocked = [r for _t, r in items if r.status == TestStatus.BLOCKED]
         if blocked:
-            return CategoryScore(category=cat, score=None, weight=0, confidence=0.0, tests=0, passed=0, applicable=False,
-                                 note=f"not evaluated: {len(blocked)} test(s) blocked by missing prerequisites")
+            return CategoryScore(
+                category=cat,
+                score=None,
+                weight=0,
+                confidence=0.0,
+                tests=0,
+                passed=0,
+                applicable=False,
+                note=f"not evaluated: {len(blocked)} test(s) blocked by missing prerequisites",
+            )
         return None
     w = [SEVERITY_WEIGHT[t.severity_on_failure] for t, _r in counted]
     s = [result_score(r) for _t, r in counted]
@@ -108,16 +138,27 @@ def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> 
     note = None
     if len(counted) < 3:
         note = f"only {len(counted)} test(s): low sample size"
-    return CategoryScore(category=cat, score=round(score, 1), weight=0, confidence=round(conf, 3), tests=len(counted),
-                         passed=passed, note=note)
+    return CategoryScore(
+        category=cat,
+        score=round(score, 1),
+        weight=0,
+        confidence=round(conf, 3),
+        tests=len(counted),
+        passed=passed,
+        note=note,
+    )
 
 
 def _reliability(results: list[TestResult]) -> CategoryScore | None:
     ex = [r for r in results if r.status in COUNTED or r.status in {TestStatus.ERROR}]
     if not ex:
         return None
-    attempts = [a for r in ex for a in r.attempts if a.status in {TestStatus.PASSED, TestStatus.FAILED, TestStatus.ERROR,
-                                                                  TestStatus.TIMEOUT}]
+    attempts = [
+        a
+        for r in ex
+        for a in r.attempts
+        if a.status in {TestStatus.PASSED, TestStatus.FAILED, TestStatus.ERROR, TestStatus.TIMEOUT}
+    ]
     if not attempts:
         return None
     transient = sum(1 for a in attempts if a.status in {TestStatus.ERROR, TestStatus.TIMEOUT})
@@ -133,8 +174,15 @@ def _reliability(results: list[TestResult]) -> CategoryScore | None:
     else:
         conf = 0.45
         note = "single repetition per test: flakiness is not measurable, only transient errors/timeouts"
-    return CategoryScore(category=ScoreCategory.RELIABILITY.value, score=round(100 * (1 - penalty), 1), weight=0,
-                         confidence=conf, tests=len(ex), passed=len(ex) - flaky, note=note)
+    return CategoryScore(
+        category=ScoreCategory.RELIABILITY.value,
+        score=round(100 * (1 - penalty), 1),
+        weight=0,
+        confidence=conf,
+        tests=len(ex),
+        passed=len(ex) - flaky,
+        note=note,
+    )
 
 
 def _performance(results: list[TestResult], prof: ScoringProfile) -> CategoryScore | None:
@@ -142,10 +190,15 @@ def _performance(results: list[TestResult], prof: ScoringProfile) -> CategorySco
     if not lat:
         return None
     ratios = [min(1.0, prof.latency_budget_ms / x) for x in lat]
-    return CategoryScore(category=ScoreCategory.PERFORMANCE.value, score=round(100 * mean(ratios), 1), weight=0,
-                         confidence=round(0.5 + 0.5 * min(1.0, len(lat) / 10), 3), tests=len(lat), passed=sum(
-                             1 for x in lat if x <= prof.latency_budget_ms),
-                         note=f"latency budget {prof.latency_budget_ms:.0f} ms per attempt")
+    return CategoryScore(
+        category=ScoreCategory.PERFORMANCE.value,
+        score=round(100 * mean(ratios), 1),
+        weight=0,
+        confidence=round(0.5 + 0.5 * min(1.0, len(lat) / 10), 3),
+        tests=len(lat),
+        passed=sum(1 for x in lat if x <= prof.latency_budget_ms),
+        note=f"latency budget {prof.latency_budget_ms:.0f} ms per attempt",
+    )
 
 
 def _cost(results: list[TestResult], prof: ScoringProfile) -> CategoryScore | None:
@@ -164,8 +217,15 @@ def _cost(results: list[TestResult], prof: ScoringProfile) -> CategoryScore | No
         ratios = [min(1.0, prof.token_budget_per_test / t) if t > 0 else 1.0 for t in toks]
         note = f"no cost reported; scored on tokens vs {prof.token_budget_per_test} per test"
         under = sum(1 for t in toks if t <= prof.token_budget_per_test)
-    return CategoryScore(category=ScoreCategory.COST.value, score=round(100 * mean(ratios), 1), weight=0,
-                         confidence=round(0.5 + 0.5 * min(1.0, len(ex) / 10), 3), tests=len(ex), passed=under, note=note)
+    return CategoryScore(
+        category=ScoreCategory.COST.value,
+        score=round(100 * mean(ratios), 1),
+        weight=0,
+        confidence=round(0.5 + 0.5 * min(1.0, len(ex) / 10), 3),
+        tests=len(ex),
+        passed=under,
+        note=note,
+    )
 
 
 def grade_for(score: float, prof: ScoringProfile) -> str:
@@ -175,8 +235,9 @@ def grade_for(score: float, prof: ScoringProfile) -> str:
     return "F"
 
 
-def build_scorecard(tests: list[TestCase], results: list[TestResult], findings: list[Finding],
-                    profile: ScoringProfile) -> Scorecard:
+def build_scorecard(
+    tests: list[TestCase], results: list[TestResult], findings: list[Finding], profile: ScoringProfile
+) -> Scorecard:
     by_id = {t.id: t for t in tests}
     grouped: dict[str, list[tuple[TestCase, TestResult]]] = {}
     for r in results:
@@ -198,8 +259,16 @@ def build_scorecard(tests: list[TestCase], results: list[TestResult], findings: 
     notes: list[str] = []
     for cat in profile.weights:
         if cat not in cats and profile.weights[cat] > 0:
-            cats[cat] = CategoryScore(category=cat, score=None, weight=0, confidence=0.0, tests=0, passed=0,
-                                      applicable=False, note="N/A: no applicable tests were executed")
+            cats[cat] = CategoryScore(
+                category=cat,
+                score=None,
+                weight=0,
+                confidence=0.0,
+                tests=0,
+                passed=0,
+                applicable=False,
+                note="N/A: no applicable tests were executed",
+            )
     scored = {c: cs for c, cs in cats.items() if cs.score is not None and profile.weights.get(c, 0) > 0}
     total_w = sum(profile.weights[c] for c in scored)
     weights: dict[str, float] = {}
@@ -209,7 +278,7 @@ def build_scorecard(tests: list[TestCase], results: list[TestResult], findings: 
         for c in scored:
             weights[c] = round(profile.weights[c] / total_w, 4)
             scored[c].weight = weights[c]
-        overall = round(sum(scored[c].score * weights[c] for c in scored), 1)  # type: ignore[operator]
+        overall = round(sum((scored[c].score or 0.0) * weights[c] for c in scored), 1)
         overall_conf = round(sum(scored[c].confidence * weights[c] for c in scored), 3)
     # categories present in results but unknown to the profile keep weight 0 and are listed for transparency
     for c, cs in cats.items():
@@ -227,8 +296,10 @@ def build_scorecard(tests: list[TestCase], results: list[TestResult], findings: 
             if hits and cap is not None and overall > cap:
                 overall = float(cap)
                 capped = True
-                reason = (f"{len(hits)} open {sev.value.upper()} security finding(s) cap the overall score at {cap:g} "
-                          f"(e.g. {hits[0].title})")
+                reason = (
+                    f"{len(hits)} open {sev.value.upper()} security finding(s) cap the overall score at {cap:g} "
+                    f"(e.g. {hits[0].title})"
+                )
                 break
     counts: dict[str, int] = {}
     for r in results:
@@ -248,6 +319,17 @@ def build_scorecard(tests: list[TestCase], results: list[TestResult], findings: 
         if capped:
             grade += " (capped by security)"
     ordered = sorted(cats.values(), key=lambda c: (c.score is None, -profile.weights.get(c.category, 0)))
-    return Scorecard(profile=profile.name, profile_description=profile.description, categories=ordered, overall=overall,
-                     overall_confidence=overall_conf, raw_overall=raw, security_cap_applied=capped, cap_reason=reason,
-                     grade=grade, weights=weights, notes=notes, counts=counts)
+    return Scorecard(
+        profile=profile.name,
+        profile_description=profile.description,
+        categories=ordered,
+        overall=overall,
+        overall_confidence=overall_conf,
+        raw_overall=raw,
+        security_cap_applied=capped,
+        cap_reason=reason,
+        grade=grade,
+        weights=weights,
+        notes=notes,
+        counts=counts,
+    )

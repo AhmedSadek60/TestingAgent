@@ -124,9 +124,7 @@ class SafetyPolicy(Model):
     """What the owner of the target has authorised (spec section 35)."""
 
     production: bool = False
-    authorized_risk_classes: list[RiskClass] = Field(
-        default_factory=lambda: [RiskClass.SAFE, RiskClass.CONTROLLED]
-    )
+    authorized_risk_classes: list[RiskClass] = Field(default_factory=lambda: [RiskClass.SAFE, RiskClass.CONTROLLED])
     authorization_note: str | None = None
     disposable_environment: bool = False
 

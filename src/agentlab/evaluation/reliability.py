@@ -66,14 +66,19 @@ def compute_reliability(attempts: list[AttemptResult]) -> ReliabilityStats:
     pass_rate = passes / n if n else 0.0
     lat = [a.latency_ms for a in executed if a.latency_ms]
     return ReliabilityStats(
-        repetitions=n, passes=passes, pass_rate=round(pass_rate, 4),
+        repetitions=n,
+        passes=passes,
+        pass_rate=round(pass_rate, 4),
         flaky=0 < passes < n,
-        deterministic_failure=n >= 2 and passes == 0 and len(sigs) <= 1 and all(
-            a.status == TestStatus.FAILED for a in failures),
+        deterministic_failure=n >= 2
+        and passes == 0
+        and len(sigs) <= 1
+        and all(a.status == TestStatus.FAILED for a in failures),
         timeout_rate=round(sum(1 for a in executed if a.status == TestStatus.TIMEOUT) / n, 4) if n else 0.0,
         error_rate=round(sum(1 for a in executed if a.status == TestStatus.ERROR) / n, 4) if n else 0.0,
         output_variance=output_variance([o for a in executed for o in a.outputs[-1:]]),
-        latency_p50_ms=round(percentile(lat, 50), 2), latency_p95_ms=round(percentile(lat, 95), 2),
+        latency_p50_ms=round(percentile(lat, 50), 2),
+        latency_p95_ms=round(percentile(lat, 95), 2),
     )
 
 
@@ -144,8 +149,12 @@ def compute_confidence(test: TestCase, attempts: list[AttemptResult], stats: Rel
     if not executed:
         return 0.0
     ev = evidence_factor(executed)
-    has_expectation = bool(test.expected_output or test.expected_tool_calls or any(
-        s.required for s in test.assertions) or any(t.assertions for t in test.turns))
+    has_expectation = bool(
+        test.expected_output
+        or test.expected_tool_calls
+        or any(s.required for s in test.assertions)
+        or any(t.assertions for t in test.turns)
+    )
     expectation = 1.0 if has_expectation else 0.8
     sample = 1 - 0.15 / math.sqrt(len(executed))
     consistency = 1.0

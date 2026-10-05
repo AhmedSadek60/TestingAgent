@@ -14,8 +14,14 @@ from agentlab.core.models import AssertionResult, ExpectedToolCall, TestCase, To
 from agentlab.evaluation.assertions import _match_args
 from agentlab.evaluation.context import EvalContext
 
-DEFAULT_THRESHOLDS = {"tool_selection": 1.0, "tool_arguments": 1.0, "unnecessary_actions": 1.0,
-                      "tool_ordering": 1.0, "efficiency": 0.5, "error_recovery": 1.0}
+DEFAULT_THRESHOLDS = {
+    "tool_selection": 1.0,
+    "tool_arguments": 1.0,
+    "unnecessary_actions": 1.0,
+    "tool_ordering": 1.0,
+    "efficiency": 0.5,
+    "error_recovery": 1.0,
+}
 REQUIRED = {"tool_selection", "tool_arguments", "unnecessary_actions"}
 
 
@@ -49,9 +55,18 @@ def evaluate_trajectory(test: TestCase, calls: list[ToolCall], ctx: EvalContext)
 
     def add(metric: str, score: float, msg: str, **ev: Any) -> None:
         passed = score >= thresholds[metric] - 1e-9
-        results.append(AssertionResult(
-            type=f"trajectory:{metric}", passed=passed, score=max(0.0, min(1.0, score)), message=msg, metric=metric,
-            weight=1.0 if metric in REQUIRED else 0.5, required=metric in REQUIRED, evidence=ev))
+        results.append(
+            AssertionResult(
+                type=f"trajectory:{metric}",
+                passed=passed,
+                score=max(0.0, min(1.0, score)),
+                message=msg,
+                metric=metric,
+                weight=1.0 if metric in REQUIRED else 0.5,
+                required=metric in REQUIRED,
+                evidence=ev,
+            )
+        )
 
     pairs = _match(expected, calls)
     matched_actual = {a for _e, a in pairs if a is not None}
@@ -72,7 +87,13 @@ def evaluate_trajectory(test: TestCase, calls: list[ToolCall], ctx: EvalContext)
             parts.append(f"did not call {missing}")
         if extra:
             parts.append(f"called unexpected/extra {extra}")
-        add("tool_selection", f1, "tool selection incorrect: " + "; ".join(parts), expected=exp_names, observed=act_names)
+        add(
+            "tool_selection",
+            f1,
+            "tool selection incorrect: " + "; ".join(parts),
+            expected=exp_names,
+            observed=act_names,
+        )
 
     # --- arguments
     if expected:
@@ -88,8 +109,12 @@ def evaluate_trajectory(test: TestCase, calls: list[ToolCall], ctx: EvalContext)
             if avg >= 1.0:
                 add("tool_arguments", 1.0, "all tool arguments were correct")
             else:
-                add("tool_arguments", avg, "incorrect tool arguments: " + "; ".join(problems[:4]),
-                    observed=[c.arguments for c in calls][:5])
+                add(
+                    "tool_arguments",
+                    avg,
+                    "incorrect tool arguments: " + "; ".join(problems[:4]),
+                    observed=[c.arguments for c in calls][:5],
+                )
         elif any(e.arguments for e in expected):
             add("tool_arguments", 0.0, "no expected tool was called, so arguments could not be correct")
 
@@ -105,17 +130,25 @@ def evaluate_trajectory(test: TestCase, calls: list[ToolCall], ctx: EvalContext)
     elif unnecessary == 0:
         add("unnecessary_actions", 1.0, "no unnecessary or duplicate tool calls")
     else:
-        add("unnecessary_actions", max(0.0, 1 - unnecessary / len(calls)),
-            f"{unnecessary} unnecessary/duplicate tool call(s) out of {len(calls)}", observed=act_names[:12])
+        add(
+            "unnecessary_actions",
+            max(0.0, 1 - unnecessary / len(calls)),
+            f"{unnecessary} unnecessary/duplicate tool call(s) out of {len(calls)}",
+            observed=act_names[:12],
+        )
 
     # --- ordering
     idxs = [a for _e, a in pairs if a is not None]
     if len(idxs) >= 2:
         inversions = sum(1 for i in range(len(idxs)) for j in range(i + 1, len(idxs)) if idxs[i] > idxs[j])
         total = len(idxs) * (len(idxs) - 1) / 2
-        add("tool_ordering", 1 - inversions / total,
-            "tools were called in the expected order" if inversions == 0 else
-            f"tools called out of order (expected {exp_names}, observed {act_names})")
+        add(
+            "tool_ordering",
+            1 - inversions / total,
+            "tools were called in the expected order"
+            if inversions == 0
+            else f"tools called out of order (expected {exp_names}, observed {act_names})",
+        )
 
     # --- efficiency
     if expected:
@@ -126,9 +159,18 @@ def evaluate_trajectory(test: TestCase, calls: list[ToolCall], ctx: EvalContext)
     errors = [i for i, c in enumerate(calls) if c.status != "success" or str(c.result).lower().startswith("error")]
     if errors:
         last = errors[-1]
-        recovered = last < len(calls) - 1 or "error" in ctx.response.output.lower() or "unable" in ctx.response.output.lower() \
+        recovered = (
+            last < len(calls) - 1
+            or "error" in ctx.response.output.lower()
+            or "unable" in ctx.response.output.lower()
             or "sorry" in ctx.response.output.lower()
-        add("error_recovery", 1.0 if recovered else 0.0,
-            "agent recovered from or reported the tool failure" if recovered else
-            "agent ignored a tool failure and gave no indication of it", failed_tool=calls[last].name)
+        )
+        add(
+            "error_recovery",
+            1.0 if recovered else 0.0,
+            "agent recovered from or reported the tool failure"
+            if recovered
+            else "agent ignored a tool failure and gave no indication of it",
+            failed_tool=calls[last].name,
+        )
     return results

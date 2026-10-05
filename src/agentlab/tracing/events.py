@@ -34,11 +34,11 @@ class Event(Model):
     redaction_status: RedactionStatus = RedactionStatus.NOT_SCANNED
 
     @classmethod
-    def create(cls, run_id: str, type: EventType, payload: dict[str, Any] | None = None,
-               test_id: str | None = None) -> Event:
+    def create(
+        cls, run_id: str, type: EventType, payload: dict[str, Any] | None = None, test_id: str | None = None
+    ) -> Event:
         result = get_redactor().redact(payload or {})
-        return cls(run_id=run_id, test_id=test_id, type=type, payload=result.value,
-                   redaction_status=result.status)
+        return cls(run_id=run_id, test_id=test_id, type=type, payload=result.value, redaction_status=result.status)
 
 
 Subscriber = Callable[[Event], None]
@@ -85,6 +85,7 @@ class EventBus:
                 pass
         return event
 
-    def emit(self, run_id: str, type: EventType, payload: dict[str, Any] | None = None,
-             test_id: str | None = None) -> Event:
+    def emit(
+        self, run_id: str, type: EventType, payload: dict[str, Any] | None = None, test_id: str | None = None
+    ) -> Event:
         return self.publish(Event.create(run_id, type, payload, test_id))

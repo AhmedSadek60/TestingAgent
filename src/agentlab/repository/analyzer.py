@@ -48,17 +48,57 @@ from agentlab.security.untrusted import injection_indicators
 MAX_READ = 400_000
 MAX_FILES_SCANNED = 4000
 GUIDANCE = {"agents.md", "claude.md", "gemini.md", ".cursorrules", ".windsurfrules", "copilot-instructions.md"}
-ENTRY_NAMES = {"main.py", "app.py", "server.py", "run.py", "agent.py", "__main__.py", "manage.py", "cli.py", "index.js",
-               "index.ts", "server.js", "server.ts", "app.js", "app.ts", "main.ts", "main.js", "main.go", "main.rs",
-               "Main.java", "Application.java", "Program.cs", "main.kt", "index.php", "main.rb", "app.rb", "main.swift"}
-DEPLOY_FILES = {
-    "dockerfile": "Docker", "docker-compose.yml": "docker-compose", "docker-compose.yaml": "docker-compose",
-    "compose.yaml": "docker-compose", "compose.yml": "docker-compose", "procfile": "Procfile (Heroku-style)",
-    "vercel.json": "Vercel", "fly.toml": "Fly.io", "serverless.yml": "Serverless Framework", "netlify.toml": "Netlify",
-    "chart.yaml": "Helm", "skaffold.yaml": "Skaffold", "app.yaml": "App Engine", "render.yaml": "Render",
+ENTRY_NAMES = {
+    "main.py",
+    "app.py",
+    "server.py",
+    "run.py",
+    "agent.py",
+    "__main__.py",
+    "manage.py",
+    "cli.py",
+    "index.js",
+    "index.ts",
+    "server.js",
+    "server.ts",
+    "app.js",
+    "app.ts",
+    "main.ts",
+    "main.js",
+    "main.go",
+    "main.rs",
+    "Main.java",
+    "Application.java",
+    "Program.cs",
+    "main.kt",
+    "index.php",
+    "main.rb",
+    "app.rb",
+    "main.swift",
 }
-TEST_PATTERNS = (re.compile(r"(^|/)(tests?|__tests__|spec|specs)/"), re.compile(r"(_test\.go|_spec\.rb|Test\.java|Tests\.cs|"
-                 r"\.test\.[jt]sx?|\.spec\.[jt]sx?|test_[\w]+\.py|_test\.py|Test\.kt|Tests\.swift)$"))
+DEPLOY_FILES = {
+    "dockerfile": "Docker",
+    "docker-compose.yml": "docker-compose",
+    "docker-compose.yaml": "docker-compose",
+    "compose.yaml": "docker-compose",
+    "compose.yml": "docker-compose",
+    "procfile": "Procfile (Heroku-style)",
+    "vercel.json": "Vercel",
+    "fly.toml": "Fly.io",
+    "serverless.yml": "Serverless Framework",
+    "netlify.toml": "Netlify",
+    "chart.yaml": "Helm",
+    "skaffold.yaml": "Skaffold",
+    "app.yaml": "App Engine",
+    "render.yaml": "Render",
+}
+TEST_PATTERNS = (
+    re.compile(r"(^|/)(tests?|__tests__|spec|specs)/"),
+    re.compile(
+        r"(_test\.go|_spec\.rb|Test\.java|Tests\.cs|"
+        r"\.test\.[jt]sx?|\.spec\.[jt]sx?|test_[\w]+\.py|_test\.py|Test\.kt|Tests\.swift)$"
+    ),
+)
 
 
 def _line_of(text: str, index: int) -> int:
@@ -69,7 +109,13 @@ def _py_type_to_json(annotation: ast.expr | None) -> str:
     if annotation is None:
         return "string"
     src = ast.unparse(annotation).lower()
-    for key, val in (("int", "integer"), ("float", "number"), ("bool", "boolean"), ("list", "array"), ("dict", "object")):
+    for key, val in (
+        ("int", "integer"),
+        ("float", "number"),
+        ("bool", "boolean"),
+        ("list", "array"),
+        ("dict", "object"),
+    ):
         if key in src:
             return val
     return "string"
@@ -82,9 +128,16 @@ class RepositoryAnalyzer:
     # ------------------------------------------------------------------ public
     def analyze(self, repo: IngestedRepo) -> RepositoryAnalysis:
         root = repo.path
-        a = RepositoryAnalysis(root_name=repo.name, commit=repo.commit, ref=repo.ref, url=repo.url,
-                               file_count=repo.file_count, total_bytes=repo.total_bytes, skipped=dict(repo.skipped),
-                               warnings=list(repo.warnings))
+        a = RepositoryAnalysis(
+            root_name=repo.name,
+            commit=repo.commit,
+            ref=repo.ref,
+            url=repo.url,
+            file_count=repo.file_count,
+            total_bytes=repo.total_bytes,
+            skipped=dict(repo.skipped),
+            warnings=list(repo.warnings),
+        )
         files = self._list_files(root)
         lang_bytes: Counter[str] = Counter()
         cap_hits: dict[str, list[Located]] = {}
@@ -139,10 +192,21 @@ class RepositoryAnalyzer:
                 for m in S.ENV_KEY.finditer(text):
                     env_keys.add(m.group(1))
             ext = PurePosixPath(rel).suffix.lower()
-            if base in {"openapi.json", "openapi.yaml", "openapi.yml", "swagger.json", "swagger.yaml", "swagger.yml"} or (
-                    ext in {".json", ".yaml", ".yml"} and re.search(r'^\s*["\']?(openapi|swagger)["\']?\s*:', text[:2000], re.M)):
+            if base in {
+                "openapi.json",
+                "openapi.yaml",
+                "openapi.yml",
+                "swagger.json",
+                "swagger.yaml",
+                "swagger.yml",
+            } or (
+                ext in {".json", ".yaml", ".yml"}
+                and re.search(r'^\s*["\']?(openapi|swagger)["\']?\s*:', text[:2000], re.M)
+            ):
                 a.openapi_specs.append(Located(path=rel))
-            if base in {".mcp.json", "mcp.json", "claude_desktop_config.json"} or rel.endswith((".cursor/mcp.json", ".vscode/mcp.json")):
+            if base in {".mcp.json", "mcp.json", "claude_desktop_config.json"} or rel.endswith(
+                (".cursor/mcp.json", ".vscode/mcp.json")
+            ):
                 self._mcp_config(rel, text, a)
             if ext in CONFIG_EXT or ext in {".json", ".yaml", ".yml"}:
                 self._tools_from_structured(rel, text, a, seen_tools)
@@ -195,8 +259,15 @@ class RepositoryAnalyzer:
     # ------------------------------------------------------------------ manifests
     def _manifest(self, rel: str, base: str, text: str, a: RepositoryAnalysis) -> None:
         def dep(name: str, version: str | None, eco: str, dev: bool = False) -> None:
-            a.dependencies.append(DependencyInfo(name=name, version=version, ecosystem=eco, source=rel,
-                                                 dev=dev or bool(re.search(r"(dev|test)", base))))
+            a.dependencies.append(
+                DependencyInfo(
+                    name=name,
+                    version=version,
+                    ecosystem=eco,
+                    source=rel,
+                    dev=dev or bool(re.search(r"(dev|test)", base)),
+                )
+            )
 
         try:
             if base.startswith("requirements") and base.endswith(".txt"):
@@ -237,7 +308,10 @@ class RepositoryAnalyzer:
                     dep(m.group(2), None, "maven")
                     dep(m.group(1), None, "maven")
             elif base in {"build.gradle", "build.gradle.kts"}:
-                for m in re.finditer(r"""(?:implementation|api|compile|runtimeOnly)\s*\(?\s*["']([^:"']+):([^:"']+)(?::([^"']+))?["']""", text):
+                for m in re.finditer(
+                    r"""(?:implementation|api|compile|runtimeOnly)\s*\(?\s*["']([^:"']+):([^:"']+)(?::([^"']+))?["']""",
+                    text,
+                ):
                     dep(m.group(2), m.group(3), "maven")
                     dep(m.group(1), None, "maven")
             elif base.endswith(".csproj"):
@@ -250,8 +324,12 @@ class RepositoryAnalyzer:
                 data = tomllib.loads(text)
                 for sect in ("dependencies", "dev-dependencies"):
                     for k, v in data.get(sect, {}).items():
-                        dep(k, v if isinstance(v, str) else (v.get("version") if isinstance(v, dict) else None), "cargo",
-                            dev=sect == "dev-dependencies")
+                        dep(
+                            k,
+                            v if isinstance(v, str) else (v.get("version") if isinstance(v, dict) else None),
+                            "cargo",
+                            dev=sect == "dev-dependencies",
+                        )
             elif base == "composer.json":
                 data = json.loads(text)
                 for sect in ("require", "require-dev"):
@@ -269,13 +347,26 @@ class RepositoryAnalyzer:
         except (ValueError, tomllib.TOMLDecodeError, KeyError, TypeError) as exc:
             a.warnings.append(f"could not parse {rel}: {type(exc).__name__}")
 
-    def _dependencies_to_facts(self, a: RepositoryAnalysis, frameworks: set[str], providers: set[str], dbs: set[str],
-                               vecs: set[str], mems: set[str], browsers: set[str], cap_hits: dict[str, list[Located]]) -> None:
+    def _dependencies_to_facts(
+        self,
+        a: RepositoryAnalysis,
+        frameworks: set[str],
+        providers: set[str],
+        dbs: set[str],
+        vecs: set[str],
+        mems: set[str],
+        browsers: set[str],
+        cap_hits: dict[str, list[Located]],
+    ) -> None:
         for d in a.dependencies:
             if d.dev:
                 continue
             key = S.normalise_dep(d.name)
-            hit = S.DEPENDENCIES.get(key) or S.DEPENDENCIES.get(key.replace("-", "_")) or S.DEPENDENCIES.get(d.name.lower())
+            hit = (
+                S.DEPENDENCIES.get(key)
+                or S.DEPENDENCIES.get(key.replace("-", "_"))
+                or S.DEPENDENCIES.get(d.name.lower())
+            )
             if not hit:
                 for k, v in S.DEPENDENCIES.items():
                     if "/" in k and d.name.lower().endswith(k):
@@ -284,20 +375,39 @@ class RepositoryAnalyzer:
             if not hit:
                 continue
             kind, label, cap = hit
-            {"framework": frameworks, "provider": providers, "database": dbs, "vectordb": vecs, "memory": mems,
-             "browser": browsers}.get(kind, set()).add(label)
+            {
+                "framework": frameworks,
+                "provider": providers,
+                "database": dbs,
+                "vectordb": vecs,
+                "memory": mems,
+                "browser": browsers,
+            }.get(kind, set()).add(label)
             if kind == "vectordb":
                 vecs.add(label)
             if cap:
                 loc = Located(path=d.source)
                 cap_hits.setdefault(cap, []).append(loc)
-                a.signals.append(Signal(kind="dependency", detail=f"{d.name} -> {label} ({cap})", location=loc, weight=0.7))
+                a.signals.append(
+                    Signal(kind="dependency", detail=f"{d.name} -> {label} ({cap})", location=loc, weight=0.7)
+                )
             elif kind == "framework":
-                a.signals.append(Signal(kind="dependency", detail=f"{d.name} -> {label}", location=Located(path=d.source), weight=0.5))
+                a.signals.append(
+                    Signal(
+                        kind="dependency", detail=f"{d.name} -> {label}", location=Located(path=d.source), weight=0.5
+                    )
+                )
 
     # ------------------------------------------------------------------ source scanning
-    def _code(self, rel: str, lang: str, text: str, a: RepositoryAnalysis, cap_hits: dict[str, list[Located]],
-              seen_tools: set[tuple[str, str]]) -> None:
+    def _code(
+        self,
+        rel: str,
+        lang: str,
+        text: str,
+        a: RepositoryAnalysis,
+        cap_hits: dict[str, list[Located]],
+        seen_tools: set[tuple[str, str]],
+    ) -> None:
         for kind, rx, cap, detail in S.CODE_SIGNALS:
             m = rx.search(text)
             if m and cap and (rel.rsplit("/", 1)[-1].lower() not in {"readme.md"}):
@@ -306,7 +416,9 @@ class RepositoryAnalyzer:
                 if len(hits) < 12:
                     hits.append(loc)
                 if len([s for s in a.signals if s.kind == kind]) < 6:
-                    a.signals.append(Signal(kind=kind, detail=f"{detail}: '{m.group(0)[:40]}'", location=loc, weight=0.4))
+                    a.signals.append(
+                        Signal(kind=kind, detail=f"{detail}: '{m.group(0)[:40]}'", location=loc, weight=0.4)
+                    )
         if lang == "Python":
             self._python_tools(rel, text, a, seen_tools)
         for framework, rx, _lang in S.TOOL_PATTERNS:
@@ -318,22 +430,41 @@ class RepositoryAnalyzer:
                     continue
                 desc = re.sub(r"\s+", " ", (m.groupdict().get("desc") or "")).strip()
                 seen_tools.add((framework, name))
-                a.tools.append(ToolDefinition(name=name, description=desc[:300], framework=framework,
-                                              location=Located(path=rel, line=_line_of(text, m.start())),
-                                              side_effects=S.infer_side_effects(name, desc)))
+                a.tools.append(
+                    ToolDefinition(
+                        name=name,
+                        description=desc[:300],
+                        framework=framework,
+                        location=Located(path=rel, line=_line_of(text, m.start())),
+                        side_effects=S.infer_side_effects(name, desc),
+                    )
+                )
         for framework, rx in S.AGENT_DEF_PATTERNS:
             for m in rx.finditer(text):
                 nm = m.groupdict().get("name") or m.groupdict().get("role") or "agent"
-                if len(a.agent_definitions) < 60 and not any(d.name == nm and d.framework == framework for d in a.agent_definitions):
-                    a.agent_definitions.append(AgentDefinition(name=nm, framework=framework,
-                                                               location=Located(path=rel, line=_line_of(text, m.start())),
-                                                               role=m.groupdict().get("role")))
+                if len(a.agent_definitions) < 60 and not any(
+                    d.name == nm and d.framework == framework for d in a.agent_definitions
+                ):
+                    a.agent_definitions.append(
+                        AgentDefinition(
+                            name=nm,
+                            framework=framework,
+                            location=Located(path=rel, line=_line_of(text, m.start())),
+                            role=m.groupdict().get("role"),
+                        )
+                    )
         for framework, rx in S.ROUTE_PATTERNS:
             for m in rx.finditer(text):
                 line = _line_of(text, m.start())
                 if len(a.apis) < 150 and not any(r.location.path == rel and r.location.line == line for r in a.apis):
-                    a.apis.append(ApiRoute(method=m.group("method").upper(), path=m.group("path"), framework=framework,
-                                           location=Located(path=rel, line=line)))
+                    a.apis.append(
+                        ApiRoute(
+                            method=m.group("method").upper(),
+                            path=m.group("path"),
+                            framework=framework,
+                            location=Located(path=rel, line=line),
+                        )
+                    )
         self._prompts(rel, text, a)
 
     def _python_tools(self, rel: str, text: str, a: RepositoryAnalysis, seen: set[tuple[str, str]]) -> None:
@@ -370,18 +501,33 @@ class RepositoryAnalyzer:
                 if default is None:
                     required.append(arg.arg)
             confirm = any(p in {"confirm", "confirmed", "approved", "user_confirmed"} for p in props)
-            fw = "MCP (FastMCP)" if any(isinstance(d, ast.Call | ast.Attribute) and "tool" in ast.dump(d)[:80] and
-                                        "attr='tool'" in ast.dump(d)[:200] for d in node.decorator_list) else "Python @tool"
+            fw = (
+                "MCP (FastMCP)"
+                if any(
+                    isinstance(d, ast.Call | ast.Attribute)
+                    and "tool" in ast.dump(d)[:80]
+                    and "attr='tool'" in ast.dump(d)[:200]
+                    for d in node.decorator_list
+                )
+                else "Python @tool"
+            )
             name = node.name
             description = doc.split("\n\n")[0].replace("\n", " ").strip()
             if kw.get("name") is not None and isinstance(kw["name"], ast.Constant):
                 name = str(kw["name"].value)
             if kw.get("description") is not None and isinstance(kw["description"], ast.Constant):
                 description = str(kw["description"].value)
-            a.tools.append(ToolDefinition(
-                name=name, description=description[:300], framework=fw, location=Located(path=rel, line=node.lineno),
-                parameters={"type": "object", "properties": props, "required": required},
-                side_effects=S.infer_side_effects(name, description), requires_confirmation=True if confirm else None))
+            a.tools.append(
+                ToolDefinition(
+                    name=name,
+                    description=description[:300],
+                    framework=fw,
+                    location=Located(path=rel, line=node.lineno),
+                    parameters={"type": "object", "properties": props, "required": required},
+                    side_effects=S.infer_side_effects(name, description),
+                    requires_confirmation=True if confirm else None,
+                )
+            )
 
     def _prompts(self, rel: str, text: str, a: RepositoryAnalysis) -> None:
         for m in S.PROMPT_ASSIGN.finditer(text):
@@ -390,10 +536,16 @@ class RepositoryAnalyzer:
                 continue
             if len(a.prompts) >= 40:
                 return
-            a.prompts.append(PromptItem(
-                kind="system_prompt" if "system" in m.group("name").lower() else "instructions", excerpt=body[:400],
-                sha256=hashlib.sha256(body.encode()).hexdigest()[:16], chars=len(body),
-                location=Located(path=rel, line=_line_of(text, m.start())), injection_indicators=injection_indicators(body)))
+            a.prompts.append(
+                PromptItem(
+                    kind="system_prompt" if "system" in m.group("name").lower() else "instructions",
+                    excerpt=body[:400],
+                    sha256=hashlib.sha256(body.encode()).hexdigest()[:16],
+                    chars=len(body),
+                    location=Located(path=rel, line=_line_of(text, m.start())),
+                    injection_indicators=injection_indicators(body),
+                )
+            )
 
     def _tools_from_structured(self, rel: str, text: str, a: RepositoryAnalysis, seen: set[tuple[str, str]]) -> None:
         try:
@@ -412,13 +564,25 @@ class RepositoryAnalyzer:
                 if isinstance(node.get("function"), dict) and node.get("type") == "function":
                     node = node["function"]
                     schema, nm = node.get("parameters"), node.get("name")
-                if isinstance(nm, str) and isinstance(schema, dict) and (node.get("description") or schema.get("properties")):
-                    if ("config", nm) not in seen:
-                        seen.add(("config", nm))
-                        desc = str(node.get("description") or "")
-                        a.tools.append(ToolDefinition(name=nm, description=desc[:300], parameters=schema, framework="config/JSON schema",
-                                                      location=Located(path=rel), side_effects=S.infer_side_effects(nm, desc)))
-                        found += 1
+                if (
+                    isinstance(nm, str)
+                    and isinstance(schema, dict)
+                    and (node.get("description") or schema.get("properties"))
+                    and ("config", nm) not in seen
+                ):
+                    seen.add(("config", nm))
+                    desc = str(node.get("description") or "")
+                    a.tools.append(
+                        ToolDefinition(
+                            name=nm,
+                            description=desc[:300],
+                            parameters=schema,
+                            framework="config/JSON schema",
+                            location=Located(path=rel),
+                            side_effects=S.infer_side_effects(nm, desc),
+                        )
+                    )
+                    found += 1
                 for v in node.values():
                     walk(v, depth + 1)
             elif isinstance(node, list):
@@ -437,9 +601,19 @@ class RepositoryAnalyzer:
             for name, cfg in servers.items():
                 if not isinstance(cfg, dict):
                     continue
-                transport = cfg.get("type") or ("stdio" if cfg.get("command") else "http" if cfg.get("url") else "unknown")
-                a.mcp.append(McpServerConfig(name=name, transport=str(transport), command=cfg.get("command"), url=cfg.get("url"),
-                                             location=Located(path=rel), env_keys=sorted((cfg.get("env") or {}).keys())))
+                transport = cfg.get("type") or (
+                    "stdio" if cfg.get("command") else "http" if cfg.get("url") else "unknown"
+                )
+                a.mcp.append(
+                    McpServerConfig(
+                        name=name,
+                        transport=str(transport),
+                        command=cfg.get("command"),
+                        url=cfg.get("url"),
+                        location=Located(path=rel),
+                        env_keys=sorted((cfg.get("env") or {}).keys()),
+                    )
+                )
 
     @staticmethod
     def _model_names(text: str, models: set[str]) -> None:
@@ -456,9 +630,17 @@ class RepositoryAnalyzer:
         found = injection_indicators(text[:60_000])
         if found:
             m = re.search(found[0], text[:60_000], re.I)
-            a.signals.append(Signal(kind="injection_indicator", detail=f"instruction-like text matching /{found[0][:50]}/",
-                                    location=Located(path=rel, line=_line_of(text, m.start()) if m else None), weight=0.9))
-            a.warnings.append(f"{rel} contains instruction-like text aimed at AI assistants; it is treated as untrusted data and never obeyed")
+            a.signals.append(
+                Signal(
+                    kind="injection_indicator",
+                    detail=f"instruction-like text matching /{found[0][:50]}/",
+                    location=Located(path=rel, line=_line_of(text, m.start()) if m else None),
+                    weight=0.9,
+                )
+            )
+            a.warnings.append(
+                f"{rel} contains instruction-like text aimed at AI assistants; it is treated as untrusted data and never obeyed"
+            )
 
     def _secrets(self, rel: str, text: str, a: RepositoryAnalysis) -> None:
         if rel.endswith((".example", ".sample", ".md", ".lock")) or "/tests/" in f"/{rel}" or "fixtures" in rel:
@@ -467,18 +649,28 @@ class RepositoryAnalyzer:
             return
         _t, counts = self.redactor.redact_text(text[:100_000])
         if counts:
-            m = re.search(r"(?i)(api[_-]?key|secret|token|passwd|password)\s*[:=]\s*[\"']?[A-Za-z0-9_\-./+=]{12,}", text)
+            m = re.search(
+                r"(?i)(api[_-]?key|secret|token|passwd|password)\s*[:=]\s*[\"']?[A-Za-z0-9_\-./+=]{12,}", text
+            )
             line = _line_of(text, m.start()) if m else None
             a.secrets_found.append(Located(path=rel, line=line))
             a.warnings.append(f"possible hard-coded secret in {rel}{f':{line}' if line else ''} (value not recorded)")
 
     # ------------------------------------------------------------------ synthesis
     def _capabilities(self, a: RepositoryAnalysis, hits: dict[str, list[Located]]) -> dict[str, bool]:
-        mcp_deps = [d for d in a.dependencies if not d.dev and S.DEPENDENCIES.get(S.normalise_dep(d.name), ("", "", ""))[0] == "mcp"]
+        mcp_deps = [
+            d
+            for d in a.dependencies
+            if not d.dev and S.DEPENDENCIES.get(S.normalise_dep(d.name), ("", "", ""))[0] == "mcp"
+        ]
         mcp_tools = [t for t in a.tools if t.framework.startswith("MCP")]
         if not a.mcp and mcp_deps and (mcp_tools or not a.apis):
-            a.mcp.append(McpServerConfig(name=a.root_name, transport="stdio/http", role="server",
-                                         location=Located(path=mcp_deps[0].source)))
+            a.mcp.append(
+                McpServerConfig(
+                    name=a.root_name, transport="stdio/http", role="server", location=Located(path=mcp_deps[0].source)
+                )
+            )
+
         def strong(cap: str, minimum: int = 1) -> bool:
             return len(hits.get(cap, [])) >= minimum
 
@@ -487,17 +679,33 @@ class RepositoryAnalyzer:
             "rag": strong("rag", 2) or bool(a.vector_databases),
             "memory": strong("memory", 2) or bool(a.memory_systems),
             "planning": strong("planning", 2),
-            "multi_agent": strong("multi_agent", 2) or len({d.name for d in a.agent_definitions if d.framework in {
-                "CrewAI", "OpenAI Agents SDK", "AutoGen", "LangGraph node"}}) >= 2,
+            "multi_agent": strong("multi_agent", 2)
+            or len(
+                {
+                    d.name
+                    for d in a.agent_definitions
+                    if d.framework in {"CrewAI", "OpenAI Agents SDK", "AutoGen", "LangGraph node"}
+                }
+            )
+            >= 2,
             "browser": bool(a.browser_frameworks) or strong("browser", 2),
             "computer_use": strong("computer_use"),
-            "coding": strong("coding", 3) and any(h.path.endswith((".py", ".ts", ".js", ".go", ".rs", ".java", ".kt")) for h in hits.get("coding", [])),
+            "coding": strong("coding", 3)
+            and any(
+                h.path.endswith((".py", ".ts", ".js", ".go", ".rs", ".java", ".kt")) for h in hits.get("coding", [])
+            ),
             "mcp": bool(a.mcp) or strong("mcp") or any(t.framework.startswith("MCP") for t in a.tools),
-            "human_approval": strong("human_approval"), "guardrails": strong("guardrails"),
-            "streaming": strong("streaming"), "multimodal": strong("multimodal", 2), "voice": strong("voice", 2),
-            "long_running": strong("long_running", 2), "event_driven": strong("event_driven", 2),
-            "api": bool(a.apis) or bool(a.openapi_specs) or strong("api"), "ui": strong("ui"),
-            "documents": strong("documents"), "state": strong("state") or bool(a.databases),
+            "human_approval": strong("human_approval"),
+            "guardrails": strong("guardrails"),
+            "streaming": strong("streaming"),
+            "multimodal": strong("multimodal", 2),
+            "voice": strong("voice", 2),
+            "long_running": strong("long_running", 2),
+            "event_driven": strong("event_driven", 2),
+            "api": bool(a.apis) or bool(a.openapi_specs) or strong("api"),
+            "ui": strong("ui"),
+            "documents": strong("documents"),
+            "state": strong("state") or bool(a.databases),
         }
         if caps["coding"] and not (a.tools or any("agent" in p.path.lower() for p in hits.get("coding", []))):
             caps["coding"] = False
@@ -542,9 +750,9 @@ class RepositoryAnalyzer:
             for n in names[:12]:
                 g.add_node(f"agent:{n}", n, "agent")
                 g.add_edge("agent", f"agent:{n}", "delegates")
-        for d in a.databases:
-            g.add_node(f"db:{d}", d, "database")
-            g.add_edge("agent", f"db:{d}")
+        for db in a.databases:
+            g.add_node(f"db:{db}", db, "database")
+            g.add_edge("agent", f"db:{db}")
 
 
 __all__ = ["RepositoryAnalyzer", "BINARY_EXT"]

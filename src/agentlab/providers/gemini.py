@@ -31,10 +31,18 @@ from agentlab.providers.base import (
 
 class GeminiProvider(LLMProvider):
     type_name = "gemini"
-    default_capabilities = frozenset({
-        Capability.CHAT, Capability.STREAMING, Capability.STRUCTURED_OUTPUT, Capability.JSON_SCHEMA,
-        Capability.TOOL_CALLING, Capability.MULTIMODAL, Capability.EMBEDDINGS, Capability.MODEL_DISCOVERY,
-    })
+    default_capabilities = frozenset(
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.STRUCTURED_OUTPUT,
+            Capability.JSON_SCHEMA,
+            Capability.TOOL_CALLING,
+            Capability.MULTIMODAL,
+            Capability.EMBEDDINGS,
+            Capability.MODEL_DISCOVERY,
+        }
+    )
 
     def __init__(self, config, credentials=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(config, credentials)
@@ -69,8 +77,12 @@ class GeminiProvider(LLMProvider):
             for c in m.tool_calls:
                 parts.append({"functionCall": {"name": c.name, "args": c.arguments}})
             if m.role == "tool":
-                contents.append({"role": "user", "parts": [{"functionResponse": {
-                    "name": m.name or "tool", "response": {"result": m.text()}}}]})
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [{"functionResponse": {"name": m.name or "tool", "response": {"result": m.text()}}}],
+                    }
+                )
                 continue
             contents.append({"role": "model" if m.role == "assistant" else "user", "parts": parts})
         system = {"parts": system_parts} if system_parts else None
@@ -92,8 +104,14 @@ class GeminiProvider(LLMProvider):
         if system:
             body["systemInstruction"] = system
         if request.tools:
-            body["tools"] = [{"functionDeclarations": [
-                {"name": t.name, "description": t.description, "parameters": t.parameters} for t in request.tools]}]
+            body["tools"] = [
+                {
+                    "functionDeclarations": [
+                        {"name": t.name, "description": t.description, "parameters": t.parameters}
+                        for t in request.tools
+                    ]
+                }
+            ]
         return body
 
     async def _complete(self, request: CompletionRequest, model: str) -> CompletionResponse:
@@ -110,15 +128,23 @@ class GeminiProvider(LLMProvider):
             raise ProviderError(f"{self.name}: no candidates returned (blockReason={block})")
         parts = (cands[0].get("content") or {}).get("parts") or []
         text = "".join(p.get("text", "") for p in parts if "text" in p and not p.get("thought"))
-        calls = [LLMToolCall(name=p["functionCall"]["name"], arguments=p["functionCall"].get("args") or {})
-                 for p in parts if "functionCall" in p]
+        calls = [
+            LLMToolCall(name=p["functionCall"]["name"], arguments=p["functionCall"].get("args") or {})
+            for p in parts
+            if "functionCall" in p
+        ]
         um = data.get("usageMetadata") or {}
         return CompletionResponse(
-            text=text, tool_calls=calls, provider=self.name, model=data.get("modelVersion", model),
-            usage=TokenUsage(input_tokens=um.get("promptTokenCount", 0) or 0,
-                             output_tokens=(um.get("candidatesTokenCount", 0) or 0)
-                             + (um.get("thoughtsTokenCount", 0) or 0)),
-            finish_reason=cands[0].get("finishReason"), request_id=data.get("responseId"),
+            text=text,
+            tool_calls=calls,
+            provider=self.name,
+            model=data.get("modelVersion", model),
+            usage=TokenUsage(
+                input_tokens=um.get("promptTokenCount", 0) or 0,
+                output_tokens=(um.get("candidatesTokenCount", 0) or 0) + (um.get("thoughtsTokenCount", 0) or 0),
+            ),
+            finish_reason=cands[0].get("finishReason"),
+            request_id=data.get("responseId"),
         )
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
@@ -147,7 +173,7 @@ class GeminiProvider(LLMProvider):
         out: list[ModelInfo] = []
         page: str | None = None
         while True:
-            params = {"pageSize": 1000, **({"pageToken": page} if page else {})}
+            params: dict[str, str | int] = {"pageSize": 1000, **({"pageToken": page} if page else {})}
             r = await self._client.get(f"{self.base_url}/models", headers=self._headers(), params=params)
             raise_for_status(self.name, r.status_code, r.text, dict(r.headers))
             data = r.json()
@@ -158,9 +184,15 @@ class GeminiProvider(LLMProvider):
                     caps |= set(self.default_capabilities) - {Capability.EMBEDDINGS}
                 if "embedContent" in methods:
                     caps.add(Capability.EMBEDDINGS)
-                out.append(ModelInfo(id=m["name"].removeprefix("models/"), name=m.get("displayName"),
-                                     context_length=m.get("inputTokenLimit"), capabilities=sorted(caps),
-                                     provider=self.name))
+                out.append(
+                    ModelInfo(
+                        id=m["name"].removeprefix("models/"),
+                        name=m.get("displayName"),
+                        context_length=m.get("inputTokenLimit"),
+                        capabilities=sorted(caps),
+                        provider=self.name,
+                    )
+                )
             page = data.get("nextPageToken")
             if not page:
                 return out

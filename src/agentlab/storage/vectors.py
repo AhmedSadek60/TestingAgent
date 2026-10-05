@@ -87,7 +87,8 @@ class PgVectorStore(VectorStore):
         self.conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         self.conn.execute(
             f"CREATE TABLE IF NOT EXISTS {table} (id text PRIMARY KEY, embedding vector({dim}), "  # noqa: S608
-            "content text, metadata jsonb)")
+            "content text, metadata jsonb)"
+        )
 
     def add(self, id, vector, text, metadata=None):  # type: ignore[no-untyped-def]
         import json
@@ -96,17 +97,20 @@ class PgVectorStore(VectorStore):
             f"INSERT INTO {self.table} (id, embedding, content, metadata) VALUES (%s, %s::vector, %s, %s) "  # noqa: S608
             "ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, content = EXCLUDED.content, "
             "metadata = EXCLUDED.metadata",
-            (id, "[" + ",".join(map(str, vector)) + "]", text, json.dumps(metadata or {})))
+            (id, "[" + ",".join(map(str, vector)) + "]", text, json.dumps(metadata or {})),
+        )
 
     def search(self, vector, k=5):  # type: ignore[no-untyped-def]
         rows = self.conn.execute(
             f"SELECT id, 1 - (embedding <=> %s::vector) AS score, content, metadata FROM {self.table} "  # noqa: S608
             "ORDER BY embedding <=> %s::vector LIMIT %s",
-            ("[" + ",".join(map(str, vector)) + "]",) * 2 + (k,)).fetchall()
+            ("[" + ",".join(map(str, vector)) + "]",) * 2 + (k,),
+        ).fetchall()
         return [VectorHit(r[0], float(r[1]), r[2], r[3] or {}) for r in rows]
 
     def __len__(self) -> int:
-        return int(self.conn.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0])  # noqa: S608
+        row = self.conn.execute(f"SELECT count(*) FROM {self.table}").fetchone()  # noqa: S608
+        return int(row[0]) if row else 0
 
 
 class UnsupportedVectorStore(VectorStore):
@@ -115,7 +119,8 @@ class UnsupportedVectorStore(VectorStore):
     def __init__(self, name: str) -> None:
         raise UnsupportedCapability(
             f"vector store '{name}' is not implemented in this build; implement VectorStore and register it "
-            "with agentlab.storage.vectors.VECTOR_STORES")
+            "with agentlab.storage.vectors.VECTOR_STORES"
+        )
 
     def add(self, *a, **k):  # type: ignore[no-untyped-def]
         raise NotImplementedError

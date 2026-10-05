@@ -44,12 +44,16 @@ def _cleanup_all() -> None:  # pragma: no cover - interpreter shutdown
 atexit.register(_cleanup_all)
 
 
-async def _run(args: list[str], *, stdin: bytes | None = None, timeout: float = 60.0,
-               max_bytes: int = 2_000_000) -> tuple[int, bytes, bytes, bool, bool]:
+async def _run(
+    args: list[str], *, stdin: bytes | None = None, timeout: float = 60.0, max_bytes: int = 2_000_000
+) -> tuple[int, bytes, bytes, bool, bool]:
     """Run a docker CLI command. Returns (code, stdout, stderr, timed_out, truncated)."""
     proc = await asyncio.create_subprocess_exec(
-        *args, stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        *args,
+        stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
 
     async def _read(stream: asyncio.StreamReader | None) -> tuple[bytes, bool]:
         buf = bytearray()
@@ -76,7 +80,8 @@ async def _run(args: list[str], *, stdin: bytes | None = None, timeout: float = 
 
     try:
         (out, t1), (err, t2), _ = await asyncio.wait_for(
-            asyncio.gather(_read(proc.stdout), _read(proc.stderr), _feed()), timeout=timeout)
+            asyncio.gather(_read(proc.stdout), _read(proc.stderr), _feed()), timeout=timeout
+        )
         code = await asyncio.wait_for(proc.wait(), timeout=5)
         return code, out, err, False, t1 or t2
     except TimeoutError:
@@ -97,8 +102,15 @@ class DockerSandbox(Sandbox):
     def _docker(self) -> str:
         return self.provider.docker
 
-    async def exec(self, command: list[str], *, timeout: float | None = None, env: dict[str, str] | None = None,
-                   stdin: bytes | None = None, workdir: str | None = None) -> ExecResult:
+    async def exec(
+        self,
+        command: list[str],
+        *,
+        timeout: float | None = None,
+        env: dict[str, str] | None = None,
+        stdin: bytes | None = None,
+        workdir: str | None = None,
+    ) -> ExecResult:
         if self._closed:
             raise SandboxError("sandbox is closed")
         timeout = timeout or self.spec.timeout_seconds
@@ -108,17 +120,25 @@ class DockerSandbox(Sandbox):
         wrapped = ["timeout", "-s", "KILL", str(max(1, int(timeout))), *command]
         args += [self.id, *wrapped]
         t0 = time.perf_counter()
-        code, out, err, host_timeout, trunc = await _run(args, stdin=stdin, timeout=timeout + 15,
-                                                         max_bytes=self.spec.max_output_bytes)
+        code, out, err, host_timeout, trunc = await _run(
+            args, stdin=stdin, timeout=timeout + 15, max_bytes=self.spec.max_output_bytes
+        )
         timed_out = host_timeout or code in (124, 137)
         if host_timeout:  # the client hung: the container is no longer trustworthy, remove it entirely
             await self.close()
-        return ExecResult(exit_code=code, stdout=out.decode("utf-8", "replace"), stderr=err.decode("utf-8", "replace"),
-                          timed_out=timed_out, duration_ms=round((time.perf_counter() - t0) * 1000, 2),
-                          truncated=trunc, command=command)
+        return ExecResult(
+            exit_code=code,
+            stdout=out.decode("utf-8", "replace"),
+            stderr=err.decode("utf-8", "replace"),
+            timed_out=timed_out,
+            duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+            truncated=trunc,
+            command=command,
+        )
 
-    async def put_dir(self, local: Path, dest: str | None = None, *, max_files: int = 5000,
-                      max_bytes: int = 100 * 1024 * 1024) -> int:
+    async def put_dir(
+        self, local: Path, dest: str | None = None, *, max_files: int = 5000, max_bytes: int = 100 * 1024 * 1024
+    ) -> int:
         buf = io.BytesIO()
         count = total = 0
         root = local.resolve()
@@ -133,7 +153,9 @@ class DockerSandbox(Sandbox):
                 total += size
                 count += 1
                 if count > max_files or total > max_bytes:
-                    raise SandboxError(f"directory exceeds sandbox import limits ({max_files} files / {max_bytes} bytes)")
+                    raise SandboxError(
+                        f"directory exceeds sandbox import limits ({max_files} files / {max_bytes} bytes)"
+                    )
                 info = tar.gettarinfo(str(path), arcname=str(rel))
                 info.uid = info.gid = 65534
                 info.uname = info.gname = ""
@@ -145,8 +167,9 @@ class DockerSandbox(Sandbox):
         return count
 
     async def _tar_in(self, data: bytes, dest: str) -> ExecResult:
-        return await self.exec(["tar", "-xf", "-", "-C", dest, "--no-same-owner", "--no-same-permissions"],
-                               stdin=data, timeout=120)
+        return await self.exec(
+            ["tar", "-xf", "-", "-C", dest, "--no-same-owner", "--no-same-permissions"], stdin=data, timeout=120
+        )
 
     async def put_file(self, dest: str, data: bytes, mode: int = 0o644) -> None:
         buf = io.BytesIO()
@@ -156,8 +179,9 @@ class DockerSandbox(Sandbox):
             info.mode = mode
             info.uid = info.gid = 65534
             tar.addfile(info, io.BytesIO(data))
-        r = await self.exec(["tar", "-xf", "-", "-C", "/", "--no-same-owner"], stdin=buf.getvalue(), timeout=60,
-                            workdir="/")
+        r = await self.exec(
+            ["tar", "-xf", "-", "-C", "/", "--no-same-owner"], stdin=buf.getvalue(), timeout=60, workdir="/"
+        )
         if not r.ok:
             raise SandboxError(f"failed to write {dest}: {r.stderr[:300]}")
 
@@ -171,7 +195,9 @@ class DockerSandbox(Sandbox):
         """Copy a sandbox directory out as regular files only (links and devices are dropped)."""
         code, out, err, _t, trunc = await _run(
             [self._docker, "exec", "-w", "/", self.id, "tar", "-cf", "-", "-C", path or self.spec.workdir, "."],
-            timeout=120, max_bytes=max_bytes)
+            timeout=120,
+            max_bytes=max_bytes,
+        )
         if code != 0 or trunc:
             raise SandboxError(f"export failed: {err.decode('utf-8', 'replace')[:200] or 'output too large'}")
         local = local.resolve()
@@ -214,7 +240,9 @@ class DockerSandboxProvider(SandboxProvider):
             return False, "the 'docker' CLI is not installed"
         code, out, err, to, _ = await _run([self.docker, "version", "--format", "{{.Server.Version}}"], timeout=15)
         if code != 0 or to:
-            return False, "the Docker daemon is not reachable: " + (err.decode("utf-8", "replace").strip()[:160] or "timeout")
+            return False, "the Docker daemon is not reachable: " + (
+                err.decode("utf-8", "replace").strip()[:160] or "timeout"
+            )
         return True, f"Docker {out.decode().strip()}"
 
     async def create(self, spec: SandboxSpec) -> Sandbox:
@@ -222,8 +250,10 @@ class DockerSandboxProvider(SandboxProvider):
         if not ok:
             raise SandboxUnavailable(f"{why}; refusing to run untrusted code without isolation")
         if spec.network == "allowlist":
-            raise SandboxUnavailable("network 'allowlist' mode is not supported by this build (it would need an egress proxy); "
-                                     "use 'none' or 'internal'")
+            raise SandboxUnavailable(
+                "network 'allowlist' mode is not supported by this build (it would need an egress proxy); "
+                "use 'none' or 'internal'"
+            )
         code, _o, _e, _t, _ = await _run([self.docker, "image", "inspect", spec.image], timeout=30)
         if code != 0:
             if not spec.allow_pull:
@@ -242,13 +272,46 @@ class DockerSandboxProvider(SandboxProvider):
             net_args = ["--network", network_name]
         mem = f"{spec.memory_mb}m"
         args = [
-            self.docker, "create", "--name", name, *net_args, "--read-only", "--cap-drop", "ALL",
-            "--security-opt", "no-new-privileges", "--pids-limit", str(spec.pids_limit), "--memory", mem,
-            "--memory-swap", mem, "--cpus", str(spec.cpus), "--user", spec.user, "--ulimit", "nofile=1024:1024",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m,mode=1777",  # noqa: S108 - container-local tmpfs
-            "--tmpfs", f"{spec.workdir}:rw,nosuid,size={spec.disk_mb}m,mode=1777",
-            "-w", spec.workdir, "--label", "agentlab=1", "--label", f"agentlab.run={spec.labels.get('run', '')}",
-            "-e", "HOME=/tmp", "-e", "PYTHONDONTWRITEBYTECODE=1", spec.image, "sleep", "infinity"]
+            self.docker,
+            "create",
+            "--name",
+            name,
+            *net_args,
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--pids-limit",
+            str(spec.pids_limit),
+            "--memory",
+            mem,
+            "--memory-swap",
+            mem,
+            "--cpus",
+            str(spec.cpus),
+            "--user",
+            spec.user,
+            "--ulimit",
+            "nofile=1024:1024",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=64m,mode=1777",  # noqa: S108 - container-local tmpfs
+            "--tmpfs",
+            f"{spec.workdir}:rw,nosuid,size={spec.disk_mb}m,mode=1777",
+            "-w",
+            spec.workdir,
+            "--label",
+            "agentlab=1",
+            "--label",
+            f"agentlab.run={spec.labels.get('run', '')}",
+            "-e",
+            "HOME=/tmp",
+            "-e",
+            "PYTHONDONTWRITEBYTECODE=1",
+            spec.image,
+            "sleep",
+            "infinity",
+        ]
         code, _o, e, _t, _ = await _run(args, timeout=60)
         if code != 0:
             if network_name:
