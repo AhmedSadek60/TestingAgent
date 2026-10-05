@@ -45,7 +45,9 @@ def analyse_wave(plan: TestPlan, results: Sequence[TestResult]) -> WaveAnalysis:
             continue
         if r.status == TestStatus.FAILED:
             out.failed_ids.append(r.test_id)
-            checks = Counter(a.type for att in r.attempts for a in att.assertions if not a.passed)
+            checks = Counter(
+                a.type for att in r.attempts for a in att.assertions if not a.passed and not a.evaluator_error
+            )
             if checks:
                 out.failure_summary[r.test_id] = "failed checks: " + ", ".join(t for t, _ in checks.most_common(3))
             if p.origin in {"skill", "adaptive"}:  # user and model-suggested tests have no skill to regenerate from
@@ -140,6 +142,8 @@ def make_variant(test: TestCase, kind: str, wave: int) -> TestCase:
     clone.name = f"{test.name} [variant: {kind.replace('_', ' ')}]"
     clone.tags = list(dict.fromkeys([*test.tags, "adaptive", f"variant:{kind}", f"wave:{wave}"]))
     clone.status = TestStatus.DRAFT
+    # a variant refines the conclusion about its parent: it is evidence, so it is not scored a second time
+    clone.context = {**clone.context, "diagnostic": True, "variant_of": test.id, "variant_kind": kind}
     if kind == "warmup_turn":
         clone.input, clone.turns = None, _warmup(test)
     elif kind == "persistence":
@@ -171,4 +175,5 @@ def recheck_test(test: TestCase, repetitions: int, result: TestResult, wave: int
     clone.repetitions = max(repetitions, (test.repetitions or 1) + 2)
     clone.tags = list(dict.fromkeys([*test.tags, "adaptive", "recheck", f"wave:{wave}"]))
     clone.status = TestStatus.DRAFT
+    clone.context = {**clone.context, "diagnostic": True, "recheck_of": test.id}
     return clone

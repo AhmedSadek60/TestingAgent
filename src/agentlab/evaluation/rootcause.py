@@ -95,7 +95,7 @@ def classify_root_cause(
     failed: list[AssertionResult] = []
     judges: list[JudgeResult] = []
     for a in attempts:
-        failed += [x for x in a.assertions if not x.passed]
+        failed += [x for x in a.assertions if not x.passed and not x.evaluator_error]
         judges += [j for j in a.judge if not j.passed]
     types = {f.type for f in failed}
     ev = [f"{f.type}: {f.message}" for f in failed[:4]]

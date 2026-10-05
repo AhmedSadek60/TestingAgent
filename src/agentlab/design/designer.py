@@ -191,7 +191,10 @@ class TestDesignerAgent:
         max_tests: int | None = None,
         user_tests: Sequence[TestCase] = (),
         trim: bool = True,
+        selection: Sequence[tuple[Skill, SkillMatch]] | None = None,
     ) -> TestPlan:
+        """Wave 1. ``selection`` lets the caller run skill selection as its own step (the orchestrator does, so the
+        two phases are observable); without it the designer selects the skills itself."""
         if suite not in SUITES:
             raise UserError(f"unknown suite '{suite}' (known: {', '.join(SUITES)})")
         if suite == "regression":
@@ -207,7 +210,8 @@ class TestDesignerAgent:
         for problem in registry.problems:
             plan.warnings.append(PlanWarning(level="info", code="skill_problem", message=problem))
 
-        for skill, match in registry.select(ctx, include=include, exclude=exclude):
+        chosen = list(selection) if selection is not None else registry.select(ctx, include=include, exclude=exclude)
+        for skill, match in chosen:
             if match.selected and not _skill_in_suite(skill, suite):
                 match.selected, match.skipped_reason = False, f"not part of the '{suite}' suite"
             plan.skills.append(match)

@@ -108,7 +108,9 @@ class ConversationEngine(ExecutionEngine):
         out = AttemptOutcome()
         sessions: dict[str, str] = {}
         adapter = env.adapter
-        fixtures = Path(test.context["fixtures_dir"]) if test.context.get("fixtures_dir") else None
+        # generated fixtures live in a per-run directory the orchestrator provides; a test never stores a host path
+        fixtures_ref = test.context.get("fixtures_dir") or env.extras.get("fixtures_dir")
+        fixtures = Path(fixtures_ref) if fixtures_ref else None
         try:
             for i, turn in enumerate(test.all_turns()):
                 env.cancel.raise_if_cancelled()

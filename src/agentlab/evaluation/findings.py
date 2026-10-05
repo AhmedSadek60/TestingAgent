@@ -105,7 +105,7 @@ def _failed(attempts: list[AttemptResult]) -> list[AssertionResult]:
     for a in attempts:
         for x in a.assertions:
             key = (x.type, x.message)
-            if not x.passed and key not in seen:
+            if not x.passed and not x.evaluator_error and key not in seen:
                 seen.add(key)
                 out.append(x)
     return out
@@ -279,14 +279,19 @@ def cross_test_findings(run_id: str, findings: list[Finding], min_group: int = 3
         primary = f.facts[0].split("]")[0].lstrip("[") if f.facts else "unknown"
         groups[(f.root_cause.value, primary)].append(f)
     out: list[Finding] = []
+    used: set[str] = set()
     for (cause, primary), group in groups.items():
         if len(group) < min_group:
             continue
         sev = max((g.severity for g in group), key=lambda s: s.rank)
+        tid = "CROSS-" + primary.replace(":", "-").upper()
+        if tid in used:  # the same failed check with a different likely cause is a separate pattern
+            tid += "-" + cause.split("_")[0].upper()
+        used.add(tid)
         out.append(
             Finding(
                 run_id=run_id,
-                test_id="CROSS-" + primary.replace(":", "-").upper(),
+                test_id=tid,
                 title=f"Systemic pattern: {len(group)} tests failed on '{primary}' (likely {cause.replace('_', ' ')})",
                 category="cross-test-analysis",
                 severity=sev,

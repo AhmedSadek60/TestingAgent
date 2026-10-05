@@ -38,9 +38,9 @@ def _expand(raw: dict[str, Any], n: int) -> dict[str, Any]:
     d = dict(raw)
     asserts = list(d.pop("assertions", []) or [])
     for text in d.pop("must_contain", []) or []:
-        asserts.append({"type": "contains", "params": {"text": str(text), "case_sensitive": False}})
+        asserts.append({"type": "contains", "params": {"values": [str(text)], "case_sensitive": False}})
     for text in d.pop("must_not_contain", []) or []:
-        asserts.append({"type": "not_contains", "params": {"text": str(text), "case_sensitive": False}})
+        asserts.append({"type": "not_contains", "params": {"values": [str(text)], "case_sensitive": False}})
     for rx in d.pop("must_match", []) or []:
         asserts.append({"type": "regex", "params": {"pattern": str(rx)}})
     asserts = asserts or ([{"type": "not_empty"}] if not d.get("judge") else [])

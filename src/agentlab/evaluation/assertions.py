@@ -161,6 +161,8 @@ def _values(params: dict[str, Any], ctx: EvalContext) -> list[str]:
     vals = params.get("values")
     if vals is None:
         vals = [params["value"]] if "value" in params else []
+    if not vals:
+        raise ValueError("the check needs 'value' or 'values'")
     return [str(ctx.resolve(v)) for v in vals]
 
 
@@ -863,7 +865,13 @@ def evaluate_assertion(spec_type: str, params: dict[str, Any], ctx: EvalContext)
     try:
         fn = ASSERTIONS.get(spec_type)
     except KeyError as exc:
-        return AssertionResult(type=spec_type, passed=False, score=0.0, message=f"unknown assertion type: {exc}")
+        return AssertionResult(
+            type=spec_type,
+            passed=False,
+            score=0.0,
+            message=f"unknown assertion type: {exc}",
+            evaluator_error=True,
+        )
     try:
         return fn(params, ctx)
     except Exception as exc:
@@ -872,6 +880,7 @@ def evaluate_assertion(spec_type: str, params: dict[str, Any], ctx: EvalContext)
             passed=False,
             score=0.0,
             message=f"assertion '{spec_type}' could not be evaluated: {type(exc).__name__}: {exc}",
+            evaluator_error=True,
         )
 
 

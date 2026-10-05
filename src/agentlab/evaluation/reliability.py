@@ -47,7 +47,7 @@ def output_variance(outputs: list[str]) -> float:
 
 def failure_signature(attempt: AttemptResult) -> tuple[str, ...]:
     """Which checks failed. Equal signatures across attempts indicate a deterministic failure."""
-    sig = [a.type for a in attempt.assertions if not a.passed and a.required]
+    sig = [a.type for a in attempt.assertions if not a.passed and a.required and not a.evaluator_error]
     sig += [f"judge:{j.metric}" for j in attempt.judge if not j.passed]
     if attempt.error_kind:
         sig.append(f"error:{attempt.error_kind.value}")

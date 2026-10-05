@@ -19,10 +19,26 @@ def _sub_results(p: dict[str, Any], ctx: EvalContext) -> list[AssertionResult]:
     out = []
     for spec in p.get("checks", []):
         if "type" not in spec:
-            out.append(AssertionResult(type="any_of", passed=False, score=0.0, message=f"check without 'type': {spec}"))
+            out.append(
+                AssertionResult(
+                    type="any_of",
+                    passed=False,
+                    score=0.0,
+                    message=f"check without 'type': {spec}",
+                    evaluator_error=True,
+                )
+            )
             continue
         out.append(evaluate_assertion(spec["type"], spec.get("params", {}), ctx))
     return out
+
+
+def _broken(type_: str, results: list[AssertionResult]) -> AssertionResult:
+    """A combinator whose sub-checks could not run says nothing about the target."""
+    why = next(r.message for r in results if r.evaluator_error)
+    return AssertionResult(
+        type=type_, passed=False, score=0.0, message=f"a sub-check could not be evaluated: {why}", evaluator_error=True
+    )
 
 
 @register("any_of")
@@ -32,6 +48,8 @@ def a_any_of(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
     passed = [r for r in results if r.passed]
     if passed:
         return ok("any_of", f"satisfied by: {passed[0].message}", matched=passed[0].type)
+    if any(r.evaluator_error for r in results):
+        return _broken("any_of", results)
     return fail(
         "any_of", "none of the acceptable behaviours was observed: " + "; ".join(r.message for r in results[:3])
     )
@@ -43,6 +61,8 @@ def a_all_of(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
     bad = [r for r in results if not r.passed]
     if not bad:
         return ok("all_of", f"all {len(results)} checks passed")
+    if any(r.evaluator_error for r in bad) and not any(not r.evaluator_error for r in bad):
+        return _broken("all_of", bad)
     return fail("all_of", "; ".join(r.message for r in bad[:3]), score=1 - len(bad) / max(1, len(results)))
 
 

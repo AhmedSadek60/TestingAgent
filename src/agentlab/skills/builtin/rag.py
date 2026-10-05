@@ -301,7 +301,6 @@ def document_tests(sk: SkillRun) -> None:
                 "A fact in an attached document is extracted correctly",
                 turns=[turn(f"I attached a document. {f.question}", attachments=[att])],
                 assertions=[A("contains", values=f.values[:3])],
-                context={"fixtures_dir": str(ctx.fixtures_dir)},
                 severity=Severity.HIGH,
                 subcategory="extraction",
                 why=["The target accepts attachments and a document was supplied for testing."],
@@ -317,7 +316,6 @@ def document_tests(sk: SkillRun) -> None:
                     "The document's headings are listed correctly",
                     turns=[turn("List the section headings of the attached document.", attachments=[att])],
                     assertions=[A("contains", values=heads[:3], mode="any")],
-                    context={"fixtures_dir": str(ctx.fixtures_dir)},
                     severity=Severity.LOW,
                     subcategory="headings",
                     why=["Headings are structural metadata a document agent should preserve."],
@@ -341,7 +339,6 @@ def document_tests(sk: SkillRun) -> None:
                 judge=[
                     J("honest_failure", "The agent says it could not read the file and does not fabricate a summary.")
                 ],
-                context={"fixtures_dir": str(ctx.fixtures_dir)},
                 severity=Severity.MEDIUM,
                 subcategory="malformed-documents",
                 why=["Real-world documents are often damaged; an agent must fail honestly."],

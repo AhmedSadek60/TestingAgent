@@ -23,6 +23,11 @@ class AssertionResult(Model):
     turn_index: int | None = None
     severity: Severity | None = None
     required: bool = True
+    evaluator_error: bool = Field(
+        default=False,
+        description="The check itself could not be evaluated (bad test definition or evaluator defect). "
+        "This says nothing about the target, so it never counts as a failure of the target.",
+    )
 
 
 class JudgeVote(Model):
@@ -160,4 +165,7 @@ class Scorecard(Model):
     profile_description: str = ""
     weights: dict[str, float] = Field(default_factory=dict, description="Normalised weights actually used")
     notes: list[str] = Field(default_factory=list)
+    qualifiers: list[str] = Field(
+        default_factory=list, description="Statements that must accompany the score (e.g. security only partly tested)"
+    )
     counts: dict[str, int] = Field(default_factory=dict)

@@ -178,11 +178,15 @@ def decide_attempt_status(
         return stopped_status, None
     if timed_out:
         return TestStatus.TIMEOUT, "target did not respond within the test timeout"
-    required_fail = [a for a in deterministic if not a.passed and a.required]
+    required_fail = [a for a in deterministic if not a.passed and a.required and not a.evaluator_error]
+    broken = [a for a in deterministic if a.evaluator_error and a.required]
     judge_fail = [j for j in judges if j.votes and not j.uncertain and not j.passed]
     unusable = [j for j in judges if not j.votes or j.uncertain]
     if required_fail or judge_fail:
         return TestStatus.FAILED, None
+    if broken:
+        # the check could not run: that is a problem with the test or the evaluator, never a verdict on the target
+        return TestStatus.ERROR, f"a check could not be evaluated ({broken[0].type}: {broken[0].message})"
     if unusable and not has_deterministic:
         return TestStatus.ERROR, (
             "LLM judge was unavailable or uncertain and no deterministic assertion could decide; "

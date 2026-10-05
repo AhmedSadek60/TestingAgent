@@ -51,6 +51,22 @@ class DiscoveryResult:
             self.repo = None
 
 
+@dataclass
+class IngestedTarget:
+    """What can be learned from the target's files before anything is run (spec section 5: ingestion)."""
+
+    repo: IngestedRepo | None = None
+    repo_analysis: RepositoryAnalysis | None = None
+    documents: list[AnalyzedDocument] = field(default_factory=list)
+    openapi: OpenApiAnalysis | None = None
+    warnings: list[str] = field(default_factory=list)
+
+    def cleanup(self) -> None:
+        if self.repo:
+            self.repo.cleanup()
+            self.repo = None
+
+
 ENRICH_SCHEMA = {
     "type": "object",
     "properties": {
@@ -100,26 +116,11 @@ class TargetDiscoveryAgent:
         if self.bus:
             self.bus.emit(self.run_id, type_, payload)
 
-    # ------------------------------------------------------------------ main
-    async def discover(
-        self,
-        spec: TargetSpec,
-        *,
-        probe: bool = True,
-        enrich: bool | None = None,
-        keep_repo: bool = False,
-        runtime: TargetRuntime | None = None,
-        user_description: str | None = None,
-    ) -> DiscoveryResult:
-        self._emit(
-            EventType.DISCOVERY_STARTED,
-            {
-                "target": spec.name,
-                "interfaces": spec.interfaces(),
-                "repository": bool(spec.repository),
-                "documents": len(spec.documents),
-            },
-        )
+    # ------------------------------------------------------------------ ingestion
+    async def ingest(self, spec: TargetSpec) -> IngestedTarget:
+        """Phase "target ingestion": clone and analyse the repository (safely), read documents and the OpenAPI spec.
+
+        Nothing is executed and the target is not contacted (an OpenAPI document may be fetched from its URL)."""
         warnings: list[str] = []
         repo_ing: IngestedRepo | None = None
         repo_an: RepositoryAnalysis | None = None
@@ -141,6 +142,35 @@ class TargetDiscoveryAgent:
                 warnings.append(f"repository could not be analysed ({exc.kind.value}): {exc}")
         docs = self._documents(spec, warnings)
         openapi = await self._openapi(spec, repo_ing, repo_an, warnings)
+        return IngestedTarget(repo=repo_ing, repo_analysis=repo_an, documents=docs, openapi=openapi, warnings=warnings)
+
+    # ------------------------------------------------------------------ main
+    async def discover(
+        self,
+        spec: TargetSpec,
+        *,
+        probe: bool = True,
+        enrich: bool | None = None,
+        keep_repo: bool = False,
+        runtime: TargetRuntime | None = None,
+        user_description: str | None = None,
+        ingested: IngestedTarget | None = None,
+    ) -> DiscoveryResult:
+        """Fingerprint the target. Pass ``ingested`` when the caller already ran :meth:`ingest` (and so owns the
+        cloned repository's clean-up); otherwise ingestion happens here."""
+        self._emit(
+            EventType.DISCOVERY_STARTED,
+            {
+                "target": spec.name,
+                "interfaces": spec.interfaces(),
+                "repository": bool(spec.repository),
+                "documents": len(spec.documents),
+            },
+        )
+        own_ingest = ingested is None
+        ing = ingested if ingested is not None else await self.ingest(spec)
+        warnings: list[str] = list(ing.warnings)
+        repo_ing, repo_an, docs, openapi = ing.repo, ing.repo_analysis, ing.documents, ing.openapi
 
         owned_runtime = runtime is None
         rt = runtime
@@ -205,13 +235,13 @@ class TargetDiscoveryAgent:
             documents=docs,
             probe=probe_res,
             openapi=openapi,
-            repo=repo_ing if keep_repo else None,
+            repo=repo_ing if (keep_repo or not own_ingest) else None,
             mcp_tools=mcp_tools,
             web=web_info,
             warnings=warnings,
         )
-        if repo_ing and not keep_repo:
-            repo_ing.cleanup()
+        if own_ingest and not keep_repo:
+            ing.cleanup()
         self._emit(
             EventType.DISCOVERY_COMPLETED,
             {
