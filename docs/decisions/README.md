@@ -11,4 +11,6 @@ accepted by human review, not by an agent.
 
 ## Index
 <!-- Add one line per ADR: [0001](0001-title.md) — Title — Status -->
-_None yet._
+[0001](0001-single-package-plugin-architecture.md) — One Python package with plug-in registries — Proposed
+[0002](0002-fail-closed-isolation.md) — Fail closed when isolation is unavailable — Proposed
+[0003](0003-skills-trust-model.md) — Skills are data; Python generators are trusted-only — Proposed
