@@ -1,0 +1,26 @@
+{
+  "templateMode": true,
+  "project": {
+    "name": "TBD",
+    "description": "TBD",
+    "type": "TBD"
+  },
+  "technology": {
+    "languages": [],
+    "frameworks": [],
+    "buildSystems": [],
+    "packageManagers": []
+  },
+  "commands": {
+    "install": null,
+    "build": null,
+    "test": null,
+    "lint": null,
+    "format": null,
+    "typecheck": null,
+    "verify": null
+  },
+  "architecture": {
+    "style": "TBD"
+  }
+}

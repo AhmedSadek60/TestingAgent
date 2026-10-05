@@ -1,0 +1,58 @@
+name: AI-assisted task
+description: A task written so any developer or AI agent can pick it up without private chat context
+labels: ["ai-assisted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Put durable task context here, not in a private AI chat. Do not include secrets or sensitive data.
+  - type: textarea
+    id: objective
+    attributes:
+      label: "Objective"
+      description: "What outcome is needed and why?"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: "Context"
+      description: "Background, links, related issues/ADRs, current behavior."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance criteria"
+      description: "Checkable statements."
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: "Constraints"
+      description: "Must / must not (compatibility, no new dependencies, areas not to touch, deadlines)."
+  - type: textarea
+    id: validation
+    attributes:
+      label: "Expected validation"
+      description: "Commands, tests, or manual checks that demonstrate completion."
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      description: HIGH RISK tasks need a written plan and a named approval point before irreversible steps.
+      options: [Trivial, Standard, High risk]
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: "Relevant files / components"
+  - type: input
+    id: branch
+    attributes:
+      label: "Branch name"
+      description: "feature|fix|refactor|docs|chore/<issue-id>-<short-name>"

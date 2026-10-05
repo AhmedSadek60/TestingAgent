@@ -1,0 +1,40 @@
+name: Bug report
+description: Report incorrect behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: "Summary"
+      description: "What is wrong?"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: "Steps to reproduce"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected vs actual behavior"
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: "Environment / version"
+      description: "Do not paste secrets or tokens."
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / evidence"
+      description: "Redact secrets and personal data."
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options: [Trivial, Standard, High risk]
+    validations:
+      required: true

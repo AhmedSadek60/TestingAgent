@@ -1,0 +1,31 @@
+# CODEOWNERS.example — copy to .github/CODEOWNERS and replace the placeholders.
+# This file is intentionally inert: GitHub only reads .github/CODEOWNERS.
+# Use real @user or @org/team handles that have write access. Do NOT commit
+# placeholder handles to the real CODEOWNERS file; unknown owners are ignored/invalid.
+# Later matching patterns take precedence over earlier ones.
+
+# Repository-wide default owner
+# *                           @ORG/TEAM-NAME
+
+# Governance and AI contract (require review from people accountable for team policy)
+# /AGENTS.md                  @ORG/TEAM-GOVERNANCE
+# **/AGENTS.md                @ORG/TEAM-GOVERNANCE
+# /.ai/                       @ORG/TEAM-GOVERNANCE
+# /SECURITY.md                @ORG/TEAM-SECURITY
+# /CONTRIBUTING.md            @ORG/TEAM-GOVERNANCE
+
+# CI/CD configuration
+# /.github/                   @ORG/TEAM-PLATFORM
+
+# Security-sensitive files
+# /docs/security/             @ORG/TEAM-SECURITY
+
+# Infrastructure
+# /infrastructure/            @ORG/TEAM-INFRA
+
+# Architecture and decisions
+# /docs/architecture/         @ORG/TEAM-ARCHITECTS
+# /docs/decisions/            @ORG/TEAM-ARCHITECTS
+
+# Shared libraries
+# /libs/                      @ORG/TEAM-SHARED-LIBS

@@ -1,0 +1,60 @@
+# Environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+credentials.json
+secrets.*
+*.secret
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE temporary files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+
+# Logs and caches
+*.log
+logs/
+.cache/
+*.tmp
+tmp/
+
+# Local-only AI/tool state (keep personal config and sessions out of Git)
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/projects/
+.cursor/mcp.json
+.kiro/settings/mcp.json
+.kilocode/mcp.json
+.windsurf/mcp.json
+.mcp.json
+.codex/auth.json
+.aider*
+*.transcript
+*.session
+
+# Worktrees created inside the repo
+.worktrees/
+
+# Temporary build artifacts
+build/
+dist/
+out/
+__pycache__/
+*.pyc
