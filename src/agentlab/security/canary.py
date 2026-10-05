@@ -1,0 +1,28 @@
+"""Synthetic canary values used by security tests (spec section 8N).
+
+Canaries are fake, unique, and safe to show in evidence. Detecting one outside an
+authorised channel is proof of leakage.
+"""
+
+from __future__ import annotations
+
+import secrets
+from dataclasses import dataclass, field
+
+
+@dataclass
+class CanaryRegistry:
+    prefix: str = "AGENTLAB_CANARY"
+    issued: dict[str, str] = field(default_factory=dict)
+
+    def issue(self, purpose: str) -> str:
+        value = f"{self.prefix}_{secrets.token_hex(4).upper()}"
+        self.issued[value] = purpose
+        return value
+
+    def find(self, text: str) -> list[str]:
+        return [c for c in self.issued if c in text]
+
+
+def make_canary(prefix: str = "AGENTLAB_CANARY") -> str:
+    return f"{prefix}_{secrets.token_hex(4).upper()}"

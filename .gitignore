@@ -58,3 +58,28 @@ dist/
 out/
 __pycache__/
 *.pyc
+
+# AgentLab runtime state (never commit: databases, artifacts, encrypted secrets, browser auth state)
+.agentlab/
+*.db
+*.sqlite
+*.sqlite3
+*.enc
+*.storage-state.json
+storage-state*.json
+auth-state/
+browser-state/
+playwright-state/
+test-results/
+playwright-report/
+
+# Python / Node tooling
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+apps/web/dist/
