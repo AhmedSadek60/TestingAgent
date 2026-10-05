@@ -36,6 +36,7 @@ from agentlab.evaluation.reliability import (
     compute_reliability,
 )
 from agentlab.evaluation.scoring import FAILED_SCORE_CEILING
+from agentlab.execution.capabilities import describe_missing, missing_capabilities
 from agentlab.execution.engines import (
     ENGINES,
     AttemptEnv,
@@ -50,7 +51,13 @@ from agentlab.execution.evaluate import (
     run_trajectory,
     trajectory_summary,
 )
-from agentlab.execution.limits import CancellationToken, CancelledByUser, LimitReached, LimitTracker
+from agentlab.execution.limits import (
+    CancellationToken,
+    CancelledByUser,
+    LimitReached,
+    LimitTracker,
+    repetitions_for,
+)
 from agentlab.security.gate import AuthorizationGate
 from agentlab.storage.artifacts import ArtifactStore
 from agentlab.storage.db import Store
@@ -199,32 +206,22 @@ class TestExecutor:
         """Tests that must *plant* something in the target (canary, document, poisoned tool output) can only run
         where the interface lets AgentLab do that; otherwise they are BLOCKED with the reason, never faked."""
         needs = list(test.context.get("requires_capabilities") or [])
-        if "canary_seeding" in needs and not getattr(adapter.capabilities, "canary_seeding", False):
-            declared = bool(self.d.runtime.spec.known_canaries)
-            if declared:
-                needs = [n for n in needs if n != "canary_seeding"]  # the owner planted canaries in the target
-        missing = [n for n in needs if not getattr(adapter.capabilities, n, False)]
-        if not missing:
+        if not needs:
             return None
-        hint = {
-            "canary_seeding": "AgentLab cannot place a secret in this target's hidden instructions; declare "
-            "`known_canaries` in target.yaml for a deployment you configured with synthetic secrets",
-            "knowledge_injection": "AgentLab cannot add documents to this target's knowledge for a single session",
-            "tool_output_injection": "AgentLab cannot replace a tool result of this target with test content",
-            "multimodal": "this interface cannot pass images/attachments to the model",
-            "attachments": "this interface does not accept file attachments",
-        }
-        why = "; ".join(hint.get(m, m) for m in missing)
-        return f"interface '{adapter.kind}' lacks capability {missing}: {why}"
+        gate = self.d.gate
+        missing = missing_capabilities(
+            needs,
+            adapter.capabilities,
+            known_canaries=bool(self.d.runtime.spec.known_canaries),
+            environment={
+                "workspace": gate.sandbox_available,
+                "local_site": gate.browser_available and gate.locality != "remote",
+            },
+        )
+        return describe_missing(adapter.kind, missing) if missing else None
 
     def _repetitions(self, test: TestCase, risk: RiskClass) -> int:
-        """Explicit test setting > reliability tests > per-risk override > global default."""
-        ev = self.d.config.evaluation
-        if test.repetitions:
-            return max(1, test.repetitions)
-        if test.category.lower() == "reliability" or "reliability" in test.tags:
-            return max(1, ev.reliability_repetitions)
-        return max(1, ev.repetitions_by_risk.get(risk.value, ev.repetitions))
+        return repetitions_for(self.d.config, test, risk)
 
     async def _attempt(
         self, test: TestCase, adapter: AgentAdapter, n: int

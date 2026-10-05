@@ -11,10 +11,22 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from agentlab.core.config import LimitsConfig
-from agentlab.core.enums import RunStatus, TestStatus
+from agentlab.core.config import AgentLabConfig, LimitsConfig
+from agentlab.core.enums import RiskClass, RunStatus, TestStatus
 from agentlab.core.errors import AgentLabError
 from agentlab.core.models import TestCase
+
+
+def repetitions_for(config: AgentLabConfig, test: TestCase, risk: RiskClass) -> int:
+    """How many times a test runs: an explicit test setting > reliability tests > per-risk override > global default.
+
+    Shared by the executor (what actually runs) and the designer (what the plan predicts it will cost)."""
+    ev = config.evaluation
+    if test.repetitions:
+        return max(1, test.repetitions)
+    if test.category.lower() == "reliability" or "reliability" in test.tags:
+        return max(1, ev.reliability_repetitions)
+    return max(1, ev.repetitions_by_risk.get(risk.value, ev.repetitions))
 
 
 class LimitReached(AgentLabError):

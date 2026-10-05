@@ -268,9 +268,12 @@ class SkillRun:
     def n(self, quick: int, standard: int, thorough: int | None = None) -> int:
         return self.ctx.pick(quick, standard, thorough)
 
-    def note(self, text: str) -> None:
-        if text not in self.notes:
-            self.notes.append(text)
+    def note(self, text: str, area: str | None = None) -> None:
+        """Record why something was *not* generated. ``area`` ("N11", "E", ...) lets the plan show the reason next to
+        the coverage entry it explains; untagged notes are general remarks about the skill."""
+        line = f"[{area}] {text}" if area else text
+        if line not in self.notes:
+            self.notes.append(line)
 
     # ------------------------------------------------------------------ creation
     def add(
@@ -365,6 +368,11 @@ class SkillRun:
             from agentlab.core.models import BrowserStep
 
             t.browser_steps = [BrowserStep(**s) for s in browser_steps]
+        judge_only = (
+            t.judge and not t.assertions and not any(x.assertions for x in t.turns) and not t.expected_tool_calls
+        )
+        if judge_only and "judge" not in t.preconditions:
+            t.preconditions.append("judge")  # every criterion needs a judge: BLOCKED (never FAILED) without one
         needs = dict(requires or {})
         caps = list(t.context.get("requires_capabilities") or [])
         if caps:

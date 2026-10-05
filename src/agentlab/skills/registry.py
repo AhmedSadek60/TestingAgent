@@ -321,7 +321,7 @@ def _view(ctx: SkillContext) -> dict[str, Any]:
 
 
 def _inapplicable_reason(name: str, a: Any) -> str:
-    want = [*a.types, *a.capabilities, *a.interfaces]
+    want = list(dict.fromkeys([*a.types, *a.capabilities, *a.interfaces]))
     return f"none of {want} was detected" if want else ""
 
 

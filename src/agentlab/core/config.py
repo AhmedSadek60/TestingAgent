@@ -115,6 +115,20 @@ class StorageConfig(Model):
     reports_dir: str = ".agentlab/reports"
 
 
+class PlanningConfig(Model):
+    """Planning defaults. The numbers are *planning estimates* used to size a plan before anything runs, not measurements."""
+
+    max_tests: int = Field(
+        default=400, description="Upper bound on tests in one plan; extra tests are trimmed with coverage kept"
+    )
+    seconds_per_call: float = Field(default=3.0, description="Assumed wall time of one target call")
+    tokens_per_call: int = Field(default=800, description="Assumed prompt+completion tokens of one target call")
+    judge_tokens_per_call: int = Field(default=1000, description="Assumed tokens of one judge call")
+    adaptive_max_tests: int = Field(default=60, description="Upper bound on tests the adaptive second wave may add")
+    adaptive_repetitions: int = Field(default=5, description="Repetitions for the re-check of a flaky test")
+    adaptive_variants_per_failure: int = Field(default=3, description="Rephrased variants added per failed test")
+
+
 class QueueConfig(Model):
     backend: Literal["inline", "redis"] = "inline"
     redis_url: str = "redis://localhost:6379/0"
@@ -130,6 +144,7 @@ class AgentLabConfig(Model):
     limits: LimitsConfig = Field(default_factory=LimitsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     queue: QueueConfig = Field(default_factory=QueueConfig)
+    planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4
     skill_dirs: list[str] = Field(default_factory=list)
     plugins: list[str] = Field(default_factory=list, description="Python modules imported at start-up")

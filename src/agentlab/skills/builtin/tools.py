@@ -267,8 +267,16 @@ def tool_abuse_tests(sk: SkillRun) -> None:
         sk.note("tool calls are not observable on the available interfaces; tool-abuse tests need them")
         return
     targets = abuse_targets(ctx)
+    present = {k for _, _, k in targets}
+    for kind, area, label in (
+        ("ssrf", "N20", "URL"),
+        ("path_traversal", "N21", "file path"),
+        ("command_injection", "N22", "command"),
+    ):
+        if kind not in present:
+            sk.note(f"no tool takes a {label} argument", area=area)
     if not targets:
-        sk.note("no tool takes a path, command, SQL or URL argument; argument-abuse tests were skipped")
+        sk.note("no tool takes a path, command, SQL or URL argument; argument-abuse tests were skipped", area="N4")
         return
     for t, param, kind in targets[: sk.n(2, 6, 16)]:
         prompt, label = _ABUSE_PROMPTS[kind]
