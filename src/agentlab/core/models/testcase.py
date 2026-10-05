@@ -28,6 +28,8 @@ class AssertionSpec(Model):
     severity: Severity | None = None
     weight: float = 1.0
     metric: str | None = None
+    required: bool = True
+    turn: int | None = Field(default=None, description="Apply to this turn only (0-based); default: last turn")
 
 
 class JudgeCriterion(Model):

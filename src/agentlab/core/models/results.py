@@ -22,6 +22,7 @@ class AssertionResult(Model):
     evidence: dict[str, Any] = Field(default_factory=dict)
     turn_index: int | None = None
     severity: Severity | None = None
+    required: bool = True
 
 
 class JudgeVote(Model):
@@ -44,6 +45,7 @@ class JudgeResult(Model):
     votes: list[JudgeVote] = Field(default_factory=list)
     strategy: str = "single"
     agreement: float = 1.0
+    uncertain: bool = False
     error: str | None = None
 
 
@@ -126,6 +128,10 @@ class Finding(Model):
     root_cause: RootCause = RootCause.UNKNOWN
     root_cause_confidence: float = 0.3
     is_security: bool = False
+    facts: list[str] = Field(default_factory=list, description="Observed facts backed by evidence")
+    inferences: list[str] = Field(default_factory=list, description="Conclusions drawn from the facts")
+    judgments: list[str] = Field(default_factory=list, description="LLM-judge or reviewer opinions")
+    severity_breakdown: dict[str, Any] = Field(default_factory=dict)
     fact_kind: str = Field(default="observed", description="observed | inference | judgment")
     status: str = "open"
     original: dict[str, Any] | None = None
@@ -147,6 +153,11 @@ class Scorecard(Model):
     categories: list[CategoryScore]
     overall: float | None
     overall_confidence: float
+    raw_overall: float | None = Field(default=None, description="Overall score before any security cap")
     security_cap_applied: bool = False
     cap_reason: str | None = None
     grade: str | None = None
+    profile_description: str = ""
+    weights: dict[str, float] = Field(default_factory=dict, description="Normalised weights actually used")
+    notes: list[str] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)

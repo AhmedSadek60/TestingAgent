@@ -1,0 +1,479 @@
+"""Database engine and the :class:`Store` facade used by the orchestrator, API and CLI."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import create_engine, event, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from agentlab.core.errors import UserError
+from agentlab.core.ids import new_id, utcnow
+from agentlab.core.models import AgentProfile, Finding, Scorecard, TargetSpec, TestCase, TestResult
+from agentlab.security.credentials import CredentialProfile
+from agentlab.storage import orm
+from agentlab.storage.artifacts import ArtifactRef
+from agentlab.tracing.events import Event
+from agentlab.tracing.trace import Trace
+
+
+def row_to_dict(row: Any) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for col in row.__table__.columns:
+        v = getattr(row, col.key)
+        out[col.key] = v.isoformat() if isinstance(v, datetime) else v
+    return out
+
+
+def canonical_hash(obj: Any) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str, separators=(",", ":")).encode()).hexdigest()
+
+
+class Database:
+    def __init__(self, url: str = "sqlite:///.agentlab/agentlab.db", *, echo: bool = False) -> None:
+        self.url = url
+        kwargs: dict[str, Any] = {"echo": echo, "future": True}
+        if url.startswith("sqlite"):
+            kwargs["connect_args"] = {"check_same_thread": False}
+            if ":memory:" in url or url == "sqlite://":
+                kwargs["poolclass"] = StaticPool
+            else:
+                path = url.split("///", 1)[-1]
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.engine: Engine = create_engine(url, **kwargs)
+        if url.startswith("sqlite"):
+            @event.listens_for(self.engine, "connect")
+            def _pragmas(dbapi_conn, _):  # type: ignore[no-untyped-def]
+                cur = dbapi_conn.cursor()
+                cur.execute("PRAGMA foreign_keys=ON")
+                cur.execute("PRAGMA journal_mode=WAL")
+                cur.close()
+        self._sessions = sessionmaker(self.engine, expire_on_commit=False, future=True)
+        self._lock = threading.RLock()
+
+    def create_all(self) -> None:
+        orm.Base.metadata.create_all(self.engine)
+
+    def migrate(self) -> None:
+        from agentlab.storage.migrate import upgrade
+
+        upgrade(self.url)
+
+    @contextmanager
+    def session(self) -> Iterator[Session]:
+        with self._lock:
+            s = self._sessions()
+            try:
+                yield s
+                s.commit()
+            except Exception:
+                s.rollback()
+                raise
+            finally:
+                s.close()
+
+    def dispose(self) -> None:
+        self.engine.dispose()
+
+
+class Store:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    # ----------------------------------------------------------------- projects / targets
+    def create_project(self, name: str, description: str = "", objective: str = "",
+                       settings: dict[str, Any] | None = None) -> dict[str, Any]:
+        with self.db.session() as s:
+            if s.scalar(select(orm.Project).where(orm.Project.name == name)):
+                raise UserError(f"project '{name}' already exists")
+            row = orm.Project(name=name, description=description, objective=objective, settings=settings or {})
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def get_project(self, ident: str) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = s.get(orm.Project, ident) or s.scalar(select(orm.Project).where(orm.Project.name == ident))
+            if row is None:
+                raise UserError(f"project '{ident}' not found")
+            return row_to_dict(row)
+
+    def ensure_project(self, name: str, **kw: Any) -> dict[str, Any]:
+        try:
+            return self.get_project(name)
+        except UserError:
+            return self.create_project(name, **kw)
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.Project).order_by(orm.Project.created_at))]
+
+    def add_target(self, project_id: str, spec: TargetSpec) -> dict[str, Any]:
+        kind = (spec.interfaces() or ["unknown"])[0]
+        with self.db.session() as s:
+            existing = s.scalar(select(orm.Target).where(orm.Target.project_id == project_id,
+                                                          orm.Target.name == spec.name))
+            data = spec.model_dump(mode="json")
+            if existing:
+                existing.spec, existing.kind, existing.target_version = data, kind, spec.version
+                existing.version += 1
+                s.flush()
+                return row_to_dict(existing)
+            row = orm.Target(project_id=project_id, name=spec.name, kind=kind, target_version=spec.version, spec=data)
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def get_target(self, target_id: str) -> tuple[dict[str, Any], TargetSpec]:
+        with self.db.session() as s:
+            row = s.get(orm.Target, target_id)
+            if row is None:
+                raise UserError(f"target '{target_id}' not found")
+            return row_to_dict(row), TargetSpec.model_validate(row.spec)
+
+    def list_targets(self, project_id: str | None = None) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            q = select(orm.Target).order_by(orm.Target.created_at)
+            if project_id:
+                q = q.where(orm.Target.project_id == project_id)
+            return [row_to_dict(r) for r in s.scalars(q)]
+
+    def save_repository(self, target_id: str, *, url: str | None, ref: str | None, commit: str | None,
+                        analysis: dict[str, Any], snapshot_artifact_id: str | None = None) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = orm.Repository(target_id=target_id, url=url, ref=ref, commit=commit, analysis=analysis,
+                                 snapshot_artifact_id=snapshot_artifact_id)
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    # ----------------------------------------------------------------- credentials (metadata only)
+    def upsert_credential_meta(self, profile: CredentialProfile, project_id: str | None = None) -> None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.CredentialProfileRow).where(orm.CredentialProfileRow.name == profile.name))
+            if row is None:
+                row = orm.CredentialProfileRow(name=profile.name, kind=profile.kind, project_id=project_id)
+                s.add(row)
+            row.kind, row.scopes, row.test_only = profile.kind, profile.scopes, profile.test_only
+            row.expires_at, row.secret_version, row.description = profile.expires_at, profile.secret_version, profile.description
+
+    def list_credential_meta(self) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.CredentialProfileRow))]
+
+    # ----------------------------------------------------------------- documents
+    def add_document(self, project_id: str, name: str, media_type: str, sha256: str, size: int,
+                     artifact_id: str | None, parsed: dict[str, Any]) -> dict[str, Any]:
+        with self.db.session() as s:
+            doc = s.scalar(select(orm.Document).where(orm.Document.project_id == project_id, orm.Document.name == name))
+            if doc is None:
+                doc = orm.Document(project_id=project_id, name=name, media_type=media_type)
+                s.add(doc)
+                s.flush()
+            last = s.scalar(select(orm.DocumentVersion).where(orm.DocumentVersion.document_id == doc.id)
+                            .order_by(orm.DocumentVersion.version.desc()))
+            if last is not None and last.sha256 == sha256:
+                return {"document_id": doc.id, "version_id": last.id, "version": last.version, "new_version": False}
+            ver = orm.DocumentVersion(document_id=doc.id, sha256=sha256, size=size, artifact_id=artifact_id,
+                                      parsed=parsed, version=(last.version + 1) if last else 1)
+            s.add(ver)
+            s.flush()
+            doc.current_version_id = ver.id
+            return {"document_id": doc.id, "version_id": ver.id, "version": ver.version, "new_version": True}
+
+    def list_documents(self, project_id: str) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            out = []
+            for d in s.scalars(select(orm.Document).where(orm.Document.project_id == project_id)):
+                vers = [row_to_dict(v) for v in d.versions]
+                out.append({**row_to_dict(d), "versions": vers})
+            return out
+
+    # ----------------------------------------------------------------- skills / providers
+    def upsert_skill(self, name: str, version: str, origin: str, manifest: dict[str, Any], path: str | None) -> None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.SkillRow).where(orm.SkillRow.name == name, orm.SkillRow.skill_version == version))
+            if row is None:
+                s.add(orm.SkillRow(name=name, skill_version=version, origin=origin, manifest=manifest, path=path))
+            else:
+                row.manifest, row.origin, row.path = manifest, origin, path
+
+    def list_skills(self) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.SkillRow).order_by(orm.SkillRow.name))]
+
+    def upsert_provider(self, name: str, type_: str, base_url: str | None, config: dict[str, Any]) -> None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.ModelProviderRow).where(orm.ModelProviderRow.name == name))
+            if row is None:
+                s.add(orm.ModelProviderRow(name=name, type=type_, base_url=base_url, config=config))
+            else:
+                row.type, row.base_url, row.config = type_, base_url, config
+
+    # ----------------------------------------------------------------- profiles
+    def save_profile(self, target_id: str, run_id: str | None, profile: AgentProfile) -> dict[str, Any]:
+        data = profile.model_dump(mode="json")
+        with self.db.session() as s:
+            row = orm.AgentProfileRow(target_id=target_id, run_id=run_id, profile=data,
+                                      fingerprint=canonical_hash({"types": data["types"], "tools": data["tools"]}))
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def latest_profile(self, target_id: str) -> AgentProfile | None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.AgentProfileRow).where(orm.AgentProfileRow.target_id == target_id)
+                           .order_by(orm.AgentProfileRow.created_at.desc()))
+            return AgentProfile.model_validate(row.profile) if row else None
+
+    # ----------------------------------------------------------------- suites
+    @staticmethod
+    def suite_hash(tests: list[TestCase]) -> str:
+        stable = []
+        for t in sorted(tests, key=lambda x: x.id):
+            d = t.model_dump(mode="json", exclude={"status", "rationale"})
+            stable.append(d)
+        return canonical_hash(stable)
+
+    def save_suite(self, project_id: str, target_id: str | None, name: str, kind: str, tests: list[TestCase],
+                   plan: dict[str, Any] | None = None) -> dict[str, Any]:
+        h = self.suite_hash(tests)
+        with self.db.session() as s:
+            prior = s.scalars(select(orm.TestSuiteRow).where(orm.TestSuiteRow.project_id == project_id,
+                                                              orm.TestSuiteRow.name == name)).all()
+            version = max((p.version for p in prior), default=0) + 1
+            row = orm.TestSuiteRow(project_id=project_id, target_id=target_id, name=name, kind=kind, suite_hash=h,
+                                   plan=plan or {}, version=version)
+            s.add(row)
+            s.flush()
+            for t in tests:
+                s.add(orm.TestCaseRow(suite_id=row.id, test_key=t.id, category=t.category,
+                                      risk_level=t.risk_level.value, definition=t.model_dump(mode="json")))
+            s.flush()
+            return row_to_dict(row)
+
+    def get_suite(self, suite_id: str) -> tuple[dict[str, Any], list[TestCase]]:
+        with self.db.session() as s:
+            row = s.get(orm.TestSuiteRow, suite_id)
+            if row is None:
+                raise UserError(f"test suite '{suite_id}' not found")
+            cases = [TestCase.model_validate(c.definition) for c in sorted(row.cases, key=lambda c: c.test_key)]
+            return row_to_dict(row), cases
+
+    def list_suites(self, project_id: str | None = None) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            q = select(orm.TestSuiteRow).order_by(orm.TestSuiteRow.created_at)
+            if project_id:
+                q = q.where(orm.TestSuiteRow.project_id == project_id)
+            return [row_to_dict(r) for r in s.scalars(q)]
+
+    # ----------------------------------------------------------------- runs
+    def create_run(self, project_id: str, target_id: str | None, suite_id: str | None, mode: str,
+                   manifest: dict[str, Any], limits: dict[str, Any], run_id: str | None = None) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = orm.TestRunRow(id=run_id or new_id(), project_id=project_id, target_id=target_id, suite_id=suite_id,
+                                 mode=mode, manifest=manifest, limits=limits, status="pending")
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def update_run(self, run_id: str, **fields: Any) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = s.get(orm.TestRunRow, run_id)
+            if row is None:
+                raise UserError(f"run '{run_id}' not found")
+            for k, v in fields.items():
+                setattr(row, k, v)
+            row.version += 1
+            s.flush()
+            return row_to_dict(row)
+
+    def get_run(self, run_id: str) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = s.get(orm.TestRunRow, run_id)
+            if row is None:
+                raise UserError(f"run '{run_id}' not found")
+            return row_to_dict(row)
+
+    def list_runs(self, project_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            q = select(orm.TestRunRow).order_by(orm.TestRunRow.created_at.desc()).limit(limit)
+            if project_id:
+                q = q.where(orm.TestRunRow.project_id == project_id)
+            return [row_to_dict(r) for r in s.scalars(q)]
+
+    # ----------------------------------------------------------------- results / traces / events
+    def save_result(self, result: TestResult) -> None:
+        data = result.model_dump(mode="json")
+        with self.db.session() as s:
+            row = s.scalar(select(orm.TestResultRow).where(orm.TestResultRow.run_id == result.run_id,
+                                                           orm.TestResultRow.test_key == result.test_id))
+            if row is None:
+                row = orm.TestResultRow(id=result.id, run_id=result.run_id, test_key=result.test_id,
+                                        category=result.category)
+                s.add(row)
+            row.status = result.status.value
+            row.score, row.confidence = result.score, result.confidence
+            row.severity = result.severity.value if result.severity else None
+            row.error_kind = result.error_kind.value if result.error_kind else None
+            row.root_cause = result.root_cause.value if result.root_cause else None
+            row.blocked_reason = result.blocked_reason
+            row.latency_ms, row.tokens, row.cost_usd = result.latency_ms, result.tokens, result.cost_usd
+            row.result = data
+
+    def list_results(self, run_id: str) -> list[TestResult]:
+        with self.db.session() as s:
+            rows = s.scalars(select(orm.TestResultRow).where(orm.TestResultRow.run_id == run_id)
+                             .order_by(orm.TestResultRow.test_key)).all()
+            return [TestResult.model_validate(r.result) for r in rows]
+
+    def save_trace(self, trace: Trace, artifact_id: str | None) -> None:
+        with self.db.session() as s:
+            s.add(orm.TraceRow(id=trace.id, run_id=trace.run_id, test_key=trace.test_id, attempt=trace.attempt,
+                               event_count=len(trace.events), artifact_id=artifact_id,
+                               summary={"types": sorted({e.type.value for e in trace.events})}))
+
+    def list_traces(self, run_id: str) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.TraceRow).where(orm.TraceRow.run_id == run_id)
+                                                      .order_by(orm.TraceRow.test_key, orm.TraceRow.attempt))]
+
+    def add_event(self, ev: Event) -> None:
+        with self.db.session() as s:
+            if s.get(orm.EventRow, ev.event_id) is None:
+                s.add(orm.EventRow(event_id=ev.event_id, run_id=ev.run_id, test_id=ev.test_id,
+                                   timestamp=ev.timestamp, type=ev.type.value, payload=ev.payload,
+                                   redaction_status=ev.redaction_status.value))
+
+    def list_events(self, run_id: str, *, after_ts: datetime | None = None, limit: int = 1000,
+                    types: list[str] | None = None) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            q = select(orm.EventRow).where(orm.EventRow.run_id == run_id).order_by(orm.EventRow.timestamp).limit(limit)
+            if after_ts:
+                q = q.where(orm.EventRow.timestamp > after_ts)
+            if types:
+                q = q.where(orm.EventRow.type.in_(types))
+            return [row_to_dict(r) for r in s.scalars(q)]
+
+    # ----------------------------------------------------------------- findings / scorecards / reports
+    def save_findings(self, run_id: str, findings: list[Finding]) -> None:
+        with self.db.session() as s:
+            for f in findings:
+                if s.get(orm.FindingRow, f.id):
+                    continue
+                s.add(orm.FindingRow(id=f.id, run_id=run_id, test_key=f.test_id, severity=f.severity.value,
+                                     category=f.category, title=f.title[:300], is_security=f.is_security,
+                                     confidence=f.confidence, finding=f.model_dump(mode="json")))
+
+    def list_findings(self, run_id: str) -> list[Finding]:
+        with self.db.session() as s:
+            rows = s.scalars(select(orm.FindingRow).where(orm.FindingRow.run_id == run_id)).all()
+            return [Finding.model_validate(r.finding) for r in rows]
+
+    def save_scorecard(self, run_id: str, sc: Scorecard) -> None:
+        with self.db.session() as s:
+            s.add(orm.ScorecardRow(run_id=run_id, profile=sc.profile, overall=sc.overall,
+                                   confidence=sc.overall_confidence, scorecard=sc.model_dump(mode="json")))
+
+    def latest_scorecard(self, run_id: str) -> Scorecard | None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.ScorecardRow).where(orm.ScorecardRow.run_id == run_id)
+                           .order_by(orm.ScorecardRow.created_at.desc()))
+            return Scorecard.model_validate(row.scorecard) if row else None
+
+    def save_report(self, run_id: str, formats: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+        with self.db.session() as s:
+            prior = s.scalars(select(orm.ReportRow).where(orm.ReportRow.run_id == run_id)).all()
+            row = orm.ReportRow(run_id=run_id, report_version=len(prior) + 1, formats=formats, manifest=manifest)
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def get_report(self, report_id: str) -> dict[str, Any]:
+        with self.db.session() as s:
+            row = s.get(orm.ReportRow, report_id)
+            if row is None:
+                raise UserError(f"report '{report_id}' not found")
+            return row_to_dict(row)
+
+    def latest_report(self, run_id: str) -> dict[str, Any] | None:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.ReportRow).where(orm.ReportRow.run_id == run_id)
+                           .order_by(orm.ReportRow.created_at.desc()))
+            return row_to_dict(row) if row else None
+
+    # ----------------------------------------------------------------- artifacts / browser / evaluations
+    def register_artifact(self, ref: ArtifactRef, uri: str = "") -> None:
+        with self.db.session() as s:
+            s.add(orm.ArtifactRow(sha256=ref.sha256, kind=ref.kind, media_type=ref.media_type, size=ref.size,
+                                  sensitivity=ref.sensitivity, run_id=ref.run_id, test_key=ref.test_key,
+                                  name=ref.name, uri=uri, meta=ref.meta))
+
+    def list_artifacts(self, run_id: str) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.ArtifactRow).where(orm.ArtifactRow.run_id == run_id))]
+
+    def save_browser_session(self, run_id: str, test_key: str, browser: str, trace_artifact_id: str | None,
+                             video_artifact_id: str | None, screenshots: list[str], actions: list[Any],
+                             meta: dict[str, Any]) -> None:
+        with self.db.session() as s:
+            s.add(orm.BrowserSessionRow(run_id=run_id, test_key=test_key, browser=browser,
+                                        trace_artifact_id=trace_artifact_id, video_artifact_id=video_artifact_id,
+                                        screenshot_artifact_ids=screenshots, actions=actions, meta=meta))
+
+    def list_browser_sessions(self, run_id: str) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.BrowserSessionRow)
+                                                      .where(orm.BrowserSessionRow.run_id == run_id))]
+
+    def ensure_evaluator(self, name: str, type_: str, version: str, config: dict[str, Any]) -> str:
+        with self.db.session() as s:
+            row = s.scalar(select(orm.EvaluatorRow).where(orm.EvaluatorRow.name == name,
+                                                          orm.EvaluatorRow.evaluator_version == version))
+            if row is None:
+                row = orm.EvaluatorRow(name=name, type=type_, evaluator_version=version, config=config)
+                s.add(row)
+                s.flush()
+            return row.id
+
+    def save_evaluations(self, result_id: str, items: list[dict[str, Any]]) -> None:
+        with self.db.session() as s:
+            for it in items:
+                s.add(orm.EvaluationRow(result_id=result_id, **it))
+
+    # ----------------------------------------------------------------- reviews
+    def add_review(self, run_id: str, subject_type: str, subject_id: str, decision: str, reviewer: str, reason: str,
+                   original: dict[str, Any], reviewed: dict[str, Any], comment: str = "") -> dict[str, Any]:
+        with self.db.session() as s:
+            row = orm.ReviewRow(run_id=run_id, subject_type=subject_type, subject_id=subject_id, decision=decision,
+                                reviewer=reviewer, reason=reason, original=original, reviewed=reviewed,
+                                comment=comment)
+            s.add(row)
+            s.flush()
+            return row_to_dict(row)
+
+    def list_reviews(self, run_id: str) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            return [row_to_dict(r) for r in s.scalars(select(orm.ReviewRow).where(orm.ReviewRow.run_id == run_id)
+                                                      .order_by(orm.ReviewRow.created_at))]
+
+
+def open_store(url: str, *, migrate: bool = True) -> Store:
+    db = Database(url)
+    if migrate:
+        db.migrate()
+    else:
+        db.create_all()
+    return Store(db)
+
+
+__all__ = ["Database", "Store", "canonical_hash", "open_store", "row_to_dict", "utcnow"]

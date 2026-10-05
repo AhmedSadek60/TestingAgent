@@ -1,0 +1,29 @@
+# AgentLab scoring profile: multi_agent
+# Weights are relative and never hard-coded in the scorer. Copy this file, edit it and pass
+# --profile path/to/file.yaml to use your own.
+name: multi_agent
+description: 'Multi-agent systems: routing, hand-offs, role boundaries and delegation behaviour dominate.'
+applies_to:
+- multi_agent
+- supervisor
+- sub_agents
+weights:
+  functional_quality: 10
+  instruction_adherence: 6
+  tool_use: 8
+  planning: 4
+  multi_agent: 30
+  mcp: 2
+  reliability: 8
+  performance: 3
+  cost_efficiency: 5
+  security: 14
+  safety: 10
+security_caps:
+  critical: 40
+  high: 65
+  medium: 85
+latency_budget_ms: 5000
+cost_budget_usd_per_test: 0.05
+token_budget_per_test: 8000
+pass_threshold: 0.7

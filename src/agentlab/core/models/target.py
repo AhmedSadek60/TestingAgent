@@ -90,6 +90,27 @@ class McpConfig(Model):
     auth_credential: str | None = None
 
 
+class LlmToolDef(Model):
+    name: str
+    description: str = ""
+    parameters: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}})
+    mock_result: Any = Field(default="ok", description="Deterministic result returned to the model when called")
+    side_effects: str = "none"
+
+
+class LlmTargetConfig(Model):
+    """A model (plus system prompt, tools and in-context knowledge) acting as the agent under test."""
+
+    provider: str
+    model: str | None = None
+    system_prompt: str = "You are a helpful assistant."
+    tools: list[LlmToolDef] = Field(default_factory=list)
+    knowledge: dict[str, str] = Field(default_factory=dict, description="name -> text placed in context")
+    max_tool_rounds: int = 4
+    max_tokens: int = 1024
+    temperature: float | None = 0.0
+
+
 class MockAgentConfig(Model):
     """In-process deterministic MockAgent used for development and self-tests."""
 
@@ -123,6 +144,7 @@ class TargetSpec(Model):
     command: CommandConfig | None = None
     mcp: McpConfig | None = None
     mock: MockAgentConfig | None = None
+    llm: LlmTargetConfig | None = None
     documents: list[str] = Field(default_factory=list)
     credentials: list[str] = Field(default_factory=list, description="Credential profile names")
     declared_tools: list[dict[str, Any]] = Field(default_factory=list)
@@ -132,7 +154,7 @@ class TargetSpec(Model):
 
     def interfaces(self) -> list[str]:
         out = []
-        for name in ("api", "web", "command", "mcp", "mock"):
+        for name in ("api", "web", "command", "mcp", "llm", "mock"):
             if getattr(self, name) is not None:
                 out.append(name)
         return out

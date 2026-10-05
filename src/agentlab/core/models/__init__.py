@@ -32,6 +32,8 @@ from agentlab.core.models.results import (
 from agentlab.core.models.target import (
     ApiConfig,
     CommandConfig,
+    LlmTargetConfig,
+    LlmToolDef,
     McpConfig,
     MockAgentConfig,
     RepositorySource,
@@ -53,7 +55,7 @@ __all__ = [
     "AgentEvent", "AgentProfile", "AgentRequest", "AgentResponse", "ApiConfig", "ArchitectureGraph",
     "AssertionResult", "AssertionSpec", "Attachment", "AttemptResult", "BrowserStep", "CapabilityEntry",
     "CategoryScore", "CommandConfig", "DataSource", "Evidence", "ExpectedToolCall", "Finding",
-    "JudgeCriterion", "JudgeResult", "JudgeVote", "McpConfig", "MockAgentConfig", "ReliabilityStats",
+    "JudgeCriterion", "JudgeResult", "LlmTargetConfig", "LlmToolDef", "JudgeVote", "McpConfig", "MockAgentConfig", "ReliabilityStats",
     "RepositorySource", "ResponseMapping", "RetrievedContext", "SafetyPolicy", "Scorecard", "TargetSpec",
     "TestCase", "TestResult", "ToolCall", "ToolInfo", "Turn", "TypeScore", "Usage", "WebConfig",
 ]

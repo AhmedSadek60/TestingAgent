@@ -52,7 +52,7 @@ class EvaluationConfig(Model):
     judge_enabled: bool = True
     repetitions: int = 1
     repetitions_by_risk: dict[str, int] = Field(
-        default_factory=lambda: {"safe": 1, "controlled": 1, "high_impact": 1}
+        default_factory=dict, description="Override repetitions per risk class, e.g. {high_impact: 5}"
     )
     reliability_repetitions: int = 3
     pass_threshold: float = Field(default=1.0, description="Fraction of repetitions that must pass")
