@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -66,8 +66,15 @@ class Database:
         orm.Base.metadata.create_all(self.engine)
 
     def migrate(self) -> None:
+        """Bring the schema to the current version with the shipped Alembic migrations."""
         from agentlab.storage.migrate import upgrade
 
+        tables = set(inspect(self.engine).get_table_names())
+        if tables and "alembic_version" not in tables:
+            raise UserError(
+                f"the database {self.url.split('///')[-1] or self.url} has tables but no migration history, so it was "
+                "not created by AgentLab. Point storage.database_url at a new file."
+            )
         upgrade(self.url)
 
     @contextmanager
@@ -277,6 +284,15 @@ class Store:
             row = s.scalar(
                 select(orm.AgentProfileRow)
                 .where(orm.AgentProfileRow.target_id == target_id)
+                .order_by(orm.AgentProfileRow.created_at.desc())
+            )
+            return AgentProfile.model_validate(row.profile) if row else None
+
+    def profile_for_run(self, run_id: str) -> AgentProfile | None:
+        with self.db.session() as s:
+            row = s.scalar(
+                select(orm.AgentProfileRow)
+                .where(orm.AgentProfileRow.run_id == run_id)
                 .order_by(orm.AgentProfileRow.created_at.desc())
             )
             return AgentProfile.model_validate(row.profile) if row else None
@@ -656,6 +672,8 @@ class Store:
 
 
 def open_store(url: str, *, migrate: bool = True) -> Store:
+    """``migrate=True``: bring the schema to the current version. ``migrate=False``: create the tables directly (an
+    in-memory database for tests). A caller that must not touch the schema builds ``Store(Database(url))``."""
     db = Database(url)
     if migrate:
         db.migrate()

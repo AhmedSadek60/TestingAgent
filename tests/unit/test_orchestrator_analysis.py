@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from agentlab.core.enums import RiskClass, Severity, TestStatus
 from agentlab.core.models import AssertionResult, AttemptResult, Finding, ReliabilityStats, TestCase, TestResult
-from agentlab.design.models import CoverageEntry, PlannedTest
+from agentlab.design.models import CoverageEntry, PlannedTest, TestPlan
 from agentlab.orchestrator.analysis import (
+    add_grade_note,
     analyse_cross_test,
     analyse_reliability,
     analyse_security,
     apply_adaptive_to_findings,
+    assess_scope,
     is_diagnostic,
     scored_results,
 )
@@ -214,3 +216,56 @@ def test_cross_test_patterns_group_repeated_failed_checks() -> None:
     pat = cross.patterns[0]
     assert pat.kind == "failed_check" and pat.key == "contains" and pat.count == 3
     assert cross.counts == {"failed": 3}
+
+
+# ================================================================================ scope of the score
+def plan_with(suite: str = "full", *entries: CoverageEntry) -> TestPlan:
+    return TestPlan(target="t", suite=suite, intensity="standard", profile_hash="h", coverage=list(entries))
+
+
+def entry(key: str, status: str) -> CoverageEntry:
+    return CoverageEntry(key=key, name=f"area {key}", status=status)  # type: ignore[arg-type]
+
+
+def test_a_full_run_that_covered_everything_is_not_flagged() -> None:
+    t = mk_test("A-1", "functional")
+    scope = assess_scope(plan_with("full", entry("A", "covered")), [t], [result("A-1", TestStatus.PASSED)])
+    assert not scope.limited and scope.executed == 1
+
+
+def test_a_focused_suite_is_labelled_so_its_grade_cannot_read_as_a_verdict_on_everything() -> None:
+    t = mk_test("A-1", "functional")
+    scope = assess_scope(plan_with("discovery", entry("A", "covered")), [t], [result("A-1", TestStatus.PASSED)])
+    assert scope.limited and scope.label == "discovery suite only"
+    assert "only the 'discovery' suite was run" in scope.text and "only what was measured" in scope.text
+
+
+def test_gaps_and_blocked_tests_make_a_full_run_partial_and_are_named() -> None:
+    tests = [mk_test("A-1", "functional"), mk_test("A-2", "functional")]
+    results = [result("A-1", TestStatus.PASSED), result("A-2", TestStatus.BLOCKED, reason="no judge")]
+    scope = assess_scope(
+        plan_with("full", entry("A", "partial"), entry("D", "not_covered"), entry("N1", "not_covered")), tests, results
+    )
+    assert scope.limited and scope.label == "partial coverage"
+    assert scope.gaps == ["A area A", "D area D"], "taxonomy letters only; the N-codes have their own security analysis"
+    assert "1 test(s) were BLOCKED" in scope.text and "do not count as passes" in scope.text
+
+
+def test_a_replay_of_selected_tests_is_a_subset_not_a_grade_of_the_agent() -> None:
+    t = mk_test("A-1", "functional")
+    scope = assess_scope(plan_with("full"), [t], [result("A-1", TestStatus.PASSED)], restricted=True)
+    assert scope.label == "subset of tests"
+    assert assess_scope(plan_with("regression"), [t], [result("A-1", TestStatus.PASSED)]).label == "regression replay"
+
+
+def test_variants_do_not_inflate_the_executed_count() -> None:
+    base, variant = mk_test("A-1", "functional"), mk_test("A-1-W2R1", "functional", diagnostic=True)
+    scope = assess_scope(
+        plan_with("full"), [base, variant], [result("A-1", TestStatus.PASSED), result("A-1-W2R1", TestStatus.PASSED)]
+    )
+    assert scope.executed == 1
+
+
+def test_grade_notes_compose_with_the_security_cap() -> None:
+    assert add_grade_note("A", "limited") == "A (limited)"
+    assert add_grade_note("F (capped by security)", "partial coverage") == "F (capped by security; partial coverage)"

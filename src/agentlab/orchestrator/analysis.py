@@ -16,7 +16,7 @@ from pydantic import Field
 from agentlab.core.enums import Severity, TestStatus
 from agentlab.core.models import AssertionResult, Finding, TestCase, TestResult
 from agentlab.core.models.base import Model
-from agentlab.design.models import CoverageEntry, PlannedTest
+from agentlab.design.models import CoverageEntry, PlannedTest, TestPlan
 from agentlab.design.taxonomy import SECURITY_CATEGORIES, security_codes
 from agentlab.security.redactor import get_redactor
 
@@ -546,3 +546,61 @@ def analyse_reliability(tests: Sequence[TestCase], results: Sequence[TestResult]
     if out.single_run_tests:
         out.notes.append(f"{out.single_run_tests} test(s) ran once: a single pass is not evidence of stability.")
     return out
+
+
+# ================================================================================ scope of the score
+class ScopeNote(Model):
+    """How much of the target a score describes. A grade must never read as broader than what was measured."""
+
+    limited: bool = False
+    label: str = ""
+    text: str = ""
+    executed: int = 0
+    blocked: int = 0
+    gaps: list[str] = Field(default_factory=list)
+
+
+def add_grade_note(grade: str, note: str) -> str:
+    """``A`` -> ``A (note)``; ``F (capped by security)`` -> ``F (capped by security; note)``."""
+    if grade.endswith(")") and " (" in grade:
+        return grade[:-1] + f"; {note})"
+    return f"{grade} ({note})"
+
+
+def assess_scope(
+    plan: TestPlan, tests: Sequence[TestCase], results: Sequence[TestResult], *, restricted: bool = False
+) -> ScopeNote:
+    """Say when the score covers less than the whole target: a focused suite, a replay of selected tests, areas that
+    apply to the target but were not (fully) tested, or tests that were BLOCKED."""
+    scored = scored_results(tests, results)
+    executed = sum(1 for r in scored if r.status in CONCLUSIVE)
+    blocked = sum(1 for r in scored if r.status == TestStatus.BLOCKED)
+    gaps = [f"{e.key} {e.name}" for e in plan.coverage if len(e.key) == 1 and e.status in {"not_covered", "partial"}]
+    reasons: list[str] = []
+    label = ""
+    if restricted:
+        reasons.append("only the tests you asked for were run (--only)")
+        label = "subset of tests"
+    elif plan.suite == "regression":
+        reasons.append("this replays the tests of an earlier run instead of testing everything")
+        label = "regression replay"
+    elif plan.suite != "full":
+        reasons.append(f"only the '{plan.suite}' suite was run")
+        label = f"{plan.suite} suite only"
+    if gaps:
+        shown = ", ".join(gaps[:5]) + (f" and {len(gaps) - 5} more" if len(gaps) > 5 else "")
+        reasons.append(f"{len(gaps)} area(s) that apply to this target were not fully tested ({shown})")
+        label = label or "partial coverage"
+    if blocked:
+        reasons.append(f"{blocked} test(s) were BLOCKED because a prerequisite was missing and do not count as passes")
+        label = label or "partial coverage"
+    if not reasons:
+        return ScopeNote(executed=executed)
+    return ScopeNote(
+        limited=True,
+        label=label,
+        text="Read the grade as partial: " + "; ".join(reasons) + ". The score describes only what was measured.",
+        executed=executed,
+        blocked=blocked,
+        gaps=gaps,
+    )

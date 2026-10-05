@@ -37,11 +37,14 @@ from agentlab.execution.scheduler import Scheduler
 from agentlab.orchestrator.analysis import (
     CrossTestAnalysis,
     ReliabilityAnalysis,
+    ScopeNote,
     SecurityAnalysis,
+    add_grade_note,
     analyse_cross_test,
     analyse_reliability,
     analyse_security,
     apply_adaptive_to_findings,
+    assess_scope,
     is_diagnostic,
     is_security_test,
     scored_results,
@@ -62,6 +65,7 @@ from agentlab.orchestrator.options import (
 )
 from agentlab.security.egress import EgressPolicy
 from agentlab.security.gate import AuthorizationGate
+from agentlab.security.redactor import redact
 from agentlab.services import Services
 from agentlab.skills.context import INTENSITIES
 from agentlab.tracing import Event, EventBus
@@ -201,6 +205,11 @@ class TestOrchestratorAgent:
 
     def _phase(self, run_id: str, phase: Phase, records: list[PhaseRecord], *, streamed: bool = False) -> _PhaseScope:
         return _PhaseScope(self, run_id, phase, records, streamed)
+
+    def token_for(self, run_id: str) -> CancellationToken:
+        """The cancellation token of a run (created on first use), so Ctrl-C or a cancel button can be wired before the
+        run starts."""
+        return self._tokens.setdefault(run_id, CancellationToken())
 
     def cancel(self, run_id: str, reason: str = "cancelled by user") -> bool:
         """Ask a running (or preparing) run to stop safely: running tests finish their step, the rest are SKIPPED,
@@ -478,13 +487,7 @@ class TestOrchestratorAgent:
                     "judges": [j.model_dump(mode="json") for j in cfg.evaluation.judges] if report.judge else [],
                     "note": report.judge_note,
                 },
-                environment={
-                    "docker": report.docker,
-                    "browser": report.browser,
-                    "sandbox": cfg.security.sandbox.provider,
-                    "interfaces": report.interfaces,
-                    "parallelism": report.parallelism,
-                },
+                environment=redact(report.model_dump(mode="json")),
                 options={
                     "seed": opts.seed,
                     "second_wave": opts.second_wave,
@@ -616,6 +619,21 @@ class TestOrchestratorAgent:
         return user_tests, warns
 
     async def _design(
+        self,
+        spec: TargetSpec,
+        opts: RunOptions,
+        ctx: Any,
+        selection: list[Any],
+        user_tests: list[TestCase],
+        ph: _PhaseScope,
+    ) -> TestPlan:
+        plan = await self._design_plan(spec, opts, ctx, selection, user_tests, ph)
+        if opts.only_tests:
+            plan = self.designer.restrict(plan, ctx, opts.only_tests)
+            ph.set(restricted_to=list(opts.only_tests))
+        return plan
+
+    async def _design_plan(
         self,
         spec: TargetSpec,
         opts: RunOptions,
@@ -762,6 +780,7 @@ class TestOrchestratorAgent:
                 and run_stop is None
                 and len(waves) < MAX_WAVES
                 and p.options.baseline_run_id is None
+                and not p.options.only_tests
             ):
                 child = self.designer.adapt(p.plan, list(results.values()), p.ctx)
                 if child is not None:
@@ -857,6 +876,7 @@ class TestOrchestratorAgent:
         security: SecurityAnalysis | None = None
         reliability: ReliabilityAnalysis | None = None
         scorecard: Scorecard | None = None
+        scope: ScopeNote | None = None
         planned_all = [pt for w in waves for pt in w.tests if pt.selected]
         try:
             # ---- 12. cross-test analysis --------------------------------------------------------------------
@@ -915,6 +935,11 @@ class TestOrchestratorAgent:
                         f"{diagnostics} wave-2 variant/re-check test(s) are reported as evidence and not scored, so a "
                         "weakness is not counted twice."
                     )
+                scope = assess_scope(waves[0], tests, results, restricted=bool(p.options.only_tests))
+                if scope.limited:
+                    scorecard.qualifiers.append(scope.text)
+                    if scorecard.grade:
+                        scorecard.grade = add_grade_note(scorecard.grade, scope.label)
                 if security is not None:
                     scorecard.qualifiers.append(security.rating_note)
                 if not p.environment.judge:
@@ -967,6 +992,7 @@ class TestOrchestratorAgent:
             "tokens": wall["tokens"],
             "elapsed_s": wall["elapsed_s"],
             "plan_prediction": pred,
+            "scope": scope.model_dump(mode="json") if scope else None,
         }
         # ---- 16. report generation, 17. artifact packaging ---------------------------------------------------
         rep = reporter or getattr(sv, "reporter", None)
@@ -1014,12 +1040,19 @@ class TestOrchestratorAgent:
 
     @staticmethod
     def _analysis_json(o: RunOutcome) -> dict[str, Any]:
+        """Everything about a finished run that is not a row of its own: lets a run be reloaded and reported later."""
         return {
             "cross_test": o.cross_test.model_dump(mode="json") if o.cross_test else None,
             "security": o.security.model_dump(mode="json") if o.security else None,
             "reliability": o.reliability.model_dump(mode="json") if o.reliability else None,
             "scorecard": o.scorecard.model_dump(mode="json") if o.scorecard else None,
             "plan_prediction": o.manifest.get("outcome", {}).get("plan_prediction"),
+            "phases": [r.model_dump(mode="json") for r in o.phases],
+            "warnings": o.warnings,
+            "limits": o.limits,
+            "environment": o.environment.model_dump(mode="json"),
+            "scoring_profile": o.scoring.model_dump(mode="json") if o.scoring else None,
+            "error": o.error,
         }
 
     # ================================================================== convenience
@@ -1036,12 +1069,12 @@ class TestOrchestratorAgent:
         prepared = await self.prepare(spec, opts)
         try:
             if opts.plan_only:
-                return self._plan_only_outcome(prepared)
+                return self.finish_plan_only(prepared)
             return await self.execute(prepared, cancel=cancel, reporter=reporter)
         finally:
             await prepared.aclose()
 
-    def _plan_only_outcome(self, p: PreparedRun) -> RunOutcome:
+    def finish_plan_only(self, p: PreparedRun) -> RunOutcome:
         sv = self.services
         now = utcnow()
         outcome = RunOutcome(

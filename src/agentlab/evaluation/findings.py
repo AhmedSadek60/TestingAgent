@@ -153,7 +153,7 @@ def _title(test: TestCase, failed: list[AssertionResult], judges: list[JudgeResu
     return f"{test.name} did not meet expectations [{test.id}]"
 
 
-def _reproduction(test: TestCase, target_name: str) -> str:
+def _reproduction(test: TestCase, run_id: str) -> str:
     steps = []
     for i, t in enumerate(test.all_turns(), 1):
         who = f" (session '{t.session}')" if t.session != "default" else ""
@@ -163,7 +163,10 @@ def _reproduction(test: TestCase, target_name: str) -> str:
             f"{i}. Browser step: {s.action} {s.target or s.value or ''}".rstrip()
             for i, s in enumerate(test.browser_steps, 1)
         ]
-    steps.append(f"Run: agentlab test --target {target_name} --only {test.id}")
+    steps.append(
+        "Re-run only this test with the same inputs and checks: "
+        f"agentlab test <the same target flags> --baseline {run_id} --only {test.id}"
+    )
     if test.context.get("fixtures"):
         steps.append("Fixtures required: " + ", ".join(map(str, test.context["fixtures"])))
     return "\n".join(steps)
@@ -243,7 +246,7 @@ def build_finding(
         observed=observed,
         impact=impact,
         evidence=[*result.evidence, *[f"trace:{t}" for t in result.trace_ids]],
-        reproduction=_reproduction(test, target_name),
+        reproduction=_reproduction(test, run_id),
         recommendation=rec,
         root_cause=rca.cause,
         root_cause_confidence=rca.confidence,

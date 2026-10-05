@@ -497,6 +497,26 @@ class TestDesignerAgent:
         )
         return self.finalize(child, deep_ctx, trim=True, max_tests=cfg.adaptive_max_tests)
 
+    # ================================================================== reproduction
+    def restrict(self, plan: TestPlan, ctx: SkillContext, test_ids: Iterable[str]) -> TestPlan:
+        """Keep only the requested tests (to reproduce a finding). The others stay in the plan, deselected, so what
+        was left out is visible rather than silently missing."""
+        wanted = list(dict.fromkeys(test_ids))
+        present = {p.id for p in plan.tests}
+        missing = [t for t in wanted if t not in present]
+        if missing:
+            raise UserError(
+                f"test(s) {', '.join(missing)} are not in this plan. Follow-up tests (ids ending in -W2...) exist only "
+                "while a run is in progress, and CROSS-... findings summarise several tests; use the id of a wave 1 test"
+            )
+        for p in plan.tests:
+            if p.id in wanted:
+                p.selected, p.deselected_reason = True, None
+            elif p.selected:
+                p.selected, p.deselected_reason = False, "not requested (--only)"
+        plan.assumptions.append(f"The plan is restricted to the {len(wanted)} requested test(s): {', '.join(wanted)}.")
+        return self.finalize(plan, ctx, trim=False)
+
     # ================================================================== finalisation
     def finalize(
         self, plan: TestPlan, ctx: SkillContext, *, trim: bool = True, max_tests: int | None = None

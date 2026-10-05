@@ -50,6 +50,7 @@ class RunOptions:
     run_id: str | None = None
     plan: TestPlan | None = None  # an approved/edited plan to execute instead of designing one
     baseline_run_id: str | None = None  # regression: re-run the tests of this earlier run
+    only_tests: list[str] = field(default_factory=list)  # reproduce: run just these tests (ids of the plan)
     keep_workspace: bool = False
 
 
@@ -164,6 +165,33 @@ class RunOutcome:
     def tested(self) -> bool:
         """False when nothing could be run (for example the target was unreachable): there is no verdict to give."""
         return self.executed > 0
+
+    def to_dict(self) -> dict[str, Any]:
+        """A compact JSON view (``agentlab test --json``); the full report is produced by the reporting package."""
+        return {
+            "summary": self.summary(),
+            "scorecard": self.scorecard.model_dump(mode="json") if self.scorecard else None,
+            "security": self.security.model_dump(mode="json") if self.security else None,
+            "reliability": self.reliability.model_dump(mode="json") if self.reliability else None,
+            "findings": [f.model_dump(mode="json") for f in self.findings],
+            "results": [
+                {
+                    "test_id": r.test_id,
+                    "name": r.test_name,
+                    "category": r.category,
+                    "status": r.status.value,
+                    "score": r.score,
+                    "confidence": r.confidence,
+                    "severity": r.severity.value if r.severity else None,
+                    "reason": r.blocked_reason,
+                }
+                for r in self.results
+            ],
+            "phases": [p.model_dump(mode="json") for p in self.phases],
+            "warnings": self.warnings,
+            "environment": self.environment.model_dump(mode="json"),
+            "manifest": self.manifest,
+        }
 
     def summary(self) -> dict[str, Any]:
         sc = self.scorecard

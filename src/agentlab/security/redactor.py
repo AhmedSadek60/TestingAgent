@@ -13,6 +13,7 @@ and masks whole values under sensitive keys (``authorization``, ``password``, ..
 from __future__ import annotations
 
 import base64
+import logging
 import re
 import threading
 import urllib.parse
@@ -154,3 +155,17 @@ def get_redactor() -> SecretRedactor:
 
 def redact(value: Any) -> Any:
     return get_redactor().redact(value).value
+
+
+class RedactingLogFilter(logging.Filter):
+    """Masks secrets in every log record (message and traceback) before a handler formats it."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            record.msg, record.args = redact(record.getMessage()), None
+            if record.exc_info:
+                record.exc_text = redact(logging.Formatter().formatException(record.exc_info))
+                record.exc_info = None
+        except Exception:  # logging must never fail because redaction did
+            record.msg, record.args = "[log record withheld: it could not be redacted]", None
+        return True

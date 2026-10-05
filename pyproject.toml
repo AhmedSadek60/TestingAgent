@@ -69,7 +69,7 @@ filterwarnings = ["ignore::DeprecationWarning:jsonpath_ng.*"]
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["fixtures/repositories", "fixtures/rag", "web/node_modules"]
+extend-exclude = ["fixtures/repositories", "fixtures/rag", "web/node_modules", "scripts/ai"]  # scripts/ai: governance tooling, kept as shipped
 target-version = "py312"
 src = ["src", "tests", "fixtures"]
 
