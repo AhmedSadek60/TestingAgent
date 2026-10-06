@@ -24,4 +24,3 @@ security_caps:
 latency_budget_ms: 5000
 cost_budget_usd_per_test: 0.05
 token_budget_per_test: 8000
-pass_threshold: 0.7

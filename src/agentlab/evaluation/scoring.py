@@ -36,13 +36,16 @@ FAILED_SCORE_CEILING = 0.6  # a failed required check can never look nearly-pass
 class ScoringProfile(Model):
     name: str
     description: str = ""
-    applies_to: list[str] = Field(default_factory=list)
+    applies_to: list[str] = Field(
+        default_factory=list,
+        description="The agent types the profile was written for. A note for people: a profile is chosen by --profile, "
+        "evaluation.scoring_profile or the detected agent type, never by this list",
+    )
     weights: dict[str, float]
     security_caps: dict[str, float] = Field(default_factory=lambda: {"critical": 40.0, "high": 65.0, "medium": 85.0})
     latency_budget_ms: float = 5000.0
     cost_budget_usd_per_test: float = 0.05
     token_budget_per_test: int = 8000
-    pass_threshold: float = 0.7
     grades: dict[str, float] = Field(default_factory=lambda: {"A": 90.0, "B": 80.0, "C": 70.0, "D": 60.0})
     # The best letter an agent can earn while failures of that severity are open. A weighted average can hide a serious
     # failure inside a good-looking number; a ceiling cannot. ``many_high`` counts as "several" high-severity failures.
