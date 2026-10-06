@@ -1,0 +1,85 @@
+# AgentLab as containers: the API and web interface, a worker, Redis (the queue) and PostgreSQL (the database).
+#
+#   export AGENTLAB_API_TOKEN="$(openssl rand -hex 24)"     # what the web interface asks you to sign in with
+#   export AGENTLAB_DB_PASSWORD="$(openssl rand -hex 24)"   # letters and digits only: it is written into a URL
+#   docker compose -f docker/compose.yaml up --build
+#
+# Then open http://127.0.0.1:8080. The API is published on this machine only; put TLS in front of it before you publish it
+# anywhere else. Nothing here is mounted from the host and the Docker socket is never mounted. The image has no Docker client
+# and no browser, so tests that need a sandbox or a browser are reported as BLOCKED, with that reason (docs/installation.md#docker).
+name: agentlab
+
+x-agentlab: &agentlab
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: agentlab:local
+  environment:
+    AGENTLAB_API_TOKEN: ${AGENTLAB_API_TOKEN:?set AGENTLAB_API_TOKEN to a secret of at least 16 characters}
+    AGENTLAB_DATABASE_URL: postgresql+psycopg://agentlab:${AGENTLAB_DB_PASSWORD:?set AGENTLAB_DB_PASSWORD}@postgres:5432/agentlab
+    AGENTLAB_REDIS_URL: redis://redis:6379/0
+  volumes:
+    - data:/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *agentlab
+    command: ["serve", "--no-worker"]
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  worker:
+    <<: *agentlab
+    command: ["worker"]
+    # On `docker compose stop` a worker takes no new run and lets the ones in progress finish for up to 30 seconds
+    # (`agentlab worker --drain-seconds`), so Docker must wait longer than its default 10 before it kills the container.
+    stop_grace_period: 45s
+    # The worker listens on no port, so the image's HTTP health check does not apply to it.
+    healthcheck:
+      disable: true
+
+  redis:
+    image: mirror.gcr.io/library/redis:7-alpine
+    # Queued runs survive a restart of Redis: the queue is written to disk.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  postgres:
+    image: mirror.gcr.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: agentlab
+      POSTGRES_DB: agentlab
+      POSTGRES_PASSWORD: ${AGENTLAB_DB_PASSWORD:?set AGENTLAB_DB_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentlab -d agentlab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  data:
+  redis:
+  postgres:

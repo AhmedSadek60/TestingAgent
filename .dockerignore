@@ -1,0 +1,25 @@
+# What the image build must not send to the daemon: version control, local data, caches and anything built elsewhere.
+.git
+.github
+.ai
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+.agentlab
+agentlab.yaml
+target.yaml
+secrets.key
+*.enc
+**/.env
+**/.env.*
+web/node_modules
+src/agentlab/api/static
+tests
+fixtures
+docs
+scripts
