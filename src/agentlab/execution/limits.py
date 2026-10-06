@@ -87,8 +87,9 @@ class TestBudget:
 class LimitTracker:
     """Thread-safe accounting for the whole run plus per-test budgets."""
 
-    def __init__(self, limits: LimitsConfig) -> None:
+    def __init__(self, limits: LimitsConfig, *, test_timeout: float | None = None) -> None:
         self.limits = limits
+        self.test_timeout = test_timeout  # evaluation.timeout_seconds: no single test may take longer than this
         self._lock = threading.Lock()
         self.started = time.monotonic()
         self.cost = 0.0
@@ -107,7 +108,7 @@ class LimitTracker:
             max_tokens=min(test.max_tokens, self.limits.max_tokens),
             max_steps=min(test.max_steps, self.limits.max_steps),
             max_browser_actions=self.limits.max_browser_actions,
-            timeout=test.timeout,
+            timeout=test.timeout if self.test_timeout is None else min(test.timeout, self.test_timeout),
         )
 
     def record(

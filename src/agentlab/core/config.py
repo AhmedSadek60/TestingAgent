@@ -58,7 +58,12 @@ class EvaluationConfig(Model):
     )
     reliability_repetitions: int = 3
     pass_threshold: float = Field(default=1.0, description="Fraction of repetitions that must pass")
-    timeout_seconds: float = 300.0
+    timeout_seconds: float = Field(
+        default=300.0,
+        gt=0,
+        description="The longest any single test may take. A test's own timeout (60 seconds unless its skill says "
+        "otherwise) is lowered to this, never raised",
+    )
     scoring_profile: str | None = None
     llm_test_generation: bool = False
     latency_budget_ms: float = Field(default=8000.0, description="Latency a single reply should stay under")

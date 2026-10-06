@@ -716,7 +716,7 @@ class TestOrchestratorAgent:
         token = cancel or self._tokens.setdefault(run_id, CancellationToken())
         self._tokens[run_id] = token
         self._active.add(run_id)
-        limits = LimitTracker(cfg.limits)
+        limits = LimitTracker(cfg.limits, test_timeout=cfg.evaluation.timeout_seconds)
         probe = p.discovery.probe
         if probe is not None and (probe.tokens or probe.cost_usd):
             # the discovery questions were answered by the target too: they count against the run's budget
