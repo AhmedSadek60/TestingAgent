@@ -3,13 +3,21 @@
 The request body is built from a template; the response is mapped to AgentResponse via
 JSONPath expressions (with sensible auto-detection for OpenAI-style and common shapes).
 All outbound requests pass the evaluator egress policy and redirects are re-checked.
+
+A call is repeated (up to ``limits.max_retries``) only when the connection could not even be made, so nothing reached the
+agent and repeating the call cannot repeat an action it took. A timeout while waiting for the answer is never retried.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import functools
 import json
+import ssl
 import time
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 import httpx
 from jsonpath_ng.ext import parse as jp_parse
@@ -33,6 +41,40 @@ OUTPUT_KEYS = ("output", "response", "answer", "reply", "text", "message", "cont
 DEFAULT_PORTS = {"http": 80, "https": 443}
 #: What a request may still carry once a redirect has taken it to an origin its credential was not released for.
 HEADERS_SAFE_ELSEWHERE = {"content-type", "accept"}
+#: Failures that happen before a request leaves this machine: the connection was never made, or no connection was free.
+NEVER_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+T = TypeVar("T")
+
+
+class Retries:
+    """How many times one ``send`` repeated a call that never reached the agent (one per ``send``, so sessions that run in
+    parallel never share a count)."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = max(0, limit)
+        self.count = 0
+
+    async def run(self, call: Callable[[], Awaitable[T]]) -> T:
+        """Run ``call``; if the connection could not be made, wait a little and try again, as often as the limit allows."""
+        while True:
+            try:
+                return await call()
+            except NEVER_SENT as exc:
+                if self.count >= self.limit or _is_certificate_problem(exc):
+                    raise
+                self.count += 1
+                await asyncio.sleep(min(2.0, 0.25 * 2 ** (self.count - 1)))
+
+
+def _is_certificate_problem(exc: BaseException | None) -> bool:
+    """A bad certificate does not get better by asking again."""
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        if isinstance(exc, ssl.SSLError):
+            return True
+        seen.add(id(exc))
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def origin_of(url: str | httpx.URL) -> tuple[str, str, int | None]:
@@ -201,24 +243,32 @@ class AgentApiAdapter(AgentAdapter):
         body = self._body(request)
         url = self.cfg.url
         t0 = time.perf_counter()
+        retries = Retries(self.ctx.config.limits.max_retries)
         try:
             await self._plant_knowledge(request, headers)
             if self.cfg.protocol == "sse":
-                return await self._send_sse(url, headers, body, t0)
-            r = await self._request(url, headers, body)
+                streamed = await self._send_sse(url, headers, body, t0, retries)
+                streamed.retries = retries.count
+                return streamed
+            r = await self._request(url, headers, body, retries)
         except httpx.TimeoutException as exc:
             return AgentResponse(
                 error=f"timeout after {self.cfg.timeout_seconds}s",
                 status_code=None,
                 latency_ms=(time.perf_counter() - t0) * 1000,
                 raw=str(exc)[:200],
+                retries=retries.count,
             )
         except httpx.HTTPError as exc:
             return AgentResponse(
-                error=f"connection error: {type(exc).__name__}", latency_ms=(time.perf_counter() - t0) * 1000
+                error=f"connection error: {type(exc).__name__}",
+                latency_ms=(time.perf_counter() - t0) * 1000,
+                retries=retries.count,
             )
         latency = (time.perf_counter() - t0) * 1000
-        return self._to_response(r, latency)
+        response = self._to_response(r, latency)
+        response.retries = retries.count
+        return response
 
     async def _plant_knowledge(self, request: AgentRequest, headers: dict[str, str]) -> None:
         """Add the documents a test wants the agent to read, through the owner's test hook (``knowledge_endpoint``)."""
@@ -247,17 +297,24 @@ class AgentApiAdapter(AgentAdapter):
             if r.status_code >= 400:
                 raise TargetError(f"the knowledge endpoint refused document '{name}' (HTTP {r.status_code})")
 
-    async def _request(self, url: str, headers: dict[str, str], body: Any) -> httpx.Response:
+    async def _hop(self, url: str, headers: dict[str, str], body: Any) -> httpx.Response:
+        """One request to ``url``, without following a redirect."""
+        assert self._client is not None
+        if self.cfg.method == "GET":
+            return await self._client.get(url, headers=headers, params=body if isinstance(body, dict) else None)
+        return await self._client.request(self.cfg.method, url, headers=headers, json=body)
+
+    async def _request(
+        self, url: str, headers: dict[str, str], body: Any, retries: Retries | None = None
+    ) -> httpx.Response:
         """Send the request and follow at most three redirects. Every hop passes the egress policy, and a hop to an
         origin other than the one the credential was released for is made without the credential (or any other header
         the owner configured): the target, or an open redirect on it, chooses where ``Location`` points."""
         assert self._client is not None
         for _ in range(4):
             self.ctx.egress.check(url)
-            if self.cfg.method == "GET":
-                r = await self._client.get(url, headers=headers, params=body if isinstance(body, dict) else None)
-            else:
-                r = await self._client.request(self.cfg.method, url, headers=headers, json=body)
+            hop = functools.partial(self._hop, url, headers, body)
+            r = await (retries.run(hop) if retries is not None else hop())
             if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
                 nxt = str(httpx.URL(url).join(r.headers["location"]))  # re-validated by egress at loop top
                 if origin_of(nxt) != origin_of(url):
@@ -353,13 +410,22 @@ class AgentApiAdapter(AgentAdapter):
                 return v
         return []
 
-    async def _send_sse(self, url: str, headers: dict[str, str], body: Any, t0: float) -> AgentResponse:
+    async def _send_sse(
+        self, url: str, headers: dict[str, str], body: Any, t0: float, retries: Retries | None = None
+    ) -> AgentResponse:
         assert self._client is not None
         self.ctx.egress.check(url)
         resp = AgentResponse()
         pieces: list[str] = []
         first: float | None = None
-        async with self._client.stream(self.cfg.method, url, headers=headers, json=body) as r:
+        client = self._client
+        async with contextlib.AsyncExitStack() as stack:
+
+            async def open_stream() -> httpx.Response:
+                """Open the stream: the one step that can fail before the agent was reached."""
+                return await stack.enter_async_context(client.stream(self.cfg.method, url, headers=headers, json=body))
+
+            r = await (retries.run(open_stream) if retries is not None else open_stream())
             resp.status_code = r.status_code
             if r.status_code >= 400:
                 resp.error = f"HTTP {r.status_code}"
