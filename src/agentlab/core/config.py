@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from agentlab.core.errors import UserError
 from agentlab.core.models.base import Model
@@ -88,14 +88,27 @@ class SecurityConfig(Model):
 
 class BrowserConfig(Model):
     enabled: bool = True
-    browsers: list[Literal["chromium", "firefox", "webkit"]] = Field(
-        default_factory=lambda: cast(list[Literal["chromium", "firefox", "webkit"]], ["chromium"])
+    browsers: list[str] = Field(
+        default_factory=lambda: ["chromium"],
+        description="Browsers to drive. Only chromium is supported: Firefox and WebKit have not been verified, so they are "
+        "refused here instead of being accepted and ignored",
     )
     headless: bool = True
     executable_path: str | None = None
     record_video: bool = False
     record_trace: bool = True
     default_timeout_ms: int = 15_000
+
+    @field_validator("browsers")
+    @classmethod
+    def _chromium_only(cls, value: list[str]) -> list[str]:
+        unsupported = sorted({b for b in value if b != "chromium"})
+        if unsupported:
+            raise ValueError(
+                f"{', '.join(unsupported)} is not supported in this build: AgentLab drives Chromium only "
+                "(Firefox and WebKit have not been verified)"
+            )
+        return value
 
 
 class LimitsConfig(Model):
@@ -105,7 +118,13 @@ class LimitsConfig(Model):
     max_steps: int = 100
     max_browser_actions: int = 200
     max_execution_time_seconds: float = 3600.0
-    max_retries: int = 2
+    max_retries: int = Field(
+        default=2,
+        ge=0,
+        description="The most a call is repeated after a transient failure: a model call that was rate limited or "
+        "unavailable, or a request to the agent whose connection could not be made (so it never arrived). A request "
+        "that may have arrived is never repeated. 0 switches retries off, and it caps providers[].max_retries",
+    )
 
 
 class StorageConfig(Model):
