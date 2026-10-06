@@ -146,6 +146,20 @@ def _require_something(spec: TargetSpec) -> None:
         )
 
 
+def report_formats(values: list[str] | None) -> list[str] | None:
+    """``--report``: ``None`` keeps the configured formats, ``none`` writes no report, anything else is validated."""
+    if not values:
+        return None
+    words = {w.lower() for v in values for w in v.replace(",", " ").split()}
+    if "none" in words:
+        if len(words) > 1:
+            raise UserError("--report none cannot be combined with other formats")
+        return []
+    from agentlab.reporting.bundle import normalise_formats
+
+    return normalise_formats(values)
+
+
 # ========================================================================================================== test
 def test(
     ctx: typer.Context,
@@ -265,6 +279,15 @@ def test(
             rich_help_panel=OUT,
         ),
     ] = "high",
+    report: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--report",
+            help="Report formats written at the end of the run: json, md, html, pdf, all or none "
+            "(repeat or separate with commas). Default: reporting.formats of the configuration.",
+            rich_help_panel=OUT,
+        ),
+    ] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Print the result as JSON.", rich_help_panel=OUT)] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Print problems and the summary only.", rich_help_panel=OUT)
@@ -316,6 +339,7 @@ def test(
             "limits.max_execution_time_seconds": max_time,
             "max_parallel": parallel,
             "evaluation.repetitions": repetitions,
+            "reporting.formats": report_formats(report),
         },
     )
     if spec.llm is not None:

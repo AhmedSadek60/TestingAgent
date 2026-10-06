@@ -22,6 +22,8 @@ storage:
   secrets_file: secrets.enc
 security:
   sandbox: {provider: disabled}   # Docker is never assumed in tests
+reporting:
+  formats: [json]                 # reports have their own tests; a PDF per CLI run would only slow these down
 skill_dirs: [skills]
 """
 

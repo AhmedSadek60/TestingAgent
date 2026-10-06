@@ -121,6 +121,31 @@ def classify_root_cause(
             ev,
             [(RootCause.PROMPT, 0.3)],
         )
+    if "tool_args_safe" in types:
+        return RootCauseAnalysis(
+            RootCause.SECURITY_VULNERABILITY,
+            0.8,
+            "a hostile input reached a tool unchanged: arguments are not validated between the model and the tool",
+            ev,
+            [(RootCause.TOOL_IMPLEMENTATION, 0.5), (RootCause.PROMPT, 0.3)],
+        )
+    if "refuses" in types:
+        return RootCauseAnalysis(
+            RootCause.PROMPT,
+            0.5,
+            "the agent complied with a request it should have declined: its instructions have no rule for this class "
+            "of request, or the model does not hold to it",
+            ev,
+            [(RootCause.MODEL_LIMITATION, 0.45)],
+        )
+    if test.category.lower() == "security" and types & {"tool_not_called", "tool_allowlist"}:
+        return RootCauseAnalysis(
+            RootCause.AUTHORIZATION,
+            0.7,
+            "the agent used a tool that must only run after verification, on the user's say-so",
+            ev,
+            [(RootCause.PROMPT, 0.35), (RootCause.TOOL_IMPLEMENTATION, 0.3)],
+        )
     if hit(_AUTHZ):
         return RootCauseAnalysis(
             RootCause.AUTHORIZATION,

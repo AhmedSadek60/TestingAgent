@@ -25,6 +25,7 @@ from agentlab.storage.db import Database, Store, open_store
 log = logging.getLogger(__name__)
 
 WebDiscoverer = Callable[[Any], Awaitable[dict[str, Any]]]
+Reporter = Callable[[Any, "Services"], Any]  # called at the end of a run with (outcome, services); may be async
 
 
 def load_plugin_modules(modules: list[str]) -> list[str]:
@@ -49,6 +50,7 @@ class Services:
     sandbox: SandboxProvider
     base_dir: Path = field(default_factory=Path.cwd)
     web_discoverer: WebDiscoverer | None = None
+    reporter: Reporter | None = None
     startup_warnings: list[str] = field(default_factory=list)
 
     @classmethod
@@ -62,13 +64,19 @@ class Services:
         credentials: CredentialManager | None = None,
         providers: ProviderManager | None = None,
         sandbox: SandboxProvider | None = None,
+        reporter: Reporter | None = None,
         migrate: bool = True,
     ) -> Services:
-        """``migrate=False`` leaves the database untouched (it is not even created)."""
+        """``migrate=False`` leaves the database untouched (it is not even created). The report phase of a run writes
+        the formats listed in ``reporting.formats`` (an empty list turns it off) unless a ``reporter`` is given."""
         cfg = config or AgentLabConfig.load()
         base = base_dir or Path.cwd()
         warnings = load_plugin_modules(cfg.plugins)
         creds = credentials or CredentialManager(EncryptedSecretStore(_under(base, cfg.storage.secrets_file)))
+        if reporter is None and cfg.reporting.formats:
+            from agentlab.reporting.bundle import default_reporter  # local: the reporting package builds on Services
+
+            reporter = default_reporter
         return cls(
             config=cfg,
             store=store or _open_store(_db_url(base, cfg.storage.database_url), migrate),
@@ -77,6 +85,7 @@ class Services:
             providers=providers or ProviderManager(cfg, creds),
             sandbox=sandbox or create_sandbox_provider(cfg.security.sandbox.provider),
             base_dir=base,
+            reporter=reporter,
             startup_warnings=warnings,
         )
 

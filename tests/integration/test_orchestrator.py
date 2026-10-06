@@ -11,6 +11,7 @@ from agentlab.core.config import (
     EvaluationConfig,
     JudgeConfig,
     LimitsConfig,
+    ReportingConfig,
     SandboxConfig,
     SecurityConfig,
     StorageConfig,
@@ -34,6 +35,7 @@ def make_config(tmp_path: Path, **overrides: object) -> AgentLabConfig:
             secrets_file=str(tmp_path / "secrets.enc"),
         ),
         "security": SecurityConfig(sandbox=SandboxConfig(provider="disabled")),  # Docker is never assumed
+        "reporting": ReportingConfig(formats=[]),  # reports have their own tests
     }
     base.update(overrides)
     return AgentLabConfig(**base)

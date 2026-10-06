@@ -115,6 +115,23 @@ class StorageConfig(Model):
     reports_dir: str = ".agentlab/reports"
 
 
+ReportFormat = Literal["json", "md", "html", "pdf"]
+_ALL_FORMATS: tuple[ReportFormat, ...] = ("json", "md", "html", "pdf")
+
+
+class ReportingConfig(Model):
+    """What ``agentlab test`` writes at the end of a run. ``agentlab report`` can render any format later."""
+
+    formats: list[ReportFormat] = Field(
+        default_factory=lambda: list(_ALL_FORMATS),
+        description="Report formats written after every run (the folder is storage.reports_dir)",
+    )
+    include_sensitive_artifacts: bool = Field(
+        default=False,
+        description="Embed restricted evidence (screenshots taken while signed in) in the report files",
+    )
+
+
 class PlanningConfig(Model):
     """Planning defaults. The numbers are *planning estimates* used to size a plan before anything runs, not measurements."""
 
@@ -143,6 +160,7 @@ class AgentLabConfig(Model):
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     limits: LimitsConfig = Field(default_factory=LimitsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
+    reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     queue: QueueConfig = Field(default_factory=QueueConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4

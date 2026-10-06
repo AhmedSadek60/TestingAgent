@@ -33,7 +33,7 @@ from typing import Any
 import yaml
 from pydantic import Field
 
-from agentlab.core.config import AgentLabConfig, SandboxConfig, SecurityConfig, StorageConfig
+from agentlab.core.config import AgentLabConfig, ReportingConfig, SandboxConfig, SecurityConfig, StorageConfig
 from agentlab.core.enums import Severity, TestStatus
 from agentlab.core.models import TargetSpec
 from agentlab.core.models.base import Model
@@ -153,6 +153,7 @@ def _config(tmp: Path, overrides: dict[str, Any]) -> AgentLabConfig:
             secrets_file=str(tmp / "s.enc"),
         ),
         security=SecurityConfig(sandbox=SandboxConfig(provider="disabled")),
+        reporting=ReportingConfig(formats=[]),  # the self-test checks what is found, not how it is written up
     )
     return AgentLabConfig.model_validate(_merge(base.model_dump(mode="json"), overrides)) if overrides else base
 

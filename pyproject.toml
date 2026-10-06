@@ -27,15 +27,16 @@ dependencies = [
   "jsonpath-ng>=1.6",
   "pypdf>=4.2",
   "python-docx>=1.1",
+  "reportlab>=4.2",
+  "pillow>=10.3",
 ]
 
 [project.optional-dependencies]
 browser = ["playwright>=1.45"]
 postgres = ["psycopg[binary]>=3.1"]
 redis = ["redis>=5.0"]
-mcp = ["mcp>=1.9"]
-pdf = ["reportlab>=4.2"]
-all = ["agentlab[browser,postgres,redis,mcp,pdf]"]
+mcp = ["mcp>=2.3,<3"]
+all = ["agentlab[browser,postgres,redis,mcp]"]
 dev = [
   "agentlab[all]",
   "pytest>=8",
@@ -52,7 +53,7 @@ agentlab = "agentlab.cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentlab = ["py.typed", "reports/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*"]
+agentlab = ["py.typed", "reporting/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
