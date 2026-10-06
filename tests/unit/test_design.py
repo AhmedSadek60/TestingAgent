@@ -346,6 +346,31 @@ def test_user_tests_load_with_shorthands_and_report_problems(tmp_path: Path):
     assert any("missing.yaml" in p for p in problems)
 
 
+def test_a_user_test_that_is_invalid_says_which_key_and_what_to_do(tmp_path: Path):
+    f = tmp_path / "tests.yaml"
+    f.write_text(
+        """
+- name: settings beside the type
+  input: hello
+  assertions:
+    - {type: contains, value: "30 days"}
+- name: a field that does not exist
+  input: hello
+  severity: high
+- name: a wrong kind of value
+  input: hello
+  timeout: soon
+""",
+        encoding="utf-8",
+    )
+    tests, problems = load_user_tests([f])
+    assert tests == [] and len(problems) == 3
+    assert "assertions.0.value" in problems[0] and "go under 'params'" in problems[0]
+    assert "severity" in problems[1] and "go under 'params'" not in problems[1]
+    assert "timeout" in problems[2]
+    assert all("validation error for TestCase" not in p for p in problems)
+
+
 def test_user_tests_join_the_plan_and_are_never_trimmed(tmp_path: Path):
     f = tmp_path / "t.yaml"
     f.write_text(USER_YAML, encoding="utf-8")
