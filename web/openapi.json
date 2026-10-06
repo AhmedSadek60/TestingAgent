@@ -7114,14 +7114,28 @@
         "properties": {
           "suite": {
             "type": "string",
+            "enum": [
+              "discovery",
+              "functional",
+              "security",
+              "browser",
+              "reliability",
+              "full",
+              "regression"
+            ],
             "title": "Suite",
-            "description": "discovery, functional, security, browser, full or regression",
+            "description": "discovery, functional, security, browser, reliability, full or regression",
             "default": "full"
           },
           "intensity": {
             "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "thorough"
+            ],
             "title": "Intensity",
-            "description": "quick, standard or deep",
+            "description": "How many variants each skill makes: quick, standard or thorough",
             "default": "standard"
           },
           "include_skills": {
@@ -11284,15 +11298,29 @@
           },
           "suite": {
             "type": "string",
+            "enum": [
+              "discovery",
+              "functional",
+              "security",
+              "browser",
+              "reliability",
+              "full",
+              "regression"
+            ],
             "title": "Suite",
             "default": "full",
             "description": "Which suite it was made for"
           },
           "intensity": {
             "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "thorough"
+            ],
             "title": "Intensity",
             "default": "standard",
-            "description": "quick, standard or deep"
+            "description": "quick, standard or thorough"
           },
           "profile_hash": {
             "type": "string",

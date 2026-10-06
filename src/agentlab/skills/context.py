@@ -13,11 +13,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, cast, get_args
 
 from agentlab.adapters.base import AdapterCapabilities
 from agentlab.core.config import AgentLabConfig
-from agentlab.core.enums import AgentType, RiskClass, Severity
+from agentlab.core.enums import AgentType, Intensity, RiskClass, Severity
+from agentlab.core.errors import UserError
 from agentlab.core.models import (
     AgentProfile,
     AssertionSpec,
@@ -34,7 +35,15 @@ from agentlab.documents.models import AnalyzedDocument, Fact, Requirement
 from agentlab.repository.models import RepositoryAnalysis
 from agentlab.skills.model import SkillManifest
 
-INTENSITIES = ("quick", "standard", "thorough")
+INTENSITIES: tuple[str, ...] = get_args(Intensity)
+
+
+def check_intensity(value: str) -> Intensity:
+    """``value`` as an intensity, or a UserError that names the intensities there are."""
+    if value not in INTENSITIES:
+        raise UserError(f"unknown intensity '{value}' (known: {', '.join(INTENSITIES)})")
+    return cast(Intensity, value)
+
 
 DESTRUCTIVE_NAME = re.compile(
     r"delete|remove|drop|destroy|erase|wipe|purge|truncate|kill|terminate|cancel|transfer|"
@@ -67,7 +76,7 @@ class SkillContext:
     docker_available: bool = False
     browser_available: bool = False
     credential_names: list[str] = field(default_factory=list)
-    intensity: str = "standard"
+    intensity: Intensity = "standard"
     fixtures_dir: Path | None = None  # writable directory for generated fixture files (attachments)
     doc_paths: dict[str, Path] = field(default_factory=dict)  # document name -> file the user supplied
     previous: list[TestResult] = field(default_factory=list)

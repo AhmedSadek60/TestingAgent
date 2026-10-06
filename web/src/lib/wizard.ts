@@ -3,8 +3,10 @@
 import type { Document, JobOptions, JobOverrides, PlanRequest, ReportFormat, RunRequest, TargetSpec } from "../api/types";
 
 export type SourceKind = "existing" | "repository" | "url" | "api" | "documents" | "local" | "mcp" | "demo";
-export type EvalMode = "discovery" | "functional" | "security" | "browser" | "full" | "regression";
-export type Intensity = "quick" | "standard" | "deep";
+// Read from the server's generated types, so a choice the server does not know (or no longer knows) does not compile.
+// The "reliability" suite is for the command line: the wizard's six modes are the ones the specification names.
+export type EvalMode = Exclude<NonNullable<JobOptions["suite"]>, "reliability">;
+export type Intensity = NonNullable<JobOptions["intensity"]>;
 export type RiskClass = "safe" | "controlled" | "high_impact";
 
 export const SOURCES: { id: SourceKind; title: string; detail: string }[] = [
@@ -30,7 +32,7 @@ export const MODES: { id: EvalMode; title: string; detail: string }[] = [
 export const INTENSITIES: { id: Intensity; title: string; detail: string }[] = [
   { id: "quick", title: "Quick", detail: "A small, fast sample. A smoke test." },
   { id: "standard", title: "Standard", detail: "A balanced suite. The default." },
-  { id: "deep", title: "Deep", detail: "Many variants per risk. Slower and costlier." },
+  { id: "thorough", title: "Thorough", detail: "Many variants per risk. Slower and costlier." },
 ];
 
 export const STEPS = [

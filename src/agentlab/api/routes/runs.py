@@ -42,12 +42,10 @@ from agentlab.core.enums import RunStatus, Severity, TestStatus
 from agentlab.core.errors import InfrastructureError, NotFoundError, UserError
 from agentlab.core.ids import as_utc, new_id, utcnow
 from agentlab.core.models import Finding, Scorecard, TargetSpec, TestResult
-from agentlab.design import SUITES
 from agentlab.design.models import TestPlan
 from agentlab.evaluation.scoring import list_profiles
 from agentlab.jobs.models import JobOptions, JobOverrides, JobSpec
 from agentlab.reporting.review import apply_reviews, review_finding, review_result, subject_labels
-from agentlab.skills.context import INTENSITIES
 
 router = APIRouter(dependencies=[Depends(require_auth)], responses=RESPONSES)
 
@@ -66,10 +64,6 @@ KEEPALIVE_EVERY = 30  # polls without an event: about twelve seconds
 # =================================================================================================== submit
 def _options(st: ApiState, options: JobOptions) -> JobOptions:
     """The request's options, checked against what exists, with uploaded files turned into server paths."""
-    if options.suite not in SUITES:
-        raise UserError(f"suite must be one of {', '.join(SUITES)}")
-    if options.intensity not in INTENSITIES:
-        raise UserError(f"intensity must be one of {', '.join(INTENSITIES)}")
     if options.scoring_profile and options.scoring_profile not in list_profiles():
         raise UserError(f"unknown scoring profile '{options.scoring_profile}' (known: {', '.join(list_profiles())})")
     out = options.model_copy(deep=True)

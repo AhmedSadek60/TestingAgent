@@ -896,7 +896,7 @@ limits: Limits the plan was made under
 plan_hash: Fingerprint of the selected tests; a run executes the plan with this hash
 parent_plan_id: The plan this one follows up
 suite: Which suite it was made for
-intensity: quick, standard or deep
+intensity: quick, standard or thorough
 profile_hash: Fingerprint of the profile it was made from
 coverage: Which taxonomy letters (A to Q) are covered
 security_coverage: Which security categories (N1 to N28) are covered

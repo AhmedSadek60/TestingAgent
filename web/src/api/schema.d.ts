@@ -2668,16 +2668,18 @@ export interface components {
         JobOptions: {
             /**
              * Suite
-             * @description discovery, functional, security, browser, full or regression
+             * @description discovery, functional, security, browser, reliability, full or regression
              * @default full
+             * @enum {string}
              */
-            suite?: string;
+            suite?: "discovery" | "functional" | "security" | "browser" | "reliability" | "full" | "regression";
             /**
              * Intensity
-             * @description quick, standard or deep
+             * @description How many variants each skill makes: quick, standard or thorough
              * @default standard
+             * @enum {string}
              */
-            intensity?: string;
+            intensity?: "quick" | "standard" | "thorough";
             /**
              * Include Skills
              * @description Use only these skills
@@ -5307,14 +5309,16 @@ export interface components {
              * Suite
              * @description Which suite it was made for
              * @default full
+             * @enum {string}
              */
-            suite?: string;
+            suite?: "discovery" | "functional" | "security" | "browser" | "reliability" | "full" | "regression";
             /**
              * Intensity
-             * @description quick, standard or deep
+             * @description quick, standard or thorough
              * @default standard
+             * @enum {string}
              */
-            intensity?: string;
+            intensity?: "quick" | "standard" | "thorough";
             /**
              * Profile Hash
              * @description Fingerprint of the profile it was made from

@@ -33,8 +33,8 @@ HINTS = {
     "attachments": "this interface does not accept file attachments",
     "omit_auth": "this interface cannot send a request without its credentials, so enforcement cannot be checked",
     "workspace": "an isolated Docker workspace is required and Docker is unavailable (AgentLab never runs on the host)",
-    "local_site": "the instrumented local site is only reachable by a target on this machine or private network and "
-    "needs an installed browser engine",
+    "local_site": "the instrumented test site listens only on this machine's loopback address, so only a target running "
+    "on this machine can reach it, and it needs an installed browser engine",
 }
 
 

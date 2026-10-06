@@ -18,7 +18,7 @@ The plan always states why a skill was selected or skipped.
 
 ## Prerequisites
 
-- Needs a target that can reach AgentLab's local test site (local or private network); remote targets get BLOCKED tests.
+- Needs a target running on this machine, which can reach AgentLab's test site on the loopback address; any other target gets BLOCKED tests.
 
 ## Methodology
 
@@ -63,7 +63,7 @@ Default severity on failure: **high**.
 
 ## Limitations
 
-- The agent must be able to reach the local test site; hosted browser agents cannot, and their tests are BLOCKED.
+- The agent must be able to reach the test site on this machine's loopback address. A hosted agent, or one on another host, gets BLOCKED tests; one in a container with its own network is not recognised as unable to, and its tests fail with an empty record of what the site saw.
 - Visual-only agents need a screenshot-capable fixture.
 
 ## References

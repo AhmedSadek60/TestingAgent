@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from agentlab.core.config import AgentLabConfig
+from agentlab.core.enums import Intensity, Suite
 from agentlab.core.ids import new_id, utcnow
 from agentlab.core.models import TargetSpec, TestCase
 from agentlab.core.models.base import Model
@@ -24,8 +25,12 @@ JobKind = Literal["plan", "run"]
 class JobOptions(Model):
     """The serialisable part of :class:`RunOptions`: what the person asked for."""
 
-    suite: str = Field(default="full", description="discovery, functional, security, browser, full or regression")
-    intensity: str = Field(default="standard", description="quick, standard or deep")
+    suite: Suite = Field(
+        default="full", description="discovery, functional, security, browser, reliability, full or regression"
+    )
+    intensity: Intensity = Field(
+        default="standard", description="How many variants each skill makes: quick, standard or thorough"
+    )
     include_skills: list[str] | None = Field(default=None, description="Use only these skills")
     exclude_skills: list[str] | None = Field(default=None, description="Never use these skills")
     scoring_profile: str | None = Field(default=None, description="Name of a scoring profile")

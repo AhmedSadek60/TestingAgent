@@ -179,11 +179,19 @@ async def test_cancelling_skips_the_remaining_tests_but_still_scores_what_ran(se
 async def test_a_run_level_budget_stops_the_run_instead_of_failing_tests(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, limits=LimitsConfig(max_tokens=40))
     sv = Services.create(cfg, base_dir=tmp_path)
-    out = await TestOrchestratorAgent(sv).run(mock_spec(), RunOptions(intensity="quick"))
+    orch = TestOrchestratorAgent(sv)
+    announced: list[dict[str, object]] = []
+    orch.bus.subscribe(lambda e: announced.append(e.payload) if e.type == EventType.LIMIT_REACHED else None)
+    out = await orch.run(mock_spec(), RunOptions(intensity="quick"))
     stopped = [r for r in out.results if r.status.is_stopped]
     assert stopped and out.status.value.startswith("stopped_due_to")
+    assert announced and all(a["reason"] for a in announced), "a limit that is announced says which one"
     assert not any(r.status == TestStatus.FAILED and "budget" in (r.blocked_reason or "") for r in out.results)
     assert any("stopped early" in q for q in out.scorecard.qualifiers)
+    # the run says which limit stopped it: in the score's qualifier, the summary of limits and the manifest
+    assert any("max_tokens is 40" in q for q in out.scorecard.qualifiers), out.scorecard.qualifiers
+    assert "max_tokens is 40" in str(out.limits["stop_reason"]) and out.limits["stopped"] == out.status.value
+    assert "max_tokens is 40" in str(out.manifest["outcome"]["stop_reason"])
     sv.store.db.dispose()
 
 

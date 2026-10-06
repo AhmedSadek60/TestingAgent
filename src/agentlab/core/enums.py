@@ -7,6 +7,7 @@ traces, reports and the database.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 
 class AgentType(StrEnum):
@@ -50,8 +51,15 @@ class SuiteKind(StrEnum):
     FUNCTIONAL = "functional"
     SECURITY = "security"
     BROWSER = "browser"
+    RELIABILITY = "reliability"
     FULL = "full"
     REGRESSION = "regression"
+
+
+# The same two vocabularies as types. A request that names anything else is refused where it enters, and the web client's
+# generated types list exactly these, so a screen cannot offer a choice the server does not know.
+Suite = Literal["discovery", "functional", "security", "browser", "reliability", "full", "regression"]
+Intensity = Literal["quick", "standard", "thorough"]
 
 
 class TestStatus(StrEnum):

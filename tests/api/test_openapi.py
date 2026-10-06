@@ -155,3 +155,14 @@ def test_the_schema_the_web_interface_is_built_from_is_the_current_one() -> None
     assert have == module.current(), (
         "web/openapi.json is out of date: run `python scripts/export_openapi.py && (cd web && npm run gen:api)`"
     )
+
+
+def test_the_choices_a_request_can_name_are_listed_in_the_schema(schema: dict[str, Any]) -> None:
+    """The web client's types are generated from these lists, so a choice the server does not know cannot be offered."""
+    from agentlab.design import SUITES
+    from agentlab.skills.context import INTENSITIES
+
+    for name in ("JobOptions", "TestPlan"):
+        props = schema["components"]["schemas"][name]["properties"]
+        assert props["intensity"]["enum"] == list(INTENSITIES), name
+        assert set(props["suite"]["enum"]) == set(SUITES), name

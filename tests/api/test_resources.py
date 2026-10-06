@@ -374,6 +374,7 @@ async def test_every_failure_has_one_shape_and_none_leaks_internals(tmp_path: Pa
         assert any(f.startswith("body.target") for f in fields) and any("intensity" in f for f in fields), fields
         bad_option = await c.post("/test-runs", json={"target": mock_target(), "options": {"intensity": "extreme"}})
         assert bad_option.status_code == 422 and "intensity" in bad_option.json()["error"]["message"]
+        assert "'thorough'" in bad_option.json()["error"]["message"]  # it says what would have been accepted
         bad_suite = await c.post("/test-runs", json={"target": mock_target(), "options": {"suite": "everything"}})
         assert bad_suite.status_code == 422 and "suite" in bad_suite.json()["error"]["message"]
         no_target = await c.post("/test-runs", json={})

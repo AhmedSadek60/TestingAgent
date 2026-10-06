@@ -45,6 +45,7 @@ from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.sandbox.docker import DockerSandboxProvider
 from agentlab.security import safeyaml
 from agentlab.services import Services
+from agentlab.skills.context import check_intensity
 
 DATA_DIR = Path(__file__).parent / "data"
 JUDGE_REASON = "judge"  # a test BLOCKED because no LLM judge is configured says so in its reason
@@ -181,7 +182,7 @@ def run_fixture(
         try:
             spec = TargetSpec(**target)
             options = RunOptions(
-                intensity=intensity,
+                intensity=check_intensity(intensity),
                 second_wave=False,
                 only_tests=list(only or []),
                 user_test_files=[dataset] if dataset else [],

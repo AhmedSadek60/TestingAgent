@@ -210,7 +210,7 @@ describe("the request the answers become", () => {
   it("changes the plan's signature when an answer that shapes it changes, and not when it waits longer", () => {
     const a = wizard({ source: "demo", name: "Demo" });
     expect(planSignature(a, "default")).toBe(planSignature({ ...a }, "default"));
-    expect(planSignature(a, "default")).not.toBe(planSignature({ ...a, intensity: "deep" }, "default"));
+    expect(planSignature(a, "default")).not.toBe(planSignature({ ...a, intensity: "thorough" }, "default"));
     expect(planSignature(a, "default")).not.toBe(planSignature({ ...a, name: "Other" }, "default"));
     expect(planSignature(a, "default")).not.toBe(planSignature(a, "other-project"));
   });

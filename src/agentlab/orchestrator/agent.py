@@ -23,7 +23,7 @@ from agentlab.core.enums import EventType, Phase, RiskClass, RunStatus, Severity
 from agentlab.core.errors import AgentLabError, UserError
 from agentlab.core.ids import new_id, utcnow
 from agentlab.core.models import Finding, Scorecard, TargetSpec, TestCase, TestResult
-from agentlab.design import SUITES, TestDesignerAgent
+from agentlab.design import TestDesignerAgent, check_suite
 from agentlab.design.models import PlannedTest, PlanWarning, TestPlan
 from agentlab.design.render import plan_markdown
 from agentlab.design.user_tests import load_user_tests
@@ -67,7 +67,7 @@ from agentlab.security.egress import EgressPolicy
 from agentlab.security.gate import AuthorizationGate
 from agentlab.security.redactor import redact
 from agentlab.services import Services
-from agentlab.skills.context import INTENSITIES
+from agentlab.skills.context import check_intensity
 from agentlab.tracing import Event, EventBus
 
 log = logging.getLogger(__name__)
@@ -588,11 +588,8 @@ class TestOrchestratorAgent:
     async def _validate(self, spec: TargetSpec, opts: RunOptions) -> tuple[list[TestCase], list[str]]:
         cfg = self.config
         warns: list[str] = []
-        suite = "regression" if opts.baseline_run_id else opts.suite
-        if suite not in SUITES:
-            raise UserError(f"unknown suite '{suite}' (known: {', '.join(SUITES)})")
-        if opts.intensity not in INTENSITIES:
-            raise UserError(f"unknown intensity '{opts.intensity}' (known: {', '.join(INTENSITIES)})")
+        suite = check_suite("regression" if opts.baseline_run_id else opts.suite)
+        check_intensity(opts.intensity)
         if suite == "regression" and not opts.baseline_run_id and opts.plan is None:
             raise UserError("a regression run needs the id of the run to compare against (baseline_run_id)")
         if not (
@@ -996,7 +993,11 @@ class TestOrchestratorAgent:
                 if status == RunStatus.CANCELLED:
                     scorecard.qualifiers.append("The run was cancelled: the score covers only the tests that ran.")
                 elif status.value.startswith("stopped_due"):
-                    scorecard.qualifiers.append(f"The run stopped early ({status.value}); some tests did not run.")
+                    why = f": {limits.stop_reason}" if limits.stop_reason else ""
+                    scorecard.qualifiers.append(
+                        f"The run stopped early ({status.value}{why}); some tests did not run, or not all of their "
+                        "repetitions."
+                    )
                 sv.store.save_scorecard(run_id, scorecard)
                 ph.set(overall=scorecard.overall, grade=scorecard.grade, profile=scorecard.profile)
             sv.store.save_findings(run_id, findings)
@@ -1039,6 +1040,7 @@ class TestOrchestratorAgent:
             "cost_usd": wall["cost_usd"],
             "tokens": wall["tokens"],
             "elapsed_s": wall["elapsed_s"],
+            "stop_reason": wall["stop_reason"],
             "plan_prediction": pred,
             "scope": scope.model_dump(mode="json") if scope else None,
         }

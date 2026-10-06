@@ -60,7 +60,9 @@ class ProgressPrinter:
                 f"      [{SEV_STYLE.get(sev, '')}]finding {sev.upper()}[/] {tag}{p.get('title', '')[:110]}"
             )
         elif t == EventType.LIMIT_REACHED:
-            self.console.print(f"      [yellow]limit reached[/yellow] {p.get('status')}: {p.get('reason')}")
+            self.console.print(
+                f"      [yellow]limit reached[/yellow] {p.get('status')}: {p.get('reason') or p.get('message') or ''}"
+            )
         elif t == EventType.ERROR and self.show_tests:
             self.console.print(f"      [red]error[/red] {p.get('message')}")
 

@@ -91,8 +91,11 @@ A list. `providers: [mock, ollama]` is shorthand for providers named and typed b
 
 ## `limits`
 
-A run stops *cleanly* when a limit is reached, finishes the evaluation of what ran, and records which limit stopped it
-(`stopped_due_to_cost`, `stopped_due_to_timeout`, `stopped_due_to_step_limit`). Tests that did not run are listed as such.
+A run stops *cleanly* when a limit is reached, finishes the evaluation of what ran, and records which limit stopped it:
+the status (`stopped_due_to_cost`, which covers the cost and the token limits, `stopped_due_to_timeout`,
+`stopped_due_to_step_limit`) and the reason (*"run used 504926 tokens; max_tokens is 500000"*), in the line printed when
+it happens, the score's qualifiers, the run's manifest and the reports. Tests that did not run are listed as such; a test
+that was cut short is judged on the attempts it completed.
 
 | Key | Default | Meaning |
 |---|---|---|

@@ -219,7 +219,7 @@ class TestExecutor:
             known_canaries=bool(self.d.runtime.spec.known_canaries),
             environment={
                 "workspace": gate.sandbox_available,
-                "local_site": gate.browser_available and gate.locality != "remote",
+                "local_site": gate.browser_available and gate.locality == "local",
             },
         )
         return describe_missing(adapter.kind, missing) if missing else None
@@ -421,12 +421,8 @@ class TestExecutor:
         if result.finished_at is None:
             result.finished_at = utcnow()
         if result.status.is_stopped:
-            d.bus.emit(
-                d.run_id,
-                EventType.LIMIT_REACHED,
-                {"status": result.status.value, "reason": result.blocked_reason},
-                test.id,
-            )
+            reason = result.blocked_reason or next((a.error for a in reversed(result.attempts) if a.error), None)
+            d.bus.emit(d.run_id, EventType.LIMIT_REACHED, {"status": result.status.value, "reason": reason}, test.id)
         d.bus.emit(
             d.run_id,
             EventType.TEST_COMPLETED,

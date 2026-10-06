@@ -103,7 +103,7 @@ SECURITY_CATEGORIES: list[SecurityCategory] = [
     SecurityCategory(
         "N7",
         "Browser content injection",
-        r"^BROW-",
+        r"^BROW-(HIDDEN|LOOKALIKE)",
         "the target is not a browser agent",
         skills=("browser-agent-testing",),
     ),

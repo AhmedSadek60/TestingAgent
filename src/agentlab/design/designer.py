@@ -19,11 +19,11 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from agentlab.adapters.base import AdapterCapabilities, TargetRuntime
 from agentlab.core.config import AgentLabConfig, Pricing
-from agentlab.core.enums import RiskClass, SuiteKind
+from agentlab.core.enums import RiskClass, Suite, SuiteKind
 from agentlab.core.errors import UserError
 from agentlab.core.models import AgentProfile, TestCase, TestResult
 from agentlab.design.models import (
@@ -60,10 +60,19 @@ SUITES: dict[str, str] = {
     SuiteKind.FUNCTIONAL.value: "Behaviour and quality of every capability found; no adversarial tests",
     SuiteKind.SECURITY.value: "Safety and security only (taxonomy N), authorised and non-destructive",
     SuiteKind.BROWSER.value: "Browser and UI behaviour (taxonomy J)",
-    "reliability": "Repeatability, latency and cost behaviour (taxonomy O, P and Q)",
+    SuiteKind.RELIABILITY.value: "Repeatability, latency and cost behaviour (taxonomy O, P and Q)",
     SuiteKind.FULL.value: "Everything that applies to the target",
     SuiteKind.REGRESSION.value: "The tests of an earlier plan, re-run unchanged so the two runs are comparable",
 }
+
+
+def check_suite(value: str) -> Suite:
+    """``value`` as a suite, or a UserError that names the suites there are."""
+    if value not in SUITES:
+        raise UserError(f"unknown suite '{value}' (known: {', '.join(SUITES)})")
+    return cast(Suite, value)
+
+
 # letters a suite is about; a letter outside the suite is "not applicable", not a gap
 SUITE_LETTERS: dict[str, set[str]] = {
     "discovery": {"A"},
@@ -198,14 +207,13 @@ class TestDesignerAgent:
     ) -> TestPlan:
         """Wave 1. ``selection`` lets the caller run skill selection as its own step (the orchestrator does, so the
         two phases are observable); without it the designer selects the skills itself."""
-        if suite not in SUITES:
-            raise UserError(f"unknown suite '{suite}' (known: {', '.join(SUITES)})")
-        if suite == "regression":
+        kind = check_suite(suite)
+        if kind == "regression":
             raise UserError("a regression plan is built from an earlier plan: use TestDesignerAgent.regression()")
-        if suite == "discovery":
+        if kind == "discovery":
             ctx = dataclasses.replace(ctx, intensity="quick")
         registry = self.registry_for(ctx.config)
-        plan = self._new_plan(ctx, suite)
+        plan = self._new_plan(ctx, kind)
         gate = self._gate(ctx)
         ids = IdAllocator()
         seen: dict[str, str] = {}
@@ -557,7 +565,7 @@ class TestDesignerAgent:
         return plan
 
     # ------------------------------------------------------------------ plan construction helpers
-    def _new_plan(self, ctx: SkillContext, suite: str) -> TestPlan:
+    def _new_plan(self, ctx: SkillContext, suite: Suite) -> TestPlan:
         plan = TestPlan(
             target=ctx.profile.target_name,
             suite=suite,
@@ -672,7 +680,7 @@ class TestDesignerAgent:
             caps = ctx.adapter_capabilities.get(kind)
             env = {
                 "workspace": ctx.docker_available,
-                "local_site": ctx.browser_available and gate.locality != "remote",
+                "local_site": ctx.browser_available and gate.locality == "local",
             }
             if caps is None:
                 needs = [n for n in needs if n in ENVIRONMENT_CAPABILITIES]  # interface capabilities unknown

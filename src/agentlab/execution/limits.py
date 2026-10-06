@@ -139,7 +139,17 @@ class LimitTracker:
 
     # ------------------------------------------------------------------ checks
     def check_run(self) -> None:
-        """Run-level budgets: total cost, total tokens and wall-clock time."""
+        """Run-level budgets: total cost, total tokens and wall-clock time. The first one reached is remembered, so the
+        run can say which limit stopped it."""
+        try:
+            self._check_run()
+        except LimitReached as lr:
+            with self._lock:
+                if self.stopped is None:
+                    self.stopped, self.stop_reason = RunStatus(lr.status.value), str(lr)
+            raise
+
+    def _check_run(self) -> None:
         lim = self.limits
         elapsed = time.monotonic() - self.started
         if self.cost > lim.max_cost_usd:
@@ -187,6 +197,8 @@ class LimitTracker:
             "steps": self.steps,
             "browser_actions": self.browser_actions,
             "elapsed_s": round(time.monotonic() - self.started, 2),
+            "stopped": self.stopped.value if self.stopped else None,
+            "stop_reason": self.stop_reason,
             "cost_by_category": {k: round(v, 6) for k, v in self.by_category.items()},
             "cost_by_model": {k: round(v, 6) for k, v in self.by_model.items()},
             "limits": self.limits.model_dump(),

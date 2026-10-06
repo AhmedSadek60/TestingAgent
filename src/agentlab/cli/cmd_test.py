@@ -32,13 +32,13 @@ from agentlab.core.enums import RunStatus, Severity
 from agentlab.core.errors import UserError
 from agentlab.core.ids import new_id
 from agentlab.core.models import TargetSpec
-from agentlab.design import SUITES
+from agentlab.design import SUITES, check_suite
 from agentlab.design.render import plan_markdown
 from agentlab.discovery.agent import DiscoveryResult
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.orchestrator.options import PreparedRun, RunOutcome
 from agentlab.services import Services
-from agentlab.skills.context import INTENSITIES
+from agentlab.skills.context import INTENSITIES, check_intensity
 from agentlab.tracing import EventBus
 
 FAIL_ON = ("none", "low", "medium", "high", "critical")
@@ -351,8 +351,8 @@ def test(
     if baseline:
         baseline = resolve_run_id(services, baseline)  # an id prefix is enough
     options = RunOptions(
-        suite=suite,
-        intensity=intensity,
+        suite=check_suite(suite),
+        intensity=check_intensity(intensity),
         include_skills=skills,
         exclude_skills=exclude_skills,
         user_test_files=list(tests or []),
