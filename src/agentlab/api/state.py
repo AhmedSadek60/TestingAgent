@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import Request
 
-from agentlab.api.security import TokenGuard
+from agentlab.api.security import LinkSigner, TokenGuard
 from agentlab.jobs.queue import JobQueue
 from agentlab.jobs.worker import Worker
 from agentlab.services import Services
@@ -23,6 +23,7 @@ class ApiState:
     allowed_roots: list[Path] = field(default_factory=list)
     max_upload_bytes: int = 25 * 1024 * 1024
     ui_dir: Path | None = None
+    links: LinkSigner = field(default_factory=LinkSigner)
 
     @property
     def store(self):  # type: ignore[no-untyped-def]

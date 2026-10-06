@@ -210,6 +210,7 @@ def create_app(
         )
 
     app.include_router(catalog.public)
+    app.include_router(reports.public)
     for module in (projects, runs, reports, catalog):
         app.include_router(module.router)
 

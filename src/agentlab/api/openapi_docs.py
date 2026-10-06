@@ -397,6 +397,10 @@ include_sensitive: Embed evidence taken while signed in (off by default)
 report: The report the file belongs to
 file: The file in the format asked for
 
+[ViewLink]
+url: The address, on this server, that shows the report
+expires_in: How many seconds the link works for
+
 [Finding]
 id: Unique identifier of the finding
 run_id: Id of the run
@@ -1074,6 +1078,7 @@ TraceOut: The ordered events of one attempt of one test
 TraceSummary: One trace in a list
 Turn: One thing the user says in a conversation
 TypeScore: How strongly the target looks like one kind of agent
+ViewLink: A short-lived link that shows a report in a sandboxed frame
 WebConfig: A web interface to drive with a browser
 """
 

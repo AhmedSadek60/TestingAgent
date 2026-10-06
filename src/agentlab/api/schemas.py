@@ -387,6 +387,11 @@ class ExportRequest(Model):
     include_sensitive: bool = False
 
 
+class ViewLink(Model):
+    url: str = Field(description="Path on this server that opens the report; it needs no token")
+    expires_in: int = Field(description="Seconds the link stays valid")
+
+
 class ExportResponse(Model):
     report: ReportOut
     file: ReportFileOut

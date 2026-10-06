@@ -240,6 +240,13 @@ async def test_every_response_says_it_must_not_be_sniffed_framed_or_shared(tmp_p
             assert r.headers["x-content-type-options"] == "nosniff", url
             assert r.headers["x-frame-options"] == "DENY" and r.headers["referrer-policy"] == "no-referrer", url
             assert r.headers["cross-origin-resource-policy"] == "same-origin", url
+            for name in (
+                "x-content-type-options",
+                "x-frame-options",
+                "referrer-policy",
+                "cross-origin-resource-policy",
+            ):
+                assert len(r.headers.get_list(name)) == 1, f"{url}: {name} was sent more than once"
 
 
 # ======================================================================================= paths on the server
