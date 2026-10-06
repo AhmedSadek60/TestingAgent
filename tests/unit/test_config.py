@@ -73,3 +73,20 @@ def test_a_provider_key_is_a_reference_and_a_dump_shows_the_reference_only(tmp_p
 def test_an_unknown_provider_lists_the_known_ones() -> None:
     with pytest.raises(UserError, match=r"provider 'ghost' is not configured \(known: \['mock'\]\)"):
         AgentLabConfig().provider("ghost")
+
+
+def test_the_database_url_can_come_from_the_environment_so_its_password_stays_out_of_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "postgresql+psycopg://lab:" + "from-the-environment" + "@db.internal:5432/lab"
+    path = write(tmp_path, "storage:\n  database_url: sqlite:///.agentlab/other.db\n  artifacts_dir: kept-from-file\n")
+    monkeypatch.setenv("AGENTLAB_DATABASE_URL", url)
+    from_file = AgentLabConfig.load(path)
+    assert from_file.storage.database_url == url
+    assert from_file.storage.artifacts_dir == "kept-from-file", "only the URL is replaced"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("AGENTLAB_CONFIG", raising=False)
+    path.unlink()
+    assert AgentLabConfig.load().storage.database_url == url, "also with no file at all"
+    monkeypatch.delenv("AGENTLAB_DATABASE_URL")
+    assert AgentLabConfig.load().storage.database_url == "sqlite:///.agentlab/agentlab.db"

@@ -87,7 +87,7 @@ def serve(
         if not serve_ui:
             console.print("  web interface   off")
         elif ui_dir is None:
-            console.print("  web interface   not built here (cd web && npm install && npm run build)")
+            console.print("  web interface   not built here (cd web && npm ci && npm run build)")
         else:
             console.print(f"  web interface   {base}/")
         console.print(

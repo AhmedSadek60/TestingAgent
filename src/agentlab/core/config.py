@@ -242,6 +242,18 @@ class AgentLabConfig(Model):
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> AgentLabConfig:
+        """The configuration from ``path`` (else ``$AGENTLAB_CONFIG``, else ``./agentlab.yaml``, else the defaults).
+
+        ``AGENTLAB_DATABASE_URL`` replaces ``storage.database_url``, so that a database password never has to be written
+        into a file (``queue.redis_url`` has ``AGENTLAB_REDIS_URL`` for the same reason)."""
+        config = cls._read(path)
+        url = os.environ.get("AGENTLAB_DATABASE_URL")
+        if url:
+            config = config.model_copy(update={"storage": config.storage.model_copy(update={"database_url": url})})
+        return config
+
+    @classmethod
+    def _read(cls, path: str | Path | None) -> AgentLabConfig:
         candidate = path or os.environ.get("AGENTLAB_CONFIG")
         if candidate is None and Path("agentlab.yaml").exists():
             candidate = "agentlab.yaml"
