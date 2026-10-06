@@ -83,26 +83,33 @@ Authorize = Annotated[
     list[str] | None,
     typer.Option(
         "--authorize",
-        help="Allow a risk class on this target: controlled | high_impact (repeatable). Safe tests always run; "
-        "high_impact tests also need --disposable-environment.",
+        help="Allow a risk class on this target: controlled | high_impact (repeatable). Safe tests always run. "
+        "high_impact tests also need --authorization-note, and on a remote target --disposable-environment.",
         rich_help_panel=AUTH,
     ),
 ]
 AuthorizationNote = Annotated[
     str | None,
-    typer.Option("--authorization-note", help="Who authorised testing, recorded in the run.", rich_help_panel=AUTH),
+    typer.Option(
+        "--authorization-note",
+        help="Who authorised the testing and why, in your words. Needed for high_impact tests and for security tests "
+        "against a remote host; kept with the target.",
+        rich_help_panel=AUTH,
+    ),
 ]
 Disposable = Annotated[
     bool,
     typer.Option(
         "--disposable-environment",
-        help="The target is a disposable test deployment (needed for HIGH_IMPACT tests).",
+        help="The target is a disposable test deployment (a remote target needs this for high_impact tests).",
         rich_help_panel=AUTH,
     ),
 ]
 Production = Annotated[
     bool,
     typer.Option(
-        "--production", help="The target is a production system: only safe, read-only tests run.", rich_help_panel=AUTH
+        "--production",
+        help="The target is a production system: only safe tests run, and high_impact tests never do.",
+        rich_help_panel=AUTH,
     ),
 ]

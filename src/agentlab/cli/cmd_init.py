@@ -77,8 +77,8 @@ api:
 # documents: [docs/policies.md]                                        # what the agent should know
 
 # --- what you authorise ----------------------------------------------------------------------------------------
-# Safe tests always run. Add controlled tests only for a target you own; high-impact tests also need a
-# disposable environment.
+# Safe tests always run. Add controlled tests only for a target you own. High-impact tests also need a written
+# authorization_note and, on a remote target, a disposable environment.
 safety:
   production: false
   authorized_risk_classes: [safe, controlled]

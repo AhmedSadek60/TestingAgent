@@ -622,8 +622,8 @@ class TestOrchestratorAgent:
                 warns.append(f"credential profile '{name}' is not stored; tests that need it will be BLOCKED")
         if spec.safety.production and not cfg.security.allow_production_targets:
             warns.append(
-                "the target is marked production: adversarial and HIGH_IMPACT tests are blocked unless "
-                "security.allow_production_targets is enabled and the owner authorizes them"
+                "the target is marked production: tests above SAFE are blocked unless "
+                "security.allow_production_targets is on, and HIGH_IMPACT tests never run against it"
             )
         profile_name = opts.scoring_profile or cfg.evaluation.scoring_profile
         if profile_name:
