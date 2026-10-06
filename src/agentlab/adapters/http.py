@@ -30,6 +30,15 @@ from agentlab.security.redactor import get_redactor
 
 MAX_BODY = 5_000_000
 OUTPUT_KEYS = ("output", "response", "answer", "reply", "text", "message", "content", "result")
+DEFAULT_PORTS = {"http": 80, "https": 443}
+#: What a request may still carry once a redirect has taken it to an origin its credential was not released for.
+HEADERS_SAFE_ELSEWHERE = {"content-type", "accept"}
+
+
+def origin_of(url: str | httpx.URL) -> tuple[str, str, int | None]:
+    """(scheme, host, port): what "the same place" means for a credential, as for a browser's same-origin rule."""
+    u = httpx.URL(str(url))
+    return u.scheme, u.host.lower(), u.port or DEFAULT_PORTS.get(u.scheme)
 
 
 def render_template(node: Any, values: dict[str, Any]) -> Any:
@@ -140,14 +149,20 @@ class AgentApiAdapter(AgentAdapter):
         if self._client:
             await self._client.aclose()
 
-    def _headers(self, session_id: str, *, omit_auth: bool = False) -> dict[str, str]:
+    def _headers(
+        self, session_id: str, *, omit_auth: bool = False, credential: str | None = None, url: str | None = None
+    ) -> dict[str, str]:
+        """Request headers for ``url`` (default: the agent's own address). ``credential`` is the profile the *test*
+        asked for (``required_credentials``); it replaces the target's default one, so a test written for another
+        identity is sent as that identity. The credential is released only for a URL inside its scope."""
         headers = {"Content-Type": "application/json", "Accept": "application/json", **self.cfg.headers}
         if self.cfg.protocol == "sse":
             headers["Accept"] = "text/event-stream"
-        if self.cfg.auth_credential and not omit_auth:
+        name = credential or self.cfg.auth_credential
+        if name and not omit_auth:
             if self.ctx.credentials is None:
                 raise TargetError("credential requested but no CredentialManager is configured")
-            headers.update(self.ctx.credentials.auth_headers(self.cfg.auth_credential, self.cfg.url))
+            headers.update(self.ctx.credentials.auth_headers(name, url or self.cfg.url))
         if self.cfg.session_header:
             headers[self.cfg.session_header] = session_id
         return headers
@@ -182,7 +197,7 @@ class AgentApiAdapter(AgentAdapter):
             await self.open()
         assert self._client is not None
         omit_auth = bool(request.metadata.get("omit_auth"))
-        headers = self._headers(request.session_id, omit_auth=omit_auth)
+        headers = self._headers(request.session_id, omit_auth=omit_auth, credential=request.credential)
         body = self._body(request)
         url = self.cfg.url
         t0 = time.perf_counter()
@@ -213,6 +228,15 @@ class AgentApiAdapter(AgentAdapter):
         if not self.cfg.knowledge_endpoint:
             raise UnsupportedCapability("this target has no knowledge_endpoint, so documents cannot be planted")
         assert self._client is not None
+        if origin_of(self.cfg.knowledge_endpoint) != origin_of(self.cfg.url):
+            # a hook on another origin gets headers built for *its* address, so a credential scoped to the agent is
+            # refused there (a BLOCKED test) instead of being sent to a host it was never released for
+            headers = self._headers(
+                request.session_id,
+                omit_auth=bool(request.metadata.get("omit_auth")),
+                credential=request.credential,
+                url=self.cfg.knowledge_endpoint,
+            )
         for name, text in docs.items():
             self.ctx.egress.check(self.cfg.knowledge_endpoint)
             r = await self._client.post(
@@ -224,6 +248,9 @@ class AgentApiAdapter(AgentAdapter):
                 raise TargetError(f"the knowledge endpoint refused document '{name}' (HTTP {r.status_code})")
 
     async def _request(self, url: str, headers: dict[str, str], body: Any) -> httpx.Response:
+        """Send the request and follow at most three redirects. Every hop passes the egress policy, and a hop to an
+        origin other than the one the credential was released for is made without the credential (or any other header
+        the owner configured): the target, or an open redirect on it, chooses where ``Location`` points."""
         assert self._client is not None
         for _ in range(4):
             self.ctx.egress.check(url)
@@ -232,7 +259,10 @@ class AgentApiAdapter(AgentAdapter):
             else:
                 r = await self._client.request(self.cfg.method, url, headers=headers, json=body)
             if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
-                url = str(httpx.URL(url).join(r.headers["location"]))  # re-validated by egress at loop top
+                nxt = str(httpx.URL(url).join(r.headers["location"]))  # re-validated by egress at loop top
+                if origin_of(nxt) != origin_of(url):
+                    headers = {k: v for k, v in headers.items() if k.lower() in HEADERS_SAFE_ELSEWHERE}
+                url = nxt
                 continue
             return r
         raise PolicyBlocked("too many redirects")

@@ -324,7 +324,11 @@ def _compat(mat_a: RunMaterial, mat_b: RunMaterial, deltas: list[TestDelta]) -> 
         notes.append(f"{plural(changed, 'test')} share an id but differ in content and were not compared.")
     only_a, only_b = len(ids_a - ids_b), len(ids_b - ids_a)
     if only_a or only_b:
-        notes.append(f"{only_a} test(s) exist only in A and {only_b} only in B.")
+        notes.append(
+            f"{only_a} test(s) exist only in A and {only_b} only in B: the two plans were designed separately. "
+            f"To compare like with like, replay A's tests against B's target with `agentlab test --baseline "
+            f"{mat_a.run_id[:8]}`."
+        )
     blocking = [d for d in diffs if d.impact == "blocks_comparison"]
     caveats = [d for d in diffs if d.impact == "caveat"]
     if mat_a.run_id == mat_b.run_id:
@@ -540,14 +544,23 @@ def _findings(mat_a: RunMaterial, mat_b: RunMaterial) -> list[FindingDelta]:
 
 
 def _verdict(
-    comp: Compatibility, counts: Counter[str], score: dict[str, Any], sec: dict[str, Any], findings: list[FindingDelta]
+    comp: Compatibility,
+    counts: Counter[str],
+    score: dict[str, Any],
+    sec: dict[str, Any],
+    findings: list[FindingDelta],
+    *,
+    same_run: bool = False,
 ) -> tuple[Verdict, str]:
     regressions = counts["new_failure"] + sum(
         1 for f in findings if f.kind in {"new", "worse"} and f.severity_b in {"high", "critical"}
     )
     regressions += int(sec.get("direction") == "worse")
     improvements = counts["resolved"] + sum(1 for f in findings if f.kind == "resolved")
-    if comp.verdict == "not_comparable" or comp.shared_tests == 0:
+    # Different scoring profiles make the OVERALL scores incomparable; whether a test passed does not depend on the
+    # weights, so the test-level outcome still stands. Anything else that blocks a comparison blocks the verdict too.
+    blockers = {d.field for d in comp.differences if d.impact == "blocks_comparison"} - {"scoring_profile"}
+    if same_run or blockers or comp.shared_tests == 0:
         return "inconclusive", "The runs cannot be compared reliably; see the compatibility section."
     parts = []
     if counts["new_failure"]:
@@ -562,6 +575,8 @@ def _verdict(
     if delta is not None and score.get("overall_comparable"):
         parts.append(f"score {'+' if delta >= 0 else ''}{delta:.1f}")
     text = ", ".join(parts) or "no differences in outcome"
+    if comp.verdict == "not_comparable":
+        text += " (the overall scores are not comparable: the runs were scored with different profiles)"
     if regressions and improvements:
         return "mixed", f"Mixed: {text}."
     if regressions:
@@ -594,7 +609,7 @@ def compare_material(mat_a: RunMaterial, mat_b: RunMaterial) -> Comparison:
     perf, perf_changes = _perf(mat_a, mat_b, shared)
     security = _security(mat_a, mat_b)
     findings = _findings(mat_a, mat_b)
-    verdict, summary = _verdict(comp, counts, score, security, findings)
+    verdict, summary = _verdict(comp, counts, score, security, findings, same_run=mat_a.run_id == mat_b.run_id)
     order = list(KIND_TITLES)
     shown = sorted(deltas, key=lambda d: (order.index(d.kind), d.test_id))
     return Comparison(

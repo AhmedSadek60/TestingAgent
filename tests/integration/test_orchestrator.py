@@ -195,7 +195,12 @@ async def test_an_unreachable_api_is_reported_not_failed_and_nothing_is_scored(s
     assert any(w.code == "interface_unavailable" and w.level == "blocker" for w in out.plans[0].warnings)
     assert any("unavailable" in w for w in out.warnings)
     assert out.scorecard.overall is None, "nothing ran, so there is no score to give"
-    assert out.summary()["tests"] == 0 and out.tested is False
+    assert out.tested is False and out.summary()["security_posture"] == "not_tested"
+    # the tests are still designed and listed, each BLOCKED with the reason: the user sees what was not verified
+    assert out.summary()["tests"] == 3 and out.counts == {"blocked": 3}
+    assert all(
+        r.status == TestStatus.BLOCKED and "interface is unavailable" in (r.blocked_reason or "") for r in out.results
+    )
 
 
 async def test_a_judge_that_is_the_target_itself_is_never_used(tmp_path: Path) -> None:

@@ -14,6 +14,21 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+_KNOWN = {
+    "verdict": "pass",
+    "confidence": 0.9,
+    "uncertain": False,
+    "reasoning": "The reply satisfies the rubric.",
+    "evidence_quotes": [],
+}
+
+
+def verdict(score: float, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    """An answer that satisfies the schema the caller asked for (the real vendors enforce it): every property it names,
+    so a judge built on a fake can really vote, and nothing it does not name."""
+    props = list((schema or {}).get("properties") or ["verdict", "score"])
+    return {k: score if k == "score" else _KNOWN.get(k, "ok") for k in props}
+
 
 class Recorder:
     def __init__(self) -> None:
@@ -29,8 +44,12 @@ def _text_for(messages: list[dict[str, Any]]) -> str:
     c = last.get("content")
     if isinstance(c, list):
         c = " ".join(p.get("text", "") for p in c if isinstance(p, dict))
-    if "JSON Schema" in str(c):  # prompt-level JSON request (degraded structured output)
-        return '```json\n{"verdict": "pass", "score": 0.9}\n```'
+    if "JSON Schema" in str(c):  # prompt-level JSON request (degraded structured output): the schema is in the prompt
+        try:
+            schema = json.loads(str(c).split("JSON Schema:\n", 1)[1])
+        except (IndexError, ValueError):
+            schema = None
+        return "```json\n" + json.dumps(verdict(0.9, schema)) + "\n```"
     return f"echo: {c}"
 
 
@@ -68,7 +87,7 @@ def openai_app(
             }
         rf = body.get("response_format")
         if rf and rf.get("type") in ("json_schema", "json_object"):
-            msg["content"] = json.dumps({"verdict": "pass", "score": 0.9})
+            msg["content"] = json.dumps(verdict(0.9, (rf.get("json_schema") or {}).get("schema")))
         usage: dict[str, Any] = {"prompt_tokens": 11, "completion_tokens": 7}
         if openrouter:
             usage["cost"] = 0.00042
@@ -133,7 +152,7 @@ def gemini_app(rec: Recorder, *, api_key: str = "AIza-test-gemini-key") -> FastA
         parts: list[dict[str, Any]] = [{"text": "echo: " + body["contents"][-1]["parts"][0].get("text", "")}]
         gc = body.get("generationConfig", {})
         if gc.get("responseMimeType") == "application/json":
-            parts = [{"text": json.dumps({"verdict": "pass", "score": 0.8})}]
+            parts = [{"text": json.dumps(verdict(0.8, gc.get("responseJsonSchema")))}]
         if body.get("tools"):
             name = body["tools"][0]["functionDeclarations"][0]["name"]
             parts = [{"functionCall": {"name": name, "args": {"q": "x"}}}]
@@ -194,7 +213,7 @@ def ollama_app(rec: Recorder) -> FastAPI:
             return StreamingResponse(gen(), media_type="application/x-ndjson")
         msg: dict[str, Any] = {"role": "assistant", "content": "echo: " + body["messages"][-1]["content"]}
         if body.get("format"):
-            msg["content"] = json.dumps({"verdict": "pass", "score": 0.7})
+            msg["content"] = json.dumps(verdict(0.7, body["format"] if isinstance(body["format"], dict) else None))
         if body.get("tools"):
             msg = {
                 "role": "assistant",
@@ -257,7 +276,8 @@ def anthropic_app(rec: Recorder, *, api_key: str = "sk-ant-test-key-1234567890")
             )
         content: list[dict[str, Any]] = [{"type": "text", "text": "echo"}]
         if "output_config" in body:
-            content = [{"type": "text", "text": json.dumps({"verdict": "pass", "score": 0.95})}]
+            schema = body["output_config"].get("format", {}).get("schema")
+            content = [{"type": "text", "text": json.dumps(verdict(0.95, schema))}]
         if body.get("tools"):
             content = [{"type": "tool_use", "id": "toolu_1", "name": body["tools"][0]["name"], "input": {"q": "x"}}]
         return {

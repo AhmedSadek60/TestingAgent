@@ -43,6 +43,8 @@ class EgressPolicy:
             return  # unresolvable: the HTTP call will fail with a target error
         for info in infos:
             addr = ipaddress.ip_address(info[4][0])
+            if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+                addr = addr.ipv4_mapped  # ``::ffff:169.254.169.254`` is the metadata service, however it is written
             if self.block_metadata and (str(addr) in METADATA_HOSTS or addr.is_link_local):
                 raise PolicyBlocked(f"{host} resolves to link-local/metadata address {addr}")
             if not self.allow_private and (addr.is_private or addr.is_loopback):

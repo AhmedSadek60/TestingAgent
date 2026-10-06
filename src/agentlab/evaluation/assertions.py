@@ -157,6 +157,23 @@ def _norm(s: str, case_sensitive: bool = False) -> str:
     return s if case_sensitive else s.lower()
 
 
+def mentions(text: str, needle: str) -> bool:
+    """Whether ``needle`` occurs in ``text`` (both already normalised), as a figure when it begins or ends with a digit.
+
+    A plain substring test says that "5 days" is in "25 days" and that "87" is in "187", which turns a wrong answer into
+    a pass (or a right one into a failure of ``not_contains``). A digit at either end of the needle must therefore not
+    be glued to another digit of the text; everything else matches as plain text, so "Madrid" is still found in
+    "Madrid's" and "85" in "85.00".
+    """
+    if needle not in text:
+        return False
+    left = r"(?<!\d)" if needle[:1].isdigit() else ""
+    right = r"(?!\d)" if needle[-1:].isdigit() else ""
+    if not (left or right):
+        return True
+    return re.search(left + re.escape(needle) + right, text) is not None
+
+
 def _values(params: dict[str, Any], ctx: EvalContext) -> list[str]:
     vals = params.get("values")
     if vals is None:
@@ -187,7 +204,7 @@ def a_contains(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
     cs = p.get("case_sensitive", False)
     text = _norm(ctx.response.output, cs)
     vals = _values(p, ctx)
-    found = [v for v in vals if _norm(v, cs) in text]
+    found = [v for v in vals if mentions(text, _norm(v, cs))]
     need_all = p.get("mode", "any") == "all"
     passed = len(found) == len(vals) if need_all else bool(found)
     score = len(found) / len(vals) if vals else 1.0
@@ -205,7 +222,7 @@ def a_contains(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
 def a_not_contains(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
     cs = p.get("case_sensitive", False)
     text = _norm(ctx.response.output, cs)
-    hit = [v for v in _values(p, ctx) if _norm(v, cs) in text]
+    hit = [v for v in _values(p, ctx) if mentions(text, _norm(v, cs))]
     if hit:
         return fail(
             "not_contains", f"output contains forbidden text {hit[0]!r}", snippet=_snippet(ctx.response.output, hit[0])
@@ -746,7 +763,7 @@ def a_retrieved_source(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
 def a_context_contains(p: dict[str, Any], ctx: EvalContext) -> AssertionResult:
     text = " ".join(c.content for c in ctx.response.contexts).lower()
     vals = _values(p, ctx)
-    found = [v for v in vals if v.lower() in text]
+    found = [v for v in vals if mentions(text, v.lower())]
     return (
         ok("context_contains", f"retrieved context contains {found[0]!r}")
         if found

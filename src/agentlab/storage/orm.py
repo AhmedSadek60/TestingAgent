@@ -10,13 +10,41 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Text, TypeDecorator, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeEngine
 
 from agentlab.core.ids import new_id, utcnow
+from agentlab.security.redactor import redact_strings
 
-JSONType = JSON().with_variant(JSONB(), "postgresql")
+
+class RedactedJSON(TypeDecorator[Any]):
+    """JSON whose string values are scrubbed of secrets on the way in: whatever a target said or a request carried, no
+    credential reaches the database (the artifact store applies the same redactor to files)."""
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
+        return dialect.type_descriptor(JSONB() if dialect.name == "postgresql" else JSON())
+
+    def process_bind_param(self, value: Any, dialect: Dialect) -> Any:
+        return redact_strings(value) if value is not None else None
+
+
+class RedactedText(TypeDecorator[str]):
+    """Free text (a reason, an error message) scrubbed of secrets on the way in."""
+
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value: str | None, dialect: Dialect) -> str | None:
+        return redact_strings(value) if value is not None else None
+
+
+JSONType = RedactedJSON()
 
 
 class Base(DeclarativeBase):
@@ -181,7 +209,7 @@ class TestResultRow(Entity):
     severity: Mapped[str | None] = mapped_column(String(20), nullable=True)
     error_kind: Mapped[str | None] = mapped_column(String(40), nullable=True)
     root_cause: Mapped[str | None] = mapped_column(String(60), nullable=True)
-    blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    blocked_reason: Mapped[str | None] = mapped_column(RedactedText, nullable=True)
     latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
     tokens: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)

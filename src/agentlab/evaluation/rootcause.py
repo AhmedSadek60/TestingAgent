@@ -26,8 +26,17 @@ _TOOL_SELECTION = {
 _TOOL_ARGUMENTS = {"trajectory:tool_arguments"}
 _AUTHZ = {"no_destructive_without_confirmation", "asks_confirmation", "tool_allowlist", "no_external_recipient"}
 _RETRIEVAL = {"retrieved_source", "context_contains"}
+_ANSWER_VALUE = {"contains", "numeric", "equals"}  # the answer should state a value the documents hold
 _GROUNDING = {"grounded", "abstains", "citations_valid", "cites_source"}
-_SECURITY = {"no_canary_leak", "no_secret_leak", "no_injection_followed", "no_injection_indicators_in_output"}
+_SECURITY = {
+    "no_canary_leak",
+    "no_secret_leak",
+    "no_injection_followed",
+    "no_injection_indicators_in_output",
+    "diff_no_secrets",
+}
+_CODE_SCOPE = {"diff_not_touches", "diff_only_touches", "file_exists"}  # files the task did not allow it to change
+_CODE_RESULT = {"tests_pass", "hidden_tests_pass"}
 _ORCH = {
     "handoff_path",
     "max_handoffs",
@@ -121,6 +130,15 @@ def classify_root_cause(
             ev,
             [(RootCause.PROMPT, 0.3)],
         )
+    if "diff_not_contains" in types and test.category.lower() == "security":
+        return RootCauseAnalysis(
+            RootCause.SECURITY_VULNERABILITY,
+            0.85,
+            "a marker planted in untrusted project content ended up in the agent's change: it followed instructions "
+            "found in data",
+            ev,
+            [(RootCause.PROMPT, 0.4)],
+        )
     if "tool_args_safe" in types:
         return RootCauseAnalysis(
             RootCause.SECURITY_VULNERABILITY,
@@ -138,6 +156,14 @@ def classify_root_cause(
             ev,
             [(RootCause.MODEL_LIMITATION, 0.45)],
         )
+    if test.skill == "authorization-testing" and failed:
+        return RootCauseAnalysis(
+            RootCause.AUTHORIZATION,
+            0.7,
+            "the agent accepted a claim of authority it could not verify (or did not ask for proof)",
+            ev,
+            [(RootCause.PROMPT, 0.4), (RootCause.MODEL_LIMITATION, 0.25)],
+        )
     if test.category.lower() == "security" and types & {"tool_not_called", "tool_allowlist"}:
         return RootCauseAnalysis(
             RootCause.AUTHORIZATION,
@@ -154,11 +180,41 @@ def classify_root_cause(
             ev,
             [(RootCause.TOOL_IMPLEMENTATION, 0.3), (RootCause.PROMPT, 0.3)],
         )
-    if tool_errors and (hit(_TOOL_ARGUMENTS) or "no_error" in types):
+    if hit(_CODE_SCOPE):
+        return RootCauseAnalysis(
+            RootCause.AUTHORIZATION,
+            0.6,
+            "the coding agent changed or removed files the task did not allow it to touch",
+            ev,
+            [(RootCause.PROMPT, 0.35), (RootCause.MODEL_LIMITATION, 0.3)],
+        )
+    if "diff_size_max" in types:
+        return RootCauseAnalysis(
+            RootCause.PROMPT,
+            0.45,
+            "the coding agent made a much larger change than the task asked for",
+            ev,
+            [(RootCause.MODEL_LIMITATION, 0.35)],
+        )
+    if hit(_CODE_RESULT):
+        held_out = "hidden_tests_pass" in types and not any(
+            not x.passed for a in attempts for x in a.assertions if x.type == "tests_pass"
+        )
+        return RootCauseAnalysis(
+            RootCause.MODEL_LIMITATION,
+            0.45 if held_out else 0.4,
+            "the visible tests pass but held-out tests fail: the change fits the examples rather than the cause"
+            if held_out
+            else "the coding agent's change does not make the project's tests pass",
+            ev,
+            [(RootCause.PROMPT, 0.35), (RootCause.TOOL_IMPLEMENTATION, 0.15)],
+        )
+    if tool_errors and "no_error" in types and not hit(_TOOL_ARGUMENTS):
+        # the arguments were not found wrong, yet a tool returned an error: the tool itself may be at fault
         return RootCauseAnalysis(
             RootCause.TOOL_IMPLEMENTATION,
             0.55,
-            "a tool returned an error; arguments or the tool itself may be at fault",
+            "a tool returned an error although the arguments were not shown to be wrong",
             ev,
             [(RootCause.TOOL_SELECTION, 0.4)],
         )
@@ -166,9 +222,12 @@ def classify_root_cause(
         return RootCauseAnalysis(
             RootCause.TOOL_SELECTION,
             0.65,
-            "the right tool was chosen but with incorrect arguments",
+            "the right tool was chosen but with incorrect arguments"
+            + ("; the tool's error is the consequence" if tool_errors else ""),
             ev,
-            [(RootCause.PROMPT, 0.3)],
+            [(RootCause.TOOL_IMPLEMENTATION, 0.3), (RootCause.PROMPT, 0.3)]
+            if tool_errors
+            else [(RootCause.PROMPT, 0.3)],
         )
     if hit(_TOOL_SELECTION):
         return RootCauseAnalysis(
@@ -182,8 +241,9 @@ def classify_root_cause(
         return RootCauseAnalysis(
             RootCause.RETRIEVAL, 0.7, "expected source/context was not retrieved", ev, [(RootCause.DATA, 0.3)]
         )
-    if hit(_GROUNDING):
-        if not responses_with_contexts:
+    retrieved_ok = any(x.passed for a in attempts for x in a.assertions if x.type in _RETRIEVAL)
+    if hit(_GROUNDING) or (retrieved_ok and hit(_ANSWER_VALUE)):
+        if not responses_with_contexts and not retrieved_ok:
             return RootCauseAnalysis(
                 RootCause.RETRIEVAL,
                 0.5,
@@ -204,6 +264,16 @@ def classify_root_cause(
             0.6,
             "control flow (delegation, planning, loops or step usage) deviated from expectations",
             ev,
+        )
+    handoffs = [h for a in attempts for h in a.trajectory.get("handoffs", [])]
+    if handoffs and failed:
+        return RootCauseAnalysis(
+            RootCause.ORCHESTRATION,
+            0.4,
+            f"the request was handed over ({'; '.join(dict.fromkeys(handoffs[:4]))}) and the outcome was wrong: the "
+            "routing, the specialist that received it or the final synthesis may be at fault",
+            ev,
+            [(RootCause.MODEL_LIMITATION, 0.3), (RootCause.PROMPT, 0.3)],
         )
     if hit(_BROWSER) or test.category.lower() in {"browser", "ui"}:
         ui = any("selector" in str(f.evidence) or "visible" in f.message for f in failed)

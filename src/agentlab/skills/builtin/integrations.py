@@ -591,7 +591,7 @@ def _ws(fixture: str, **extra: Any) -> dict[str, Any]:
 
 def coding_tests(sk: SkillRun) -> None:
     ctx = sk.ctx
-    if "command" not in ctx.interfaces:
+    if "command" not in ctx.interfaces and "command" not in ctx.unavailable:
         sk.note(
             "coding-agent tests run the agent as a command inside the sandbox on a fixture workspace; the target declares no `command` "
             "interface, so they were skipped"
@@ -603,7 +603,12 @@ def coding_tests(sk: SkillRun) -> None:
             "an agent that is started on a workspace with a task, so they were skipped"
         )
         return
-    if not ctx.docker_available:
+    if "command" in ctx.unavailable:
+        sk.note(
+            f"the `command` interface could not be started ({ctx.unavailable['command']}): the coding-agent tests are "
+            "designed so they can be read, and are BLOCKED (never run on the host) until it can"
+        )
+    elif not ctx.docker_available:
         sk.note("Docker is not available, so coding-agent tests will be BLOCKED (they never run on the host)")
     ev = [
         f"coding capability detected (confidence {ctx.type_confidence('coding'):.2f})",

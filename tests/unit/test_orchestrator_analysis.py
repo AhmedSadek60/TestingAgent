@@ -241,14 +241,36 @@ def test_a_focused_suite_is_labelled_so_its_grade_cannot_read_as_a_verdict_on_ev
 
 
 def test_gaps_and_blocked_tests_make_a_full_run_partial_and_are_named() -> None:
-    tests = [mk_test("A-1", "functional"), mk_test("A-2", "functional")]
-    results = [result("A-1", TestStatus.PASSED), result("A-2", TestStatus.BLOCKED, reason="no judge")]
+    tests = [mk_test(f"A-{i}", "functional") for i in range(1, 8)]
+    results = [result(t.id, TestStatus.PASSED) for t in tests[:-1]] + [
+        result("A-7", TestStatus.BLOCKED, reason="no judge")
+    ]
     scope = assess_scope(
         plan_with("full", entry("A", "partial"), entry("D", "not_covered"), entry("N1", "not_covered")), tests, results
     )
-    assert scope.limited and scope.label == "partial coverage"
+    assert scope.limited and scope.label == "partial coverage" and not scope.thin
     assert scope.gaps == ["A area A", "D area D"], "taxonomy letters only; the N-codes have their own security analysis"
     assert "1 test(s) were BLOCKED" in scope.text and "do not count as passes" in scope.text
+
+
+def test_a_run_where_little_could_run_says_how_little_instead_of_carrying_a_bare_letter() -> None:
+    tests = [mk_test(f"A-{i}", "functional") for i in range(1, 41)]
+    results = [result("A-1", TestStatus.PASSED)] + [
+        result(t.id, TestStatus.BLOCKED, reason="credential profile 'x' was not provided") for t in tests[1:]
+    ]
+    scope = assess_scope(plan_with("full", entry("A", "covered")), tests, results)
+    assert scope.limited and scope.thin and scope.executed == 1 and scope.blocked == 39
+    assert scope.label == "only 1 of 40 planned tests could run"
+    assert add_grade_note("A", scope.label) == "A (only 1 of 40 planned tests could run)"
+    # the same blocked tests next to plenty of executed ones are a caveat, not the headline
+    many = [mk_test(f"B-{i}", "functional") for i in range(1, 31)]
+    ran = [result(t.id, TestStatus.PASSED) for t in many] + [result(t.id, TestStatus.BLOCKED) for t in tests[1:4]]
+    assert not assess_scope(plan_with("full", entry("A", "covered")), [*many, *tests[1:4]], ran).thin
+
+
+def test_nothing_blocked_is_never_thin_however_few_tests_ran() -> None:
+    t = mk_test("A-1", "functional")
+    assert not assess_scope(plan_with("full", entry("A", "covered")), [t], [result("A-1", TestStatus.PASSED)]).thin
 
 
 def test_a_replay_of_selected_tests_is_a_subset_not_a_grade_of_the_agent() -> None:

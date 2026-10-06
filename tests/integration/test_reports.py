@@ -692,12 +692,39 @@ def test_runs_scored_differently_are_flagged_and_their_scores_are_not_compared(l
     b.run["id"] = "run-b"
     b.manifest["scoring_profile"] = {**b.manifest["scoring_profile"], "name": "stricter", "hash": "other"}
     comparison = compare_material(a, b)
-    assert comparison.compatibility.verdict == "not_comparable" and comparison.verdict == "inconclusive"
+    assert comparison.compatibility.verdict == "not_comparable"
     assert any(
         d.field == "scoring_profile" and d.impact == "blocks_comparison" for d in comparison.compatibility.differences
     )
     assert comparison.score["overall_comparable"] is False and "NOT comparable" in comparison.score["note"]
     assert "NOT comparable" in comparison_markdown(comparison)
+    # the weights change the overall score, never whether a test passed: the test-level verdict still stands
+    assert comparison.verdict == "unchanged" and "overall scores are not comparable" in comparison.summary
+
+
+def test_a_regression_is_reported_even_when_the_runs_were_scored_with_different_profiles(lab: Lab) -> None:
+    a = load_material(lab.sv, lab.good)
+    b = copy.deepcopy(a)
+    b.run["id"] = "run-b"
+    b.manifest["scoring_profile"] = {**b.manifest["scoring_profile"], "name": "stricter", "hash": "other"}
+    victim = next(r for r in b.results if r.status == TestStatus.PASSED)
+    victim.status = TestStatus.FAILED
+    comparison = compare_material(a, b)
+    assert comparison.compatibility.verdict == "not_comparable" and comparison.score["overall_comparable"] is False
+    assert comparison.verdict == "regressed" and comparison.counts["new_failure"] == 1
+    assert "overall scores are not comparable" in comparison.summary
+
+
+def test_a_different_major_agentlab_version_makes_the_whole_comparison_inconclusive(lab: Lab) -> None:
+    a = load_material(lab.sv, lab.good)
+    b = copy.deepcopy(a)
+    b.run["id"] = "run-b"
+    b.manifest["agentlab_version"] = "99.0.0"
+    victim = next(r for r in b.results if r.status == TestStatus.PASSED)
+    victim.status = TestStatus.FAILED
+    comparison = compare_material(a, b)
+    assert comparison.compatibility.verdict == "not_comparable" and comparison.verdict == "inconclusive"
+    assert any(d.field == "agentlab_version" for d in comparison.compatibility.differences)
 
 
 def test_a_changed_skill_or_plan_is_a_caveat_and_a_changed_test_is_not_compared(lab: Lab) -> None:

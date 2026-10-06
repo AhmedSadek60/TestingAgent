@@ -55,7 +55,13 @@ class BrowserExecutionEngine(ExecutionEngine):
         with tempfile.TemporaryDirectory(prefix="agentlab-browser-") as raw:
             tmp = Path(raw)
             video_dir = str(tmp / "video") if config.browser.record_video else None
-            opened = await open_context(pool, web, env.extras.get("credentials"), record_video_dir=video_dir)
+            opened = await open_context(
+                pool,
+                web,
+                env.extras.get("credentials"),
+                record_video_dir=video_dir,
+                credential=test.required_credentials[0] if test.required_credentials else None,
+            )
             context = opened.guarded.context
             tracing = config.browser.record_trace
             if tracing:
@@ -85,6 +91,8 @@ class BrowserExecutionEngine(ExecutionEngine):
                 await session.close()
                 if video_dir:
                     video_artifact = self._video(test, env, tmp / "video")
+                # the Playwright trace and the video are evidence of the attempt, so a finding can point at them
+                out.artifacts.extend(a for a in (trace_artifact, video_artifact) if a)
             self._remember(test, env, session, trace_artifact, video_artifact)
         out.state["browser"] = session.state()
         return out

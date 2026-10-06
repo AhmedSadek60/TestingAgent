@@ -88,11 +88,14 @@ class AuthorizationGate:
         sandbox_available: bool = False,
         judge_available: bool = False,
         browser_available: bool = False,
+        unavailable: dict[str, str] | None = None,
     ) -> None:
         self.spec = spec
         self.config = config
         self.credentials = credentials
         self.interfaces = set(interfaces if interfaces is not None else spec.interfaces())
+        #: interface -> why it could not be opened or reached (the target declares it, so it is not "not configured")
+        self.unavailable = dict(unavailable or {})
         self.sandbox_available = sandbox_available
         self.judge_available = judge_available
         self.browser_available = browser_available
@@ -136,13 +139,27 @@ class AuthorizationGate:
         # ---- prerequisites (BLOCKED, never FAILED)
         for iface in test.required_interfaces:
             if iface not in self.interfaces:
+                if iface in self.unavailable:
+                    return block(
+                        "prerequisite", f"required interface '{iface}' is unavailable: {self.unavailable[iface]}"
+                    )
                 return block(
                     "prerequisite",
                     f"required interface '{iface}' is not configured for this target "
                     f"(available: {sorted(self.interfaces) or 'none'})",
                 )
         if self.spec.interfaces() == [] and not self.interfaces and test.context.get("engine") != "static":
-            return block("prerequisite", "the target exposes no interface that AgentLab can drive")
+            return block(
+                "prerequisite",
+                "there is no running instance to test: the target has no interface AgentLab can drive (give --url, "
+                "--api-url, --mcp-url, --command, --llm or --mock); tests designed from the repository wait for one",
+            )
+        if not self.interfaces and self.unavailable and test.context.get("engine") != "static":
+            return block(
+                "prerequisite",
+                "the target's interface is unavailable, so nothing can be sent to it: "
+                + "; ".join(f"{kind}: {why}" for kind, why in sorted(self.unavailable.items())),
+            )
         if test.browser_steps and not self.browser_available:
             return block(
                 "prerequisite", "browser engine is unavailable (Playwright/Chromium not installed or disabled)"

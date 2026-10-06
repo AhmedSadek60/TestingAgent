@@ -31,6 +31,8 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_GENERATED_BYTES = 2_000_000
+MAX_PICTURE_SIDE = 2048  # pixels; a plain picture of that size is 12 MB before it is compressed
+MAX_PICTURE_TEXT = 1200  # characters in a picture of text (it is drawn pixel by pixel, so cost grows with the area)
 COLUMNS = 64  # characters per line of a text picture
 GLYPH_W, GLYPH_H = 5, 7
 
@@ -137,6 +139,10 @@ def solid_png(color: str, size: int = 48) -> bytes:
     rgb = COLOURS.get(color.lower())
     if rgb is None:
         raise ValueError(f"unknown colour '{color}'; known: {', '.join(sorted(COLOURS))}")
+    if (
+        not 1 <= size <= MAX_PICTURE_SIDE
+    ):  # the picture is built in memory: its side is not the author's to choose freely
+        raise ValueError(f"picture size {size} is outside the range 1..{MAX_PICTURE_SIDE}")
     row = bytes(rgb) * size
     return encode_png(size, size, [row] * size)
 
@@ -166,6 +172,8 @@ def wrap(text: str, columns: int = COLUMNS) -> list[str]:
 def text_png(text: str, scale: int = 3) -> bytes:
     """``text`` (upper-cased) drawn black on white: every glyph is a 5x7 grid of ``scale``-pixel squares, laid out in
     cells of 6x8 squares, inside a margin of two squares on every side."""
+    if len(text) > MAX_PICTURE_TEXT:
+        raise ValueError(f"a picture of {len(text)} characters of text is too large (at most {MAX_PICTURE_TEXT})")
     scale = max(1, min(scale, 8))
     lines = wrap(text.upper())
     cols = max(1, max(len(line) for line in lines))
@@ -244,6 +252,8 @@ def generate(ref: str) -> Generated:
     kind, _, fmt = f"{parts.netloc}{parts.path}".partition("/")
     query = parse_qs(parts.query, keep_blank_values=True)
     text = unquote(_one(query, "text"))
+    if len(text) > MAX_GENERATED_BYTES:
+        raise ValueError(f"the text of '{ref[:60]}...' is larger than {MAX_GENERATED_BYTES} characters")
     data: bytes
     if (kind, fmt) == ("png", "solid"):
         colour = _one(query, "color", "red")

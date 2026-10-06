@@ -292,12 +292,12 @@ class RepositoryIngestor:
         repo = IngestedRepo(path=dest, name="repository", ref=source.ref, url=source.url, cleanup_root=root)
         try:
             if source.url:
-                self.egress.check(source.url)
-                repo.name = source.url.rstrip("/").split("/")[-1].removesuffix(".git") or "repository"
                 if source.url.startswith("git@"):
                     raise UserError(
                         "ssh repository URLs are not supported; use https:// (credentials via a credential profile)"
                     )
+                self.egress.check(source.url)
+                repo.name = source.url.rstrip("/").split("/")[-1].removesuffix(".git") or "repository"
                 shutil.rmtree(dest)
                 await _git_clone(source.url, source.ref, dest, auth_header)
                 commit, ref = read_git_head(dest)

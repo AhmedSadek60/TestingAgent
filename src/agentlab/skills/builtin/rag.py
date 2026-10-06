@@ -41,6 +41,31 @@ def _older_newer(a: Fact, b: Fact) -> tuple[Fact, Fact] | None:
     return None
 
 
+def _doc(f: Fact) -> str:
+    return f.source.split(" ")[0]
+
+
+def _topic(f: Fact) -> str:
+    """What a fact is about: its subject and its statement without the figures, so two editions of one rule match."""
+    return f"{f.subject.strip().lower()}|{re.sub(r'[\d.,%$€£]+', '#', f.statement.lower())}"
+
+
+def _cross_document_pair(facts: list[Fact]) -> tuple[Fact, Fact] | None:
+    """Two facts from two different documents about two different things, neither from a document that calls itself
+    superseded. A pair that states one rule twice (an old and a new edition) is the conflict test's business; asking
+    for both would demand two answers to the same question and fail the agent for choosing the current one."""
+    for i, first in enumerate(facts):
+        if _age(first.source)[0]:
+            continue
+        for second in facts[i + 1 :]:
+            if _doc(second) == _doc(first) or _age(second.source)[0]:
+                continue
+            if _topic(second) == _topic(first) or set(second.values) & set(first.values):
+                continue
+            return first, second
+    return None
+
+
 _TABLE_WHY = "The document contains a table; tables are a common failure point of PDF/Office extraction."
 _TABLE_HEURISTIC = " The table was recovered heuristically, so the expectation itself may be imperfect."
 
@@ -280,8 +305,9 @@ def rag_tests(sk: SkillRun) -> None:
                 metrics=["context_recall"],
                 preconditions=[_kb_note(longest.name)],
             )
-    if len({f.source.split(" ")[0] for f in facts}) >= 2:
-        f1, f2 = facts[0], next(f for f in facts if f.source.split(" ")[0] != facts[0].source.split(" ")[0])
+    pair = _cross_document_pair(facts)
+    if pair is not None:
+        f1, f2 = pair
         sk.add(
             "CROSS-DOCUMENT",
             "Combines facts from two documents",

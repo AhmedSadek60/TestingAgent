@@ -42,9 +42,12 @@ async def open_context(
     credentials: CredentialManager | None,
     *,
     record_video_dir: str | None = None,
+    credential: str | None = None,
 ) -> OpenedContext:
-    """A clean browser context for ``web``, signed in as the configured test user when the target names one."""
-    name = web.auth_credential if web else None
+    """A clean browser context for ``web``, signed in as the configured test user when the target names one.
+
+    ``credential`` is the profile a test asked for; it replaces the target's default profile for that test."""
+    name = credential or (web.auth_credential if web else None)
     if not name or web is None:
         return OpenedContext(await pool.context(record_video_dir=record_video_dir))
     if credentials is None:

@@ -60,6 +60,12 @@ KEYWORDS: dict[AgentType, list[tuple[str, float]]] = {
     AgentType.EVENT_DRIVEN: [(r"\b(webhooks?|event[- ]driven|triggers?)\b", 0.5)],
 }
 
+#: routes that take what a person says (an LLM behind one of these is a chatbot, whatever else it does)
+CHAT_ROUTE = re.compile(
+    r"/(?:v\d+/)?(?:chat|messages?|ask|converse|conversations?|completions?|prompt|talk|assistant)\b", re.I
+)
+HISTORY_SIGNAL = re.compile(r"chat[_ ]?history|message[s_ ]history|conversation|session[_ ]history|messages\b", re.I)
+
 CAP_TO_TYPE: dict[str, list[tuple[AgentType, float]]] = {
     "tools": [(AgentType.TOOL_CALLING, 0.75)],
     "rag": [(AgentType.RAG, 0.75)],
@@ -135,6 +141,9 @@ def _add(ev: dict[AgentType, list[Evidence]], t: AgentType, source: str, detail:
     ev[t].append(Evidence(source=source, detail=detail, weight=w))
 
 
+SECONDARY_TYPES = {AgentType.MEMORY, AgentType.API, AgentType.HYBRID, AgentType.REPOSITORY, AgentType.LONG_RUNNING}
+
+
 def classify(inp: FingerprintInputs) -> list[TypeScore]:
     ev: dict[AgentType, list[Evidence]] = defaultdict(list)
     spec, repo, probe = inp.spec, inp.repo, inp.probe
@@ -188,6 +197,19 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
             _add(ev, AgentType.SUB_AGENTS, "repository", f"{len(repo.agent_definitions)} agent definitions", 0.6)
         if repo.apis or repo.openapi_specs:
             _add(ev, AgentType.API, "repository", f"{len(repo.apis)} HTTP route(s)/OpenAPI present", 0.5)
+        chat_routes = [r for r in repo.apis if CHAT_ROUTE.search(r.path)]
+        if (repo.model_providers or repo.models) and chat_routes:
+            route = chat_routes[0]
+            llm = ", ".join(repo.models[:2] or repo.model_providers[:2])
+            _add(
+                ev,
+                AgentType.CHATBOT,
+                "repository",
+                f"{route.method} {route.path} ({route.location.ref()}) answers with an LLM ({llm})",
+                0.7,
+            )
+            if any(s.kind == "memory" and HISTORY_SIGNAL.search(s.detail) for s in repo.signals):
+                _add(ev, AgentType.CONVERSATIONAL, "repository", "keeps the conversation history of each session", 0.5)
         if any("react" in s.detail.lower() for s in repo.signals):
             _add(ev, AgentType.REACT, "repository", "ReAct-style agent loop", 0.6)
         if any("stategraph" in s.detail.lower() for s in repo.signals) and not repo.capabilities.get("multi_agent"):
@@ -272,7 +294,9 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
                 ],
             )
         )
-    return sorted(scores, key=lambda s: -s.confidence)
+    # equally confident types: what the agent *is* before what it merely has (a chatbot remembers a name; it is not
+    # first a "memory agent")
+    return sorted(scores, key=lambda s: (-round(s.confidence, 2), s.type in SECONDARY_TYPES))
 
 
 def build_tools(inp: FingerprintInputs) -> list[ToolInfo]:
@@ -550,6 +574,12 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
             data_sources.append(DataSource(name=db, kind="database", source="repository"))
     by = {s.type: s.confidence for s in types}
     probe = inp.probe
+    observed = list(probe.handoffs) if probe else []
+    for source, target in observed:  # who was seen handing work to whom (behaviour, not code)
+        for name in (source, target):
+            if name != "?":
+                graph.add_node(f"observed:{name}", name, "agent (observed)")
+        graph.add_edge(f"observed:{source}", f"observed:{target}", "delegates (observed)")
     profile = AgentProfile(
         target_name=spec.name,
         summary=spec.description
@@ -581,6 +611,8 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
         multi_agent={
             "detected": by.get(AgentType.MULTI_AGENT, 0) >= 0.5,
             "agents": sorted({d.name for d in repo.agent_definitions}) if repo else [],
+            "observed_agents": sorted({name for pair in observed for name in pair if name != "?"}),
+            "handoffs": [list(pair) for pair in observed],
             "handoffs_observed": bool(probe and "handoff" in probe.event_types),
         },
         mcp={

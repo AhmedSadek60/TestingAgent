@@ -30,7 +30,7 @@ from agentlab.design.user_tests import load_user_tests
 from agentlab.discovery.agent import IngestedTarget, TargetDiscoveryAgent
 from agentlab.evaluation.context import PlaceholderResolver
 from agentlab.evaluation.findings import build_finding, cross_test_findings
-from agentlab.evaluation.scoring import build_scorecard, load_profile, select_profile
+from agentlab.evaluation.scoring import build_scorecard, list_profiles, load_profile, select_profile
 from agentlab.execution.executor import ExecutionDeps, TestExecutor
 from agentlab.execution.limits import CancellationToken, CancelledByUser, LimitReached, LimitTracker
 from agentlab.execution.scheduler import Scheduler
@@ -388,6 +388,7 @@ class TestOrchestratorAgent:
                 sandbox_available=report.docker,
                 judge_available=report.judge,
                 browser_available=report.browser,
+                unavailable=runtime.errors,
             )
 
             # ---- 5. skill selection --------------------------------------------------------------------------
@@ -477,7 +478,7 @@ class TestOrchestratorAgent:
                 )
             scoring = select_profile(
                 profile,
-                opts.scoring_profile or cfg.evaluation.scoring_profile,
+                opts.scoring_profile or cfg.evaluation.scoring_profile or self._baseline_profile(spec, opts),
                 production=spec.safety.production,
             )
             manifest = build_manifest(
@@ -567,6 +568,17 @@ class TestOrchestratorAgent:
             shutil.rmtree(workdir, ignore_errors=True)
         self._active.discard(run_id)
         self._tokens.pop(run_id, None)
+
+    def _baseline_profile(self, spec: TargetSpec, opts: RunOptions) -> str | None:
+        """A replay of a baseline run is scored the way the baseline was, so that the two overall scores can be
+        compared. Discovery re-classifies each version it meets, so without this the profile would drift with the
+        behaviour under test. An explicit request (option or configuration) wins over it, and so does a production
+        target, which is never scored more leniently than ``safety_critical`` because an older run was."""
+        if not opts.baseline_run_id or spec.safety.production:
+            return None
+        manifest = self.services.store.get_run(opts.baseline_run_id).get("manifest") or {}
+        name = (manifest.get("scoring_profile") or {}).get("name")
+        return name if name in list_profiles() else None  # a profile loaded from a file by the baseline is not rebuilt
 
     async def _validate(self, spec: TargetSpec, opts: RunOptions) -> tuple[list[TestCase], list[str]]:
         cfg = self.config
@@ -705,6 +717,10 @@ class TestOrchestratorAgent:
         self._tokens[run_id] = token
         self._active.add(run_id)
         limits = LimitTracker(cfg.limits)
+        probe = p.discovery.probe
+        if probe is not None and (probe.tokens or probe.cost_usd):
+            # the discovery questions were answered by the target too: they count against the run's budget
+            limits.record(None, tokens=probe.tokens, cost=probe.cost_usd, category="discovery")
         if p.judge is not None:
             p.judge.usage_sink = lambda _kind, tokens, cost: limits.record(
                 None, tokens=tokens, cost=cost, category="judge"

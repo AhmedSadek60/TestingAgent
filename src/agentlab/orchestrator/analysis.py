@@ -557,6 +557,7 @@ class ScopeNote(Model):
     text: str = ""
     executed: int = 0
     blocked: int = 0
+    thin: bool = False  # so little could be run that even a "partial coverage" letter would read as a verdict
     gaps: list[str] = Field(default_factory=list)
 
 
@@ -591,9 +592,12 @@ def assess_scope(
         shown = ", ".join(gaps[:5]) + (f" and {len(gaps) - 5} more" if len(gaps) > 5 else "")
         reasons.append(f"{len(gaps)} area(s) that apply to this target were not fully tested ({shown})")
         label = label or "partial coverage"
+    thin = bool(blocked) and executed < max(5, 0.2 * (executed + blocked))
     if blocked:
         reasons.append(f"{blocked} test(s) were BLOCKED because a prerequisite was missing and do not count as passes")
         label = label or "partial coverage"
+    if thin:
+        label = f"only {executed} of {executed + blocked} planned tests could run"
     if not reasons:
         return ScopeNote(executed=executed)
     return ScopeNote(
@@ -602,5 +606,6 @@ def assess_scope(
         text="Read the grade as partial: " + "; ".join(reasons) + ". The score describes only what was measured.",
         executed=executed,
         blocked=blocked,
+        thin=thin,
         gaps=gaps,
     )

@@ -411,6 +411,9 @@ class TestExecutor:
                 res.severity = sev.severity
             if status.is_stopped:
                 res.blocked_reason = next((a.error for a in attempts if a.error), None)
+        elif status == TestStatus.BLOCKED:
+            # blocked while running (a credential that is not stored): the result says why, as a gate decision does
+            res.blocked_reason = next((a.error for a in attempts if a.error), None)
         return res
 
     def _finish(self, result: TestResult, test: TestCase) -> TestResult:

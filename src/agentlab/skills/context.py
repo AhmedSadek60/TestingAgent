@@ -61,6 +61,7 @@ class SkillContext:
     repo: RepositoryAnalysis | None = None
     documents: list[AnalyzedDocument] = field(default_factory=list)
     interfaces: list[str] = field(default_factory=list)
+    unavailable: dict[str, str] = field(default_factory=dict)  # declared interfaces that could not be opened -> why
     adapter_capabilities: dict[str, AdapterCapabilities] = field(default_factory=dict)
     judge_available: bool = False
     docker_available: bool = False
@@ -169,11 +170,35 @@ class SkillContext:
                     return True
             elif iface in {"mock", "llm", "api", "web"}:
                 return True
-        return False
+        return self.designed_from_repository or self.awaiting_conversation
+
+    @property
+    def awaiting_conversation(self) -> bool:
+        """The target declares an interface that takes messages, but it could not be opened or reached (the service is
+        down, the sandbox is off). Its message tests are designed anyway, so the owner can read them, and wait as
+        predicted BLOCKED - with the interface's own reason - never failed."""
+        if self.interfaces:
+            return False
+        chat_command = self.target.command is not None and self.target.command.mode == "chat"
+        return any(
+            kind in {"api", "web", "llm", "mock"} or (kind == "command" and chat_command) for kind in self.unavailable
+        )
+
+    @property
+    def designed_from_repository(self) -> bool:
+        """No interface is configured, but the repository shows a chat service (an LLM behind a chat route). Its message
+        tests are designed now, so the owner can read them, and wait as predicted BLOCKED (never failed) until a running
+        instance is given."""
+        return not self.interfaces and self.repo is not None and self.has_type("chatbot", 0.5)
 
     @property
     def authenticated(self) -> bool:
-        return bool(self.credential_names)
+        """The target is expected to demand credentials: a credential profile is stored, or the target names one. A named
+        profile that is not stored here blocks the tests that need it, but "no credentials, no access" can still be shown."""
+        declared = any(
+            getattr(iface, "auth_credential", None) for iface in (self.target.api, self.target.web, self.target.mcp)
+        )
+        return bool(self.credential_names) or declared
 
     def pick(self, quick: int, standard: int, thorough: int | None = None) -> int:
         """How many items of a family to generate at the current intensity."""

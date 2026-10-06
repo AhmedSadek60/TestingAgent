@@ -30,8 +30,11 @@ class ProbeObservation(Model):
     tool_args: list[dict[str, Any]] = Field(default_factory=list)
     contexts: list[str] = Field(default_factory=list)
     event_types: list[str] = Field(default_factory=list)
+    handoffs: list[tuple[str, str]] = Field(default_factory=list)  # (from, to) of each delegation the target reported
     citations: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
+    tokens: int = 0  # what the target reported using to answer (0 when it reports nothing)
+    cost_usd: float = 0.0
     error: str | None = None
     status_code: int | None = None
 
@@ -41,6 +44,7 @@ class ProbeResult(Model):
     tools_seen: list[str] = Field(default_factory=list)
     contexts_seen: int = 0
     event_types: list[str] = Field(default_factory=list)
+    handoffs: list[tuple[str, str]] = Field(default_factory=list)  # delegations seen while probing, first seen first
     session_memory: bool | None = None
     reachable: bool = False
     errors: list[str] = Field(default_factory=list)
@@ -50,6 +54,8 @@ class ProbeResult(Model):
     attachments: bool = False
     latency_ms_p50: float = 0.0
     refusal_on_unknown: bool | None = None
+    tokens: int = 0  # usage of all probe questions together: probing a hosted model is not free
+    cost_usd: float = 0.0
 
     def obs(self, name: str) -> ProbeObservation | None:
         return next((o for o in self.observations if o.name == name), None)
@@ -102,9 +108,16 @@ class Prober:
             tool_args=[c.arguments for c in resp.tool_calls][:6],
             contexts=[c.source for c in resp.contexts],
             event_types=sorted({e.type for e in resp.events}),
+            handoffs=[
+                (str(e.data.get("from") or "?"), str(e.data["to"]))
+                for e in resp.events
+                if e.type == "handoff" and e.data.get("to")
+            ],
             citations=resp.citations[:6],
             error=resp.error,
             latency_ms=resp.latency_ms or round((time.perf_counter() - t0) * 1000, 2),
+            tokens=resp.usage.total_tokens,
+            cost_usd=resp.usage.cost_usd,
             status_code=resp.status_code,
         )
 
@@ -141,6 +154,7 @@ class Prober:
         res.tools_seen = sorted({t for o in obs for t in o.tool_calls})
         res.contexts_seen = sum(len(o.contexts) for o in obs)
         res.event_types = sorted({t for o in obs for t in o.event_types})
+        res.handoffs = list(dict.fromkeys(h for o in obs for h in o.handoffs))
         mg = res.obs("memory_get")
         if mg and not mg.error:
             res.session_memory = "7421" in mg.output
@@ -149,6 +163,8 @@ class Prober:
             res.self_reported_tools = sorted(set(re.findall(r"\b[a-z]+(?:_[a-z0-9]+)+\b", caps.output)))[:15]
             res.self_reported_topics = sorted(k for k, rx in _TOPICS.items() if re.search(rx, caps.output, re.I))
         res.latency_ms_p50 = round(_percentile([o.latency_ms for o in obs if o.latency_ms], 0.5), 2)
+        res.tokens = sum(o.tokens for o in obs)
+        res.cost_usd = round(sum(o.cost_usd for o in obs), 8)
         caps_obj = self.adapter.capabilities
         res.streaming, res.attachments = caps_obj.streaming, caps_obj.attachments
         return res

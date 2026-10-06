@@ -161,6 +161,7 @@ def build_skill_context(
         repo=ingested.repo_analysis,
         documents=list(ingested.documents),
         interfaces=runtime.available(),
+        unavailable=dict(runtime.errors),
         adapter_capabilities={k: a.capabilities for k, a in runtime.adapters.items()},
         judge_available=report.judge,
         docker_available=report.docker,

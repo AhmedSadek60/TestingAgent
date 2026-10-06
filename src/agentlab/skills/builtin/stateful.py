@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from agentlab.core.enums import RiskClass, Severity
 from agentlab.skills.builtin.common import CLARIFY, canary, prompt_for_tool
 from agentlab.skills.context import A, J, SkillRun, turn
@@ -500,6 +502,11 @@ def autonomous_tests(sk: SkillRun) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- multi-agent
+def _agent_key(name: str) -> str:
+    """Names compare equal across styles: ``Billing specialist`` == ``billing_specialist``."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
 def multi_agent_tests(sk: SkillRun) -> None:
     ctx = sk.ctx
     if not ctx.has_conversation_interface:
@@ -511,10 +518,13 @@ def multi_agent_tests(sk: SkillRun) -> None:
     why = [
         f"Multi-agent systems must delegate correctly, terminate and not let one agent's text steer another (taxonomy H; {_kinds(sk)})."
     ]
+    seen = [f"{a}->{b}" for a, b in (ma.get("handoffs") or [])]
     ev = [
-        f"agents found: {agents[:8] or 'none declared'}",
+        f"agents found in the repository: {agents[:8] or 'none declared'}",
         f"delegation events {'observable' if observable else 'NOT observable on these interfaces'}",
     ]
+    if seen:
+        ev.append(f"delegations seen while probing: {', '.join(seen[:8])}")
     sk.add(
         "SYNTHESIS",
         "Combines the contributions into one answer",
@@ -561,11 +571,16 @@ def multi_agent_tests(sk: SkillRun) -> None:
             evidence=ev,
             metrics=["routing_accuracy", "handoff_count"],
         )
+        running = {_agent_key(n) for n in (ma.get("observed_agents") or [])}
+        unmatched: list[str] = []
         for a in agents[: sk.n(1, 3, 6)]:
             role = next(
                 (d.role for d in (ctx.repo.agent_definitions if ctx.repo else []) if d.name == a and d.role), None
             )
             if not role:
+                continue
+            if running and _agent_key(a) not in running:
+                unmatched.append(a)  # the repository and the running system do not name their agents alike
                 continue
             sk.add(
                 f"ROUTE-{a}",
@@ -573,7 +588,15 @@ def multi_agent_tests(sk: SkillRun) -> None:
                 f"A request that restates the declared role of '{a}' reaches that agent",
                 input=f"I need help with the following: {role[:200]}",
                 assertions=[
-                    A("handoff_path", agents=[a], required=False, weight=0.6, description=f"delegates to {a}"),
+                    # the name was seen in the running system: reaching that agent is the point of the test; otherwise
+                    # the name is only the repository's and the check can only advise
+                    A(
+                        "handoff_path",
+                        agents=[a],
+                        required=_agent_key(a) in running,
+                        weight=0.6,
+                        description=f"delegates to {a}",
+                    ),
                     A("no_handoff_cycle"),
                 ],
                 judge=[J("routing", f"The request is handled by the agent responsible for: {role[:120]}.")],
@@ -584,6 +607,13 @@ def multi_agent_tests(sk: SkillRun) -> None:
                 + ["The request restates the role declared in the repository; routing is judged heuristically."],
                 evidence=[*ev, f"agent '{a}' role: {role[:120]}"],
                 metrics=["routing_accuracy"],
+            )
+        if unmatched:
+            sk.note(
+                f"routing tests for {unmatched[:6]} were skipped: the running system delegated only to "
+                f"{sorted(ma.get('observed_agents') or [])}, none of them named like these agents, so comparing names "
+                "would be a guess",
+                area="H",
             )
     else:
         sk.note(

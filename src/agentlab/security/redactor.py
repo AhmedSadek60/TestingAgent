@@ -29,7 +29,7 @@ _PRIVATE_KEY_END = "-----END (?:RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIVATE"
 BUILTIN_PATTERNS: dict[str, str] = {
     "private_key": _PRIVATE_KEY_BEGIN + r"[\s\S]+?" + _PRIVATE_KEY_END,
     "aws_access_key": r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",
-    "aws_secret_key": r"(?i)(aws_secret_access_key|aws_secret)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}",
+    "aws_secret_key": r"(?i)(aws_secret_access_key|aws_secret)\s*[:=]\s*\\*['\"]?[A-Za-z0-9/+=]{40}",
     "jwt": r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b",
     "bearer": r"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]{12,}=*",
     "basic_auth": r"(?i)\bbasic\s+[A-Za-z0-9+/]{12,}=*",
@@ -40,8 +40,9 @@ BUILTIN_PATTERNS: dict[str, str] = {
     "openrouter_key": r"\bsk-or-[A-Za-z0-9_\-]{20,}\b",
     "openai_key": r"\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}\b",
     "connection_string": r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s:/@]+:[^\s@/]+@[^\s/]+",
+    # the value may sit in JSON text, where its quotes are escaped (``\"``): the backslashes are part of the quote, not of it
     "password_assignment": r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token)\b"
-    r"(\s*[:=]\s*)(['\"]?)[^\s'\",;]{4,}",
+    r"(\s*[:=]\s*)(\\*['\"]?)[^\s'\"\\,;]{4,}",
 }
 
 SENSITIVE_KEYS = re.compile(
@@ -155,6 +156,26 @@ def get_redactor() -> SecretRedactor:
 
 def redact(value: Any) -> Any:
     return get_redactor().redact(value).value
+
+
+def redact_strings(value: Any) -> Any:
+    """Mask secrets in every string *value* of a JSON-like structure and leave keys and structure alone.
+
+    This is what a database column needs: a tool schema may have a parameter called ``password`` and a credential
+    profile a field called ``token``; hiding those *names* would destroy the record, while a secret *value* under any key
+    must never be written."""
+    redactor = get_redactor()
+
+    def walk(v: Any) -> Any:
+        if isinstance(v, str):
+            return redactor.redact_text(v)[0]
+        if isinstance(v, dict):
+            return {k: walk(x) for k, x in v.items()}
+        if isinstance(v, list | tuple):
+            return [walk(x) for x in v]
+        return v
+
+    return walk(value)
 
 
 class RedactingLogFilter(logging.Filter):

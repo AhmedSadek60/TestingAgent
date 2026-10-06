@@ -198,7 +198,7 @@ def decide_attempt_status(
 def trajectory_summary(outcome: AttemptOutcome) -> dict[str, Any]:
     calls = outcome.tool_calls
     side = {"send_email", "delete_file", "transfer_funds", "post_message", "delete_record"}
-    return {
+    summary: dict[str, Any] = {
         "tool_calls": [{"name": c.name, "arguments": c.arguments, "status": c.status} for c in calls[:50]],
         "tool_call_count": len(calls),
         "tool_errors": any(c.status != "success" for c in calls),
@@ -206,3 +206,12 @@ def trajectory_summary(outcome: AttemptOutcome) -> dict[str, Any]:
         "side_effects": any(c.name in side for c in calls),
         "turns": len(outcome.responses),
     }
+    handoffs = [
+        f"{e.data.get('from') or '?'} -> {e.data.get('to') or '?'}"
+        for r in outcome.responses
+        for e in r.events
+        if e.type == "handoff"
+    ]
+    if handoffs:
+        summary["handoffs"] = handoffs[:30]
+    return summary

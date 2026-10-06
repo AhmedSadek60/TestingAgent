@@ -174,7 +174,10 @@ class CredentialManager:
         try:
             return self._profiles[name]
         except KeyError as exc:
-            raise CredentialError(f"credential profile '{name}' is not configured") from exc
+            raise CredentialError(
+                f"credential profile '{name}' is not configured (add it with `agentlab credentials add {name} "
+                "--kind bearer --scope HOST`); tests that need it are BLOCKED, not failed"
+            ) from exc
 
     def has(self, name: str) -> bool:
         return name in self._profiles
@@ -190,12 +193,9 @@ class CredentialManager:
     def _check_scope(self, profile: CredentialProfile, url: str | None) -> None:
         if not profile.scopes or url is None:
             return
+        if any(in_scope(scope, url) for scope in profile.scopes):
+            return
         host = urlparse(url).hostname or ""
-        for scope in profile.scopes:
-            if "://" in scope and url.startswith(scope):
-                return
-            if host == scope or host.endswith("." + scope.lstrip("*.")):
-                return
         raise CredentialError(f"credential profile '{profile.name}' is not scoped for host '{host}'")
 
     def fields(self, name: str, url: str | None = None) -> dict[str, str]:
@@ -243,6 +243,46 @@ class CredentialManager:
                 os.unlink(path)
             except FileNotFoundError:
                 pass
+
+
+_DEFAULT_PORTS = {"http": 80, "https": 443, "ws": 80, "wss": 443}
+
+
+def _origin(url: str) -> tuple[str, str, int | None, str] | None:
+    """(scheme, host, port, path) of a URL, with the host and scheme case-folded and the default port made explicit;
+    ``None`` when the URL has no host or an impossible port (so nothing can be in scope of it)."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not host:
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    scheme = parsed.scheme.lower()
+    return scheme, host, port or _DEFAULT_PORTS.get(scheme), parsed.path
+
+
+def in_scope(scope: str, url: str) -> bool:
+    """Whether a credential with this ``scope`` may be sent to ``url``.
+
+    A host scope (``example.com``, ``*.example.com``) covers that host and its subdomains. A URL scope
+    (``https://api.example.com/v1``) covers exactly that scheme, host and port and the path below it. Both are compared
+    on whole labels / segments: ``example.com.evil.net``, ``evilexample.com``, ``https://example.com@evil.net`` and
+    ``/v1x`` are not inside ``example.com`` or ``https://example.com/v1``."""
+    target = _origin(url)
+    if target is None:
+        return False
+    scheme, host, port, path = target
+    scope = scope.strip()
+    if "://" in scope:
+        wanted = _origin(scope)
+        if wanted is None or (scheme, host, port) != wanted[:3]:
+            return False
+        base = wanted[3].rstrip("/")
+        return not base or path == base or path.startswith(base + "/")
+    domain = scope.lower().lstrip("*.").rstrip(".")
+    return bool(domain) and (host == domain or host.endswith("." + domain))
 
 
 def resolve_reference(ref: str) -> str:

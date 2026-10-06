@@ -590,6 +590,7 @@ class TestDesignerAgent:
             sandbox_available=ctx.docker_available,
             judge_available=ctx.judge_available,
             browser_available=ctx.browser_available,
+            unavailable=ctx.unavailable,
         )
 
     def _planned(
@@ -987,7 +988,7 @@ class TestDesignerAgent:
                     + (f"Skills that were considered: {why[:400]}" if why else "No skill produced a test."),
                 ),
             )
-        if not ctx.interfaces:
+        if not ctx.interfaces and not ctx.unavailable:
             plan.warnings.insert(
                 0,
                 PlanWarning(
