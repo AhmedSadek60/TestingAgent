@@ -15,7 +15,7 @@
           "Server"
         ],
         "summary": "Is the server up",
-        "description": "Answers without a token. Says nothing about runs or data.",
+        "description": "Answers without a token. It reports counts only: runs in progress and jobs waiting.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -7083,10 +7083,10 @@
             "title": "Queue",
             "description": "Queue backend: inline or redis"
           },
-          "workers": {
+          "running": {
             "type": "integer",
-            "title": "Workers",
-            "description": "Runs this process is working on right now (inline queue)"
+            "title": "Running",
+            "description": "Runs in progress, whichever process works on them (from the database)"
           },
           "queued": {
             "type": "integer",
@@ -7100,7 +7100,7 @@
           "version",
           "auth_required",
           "queue",
-          "workers",
+          "running",
           "queued"
         ],
         "title": "Health",

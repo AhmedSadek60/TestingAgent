@@ -37,7 +37,7 @@ class Health(Model):
     version: str = Field(description="AgentLab version")
     auth_required: bool = Field(description="Whether requests must carry the API token")
     queue: str = Field(description="Queue backend: inline or redis")
-    workers: int = Field(description="Runs this process is working on right now (inline queue)")
+    running: int = Field(description="Runs in progress, whichever process works on them (from the database)")
     queued: int = Field(description="Jobs waiting for a worker")
 
 

@@ -444,6 +444,13 @@ class Store:
                 q = q.where(orm.TestRunRow.project_id == project_id)
             return [row_to_dict(r) for r in s.scalars(q)]
 
+    def count_runs(self, status: str) -> int:
+        """How many runs have this status, in any project."""
+        with self.db.session() as s:
+            return int(
+                s.scalar(select(func.count()).select_from(orm.TestRunRow).where(orm.TestRunRow.status == status)) or 0
+            )
+
     # ----------------------------------------------------------------- results / traces / events
     def save_result(self, result: TestResult) -> None:
         data = result.model_dump(mode="json")

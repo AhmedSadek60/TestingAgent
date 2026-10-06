@@ -123,10 +123,10 @@ function ServerStatus() {
   const { api } = useSession();
   const health = useAsync((signal) => api.health(signal), [api], { pollMs: 15_000 });
   if (!health.data) return health.error ? <Badge tone="bad">server unreachable</Badge> : null;
-  const { workers, queued, queue } = health.data;
+  const { running, queued, queue } = health.data;
   return (
-    <Badge tone="neutral" title={`Queue: ${queue}. ${workers} run(s) in progress, ${queued} waiting.`}>
-      {workers} running · {queued} queued
+    <Badge tone="neutral" title={`Queue: ${queue}. ${running} run(s) in progress, ${queued} waiting.`}>
+      {running} running · {queued} queued
     </Badge>
   );
 }

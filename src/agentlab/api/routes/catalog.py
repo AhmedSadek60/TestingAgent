@@ -40,7 +40,7 @@ router = APIRouter(dependencies=[Depends(require_auth)], responses=RESPONSES)
     response_model=Health,
     tags=["Server"],
     summary="Is the server up",
-    description="Answers without a token. Says nothing about runs or data.",
+    description="Answers without a token. It reports counts only: runs in progress and jobs waiting.",
 )
 async def health(request: Request) -> Health:
     st = state_of(request)
@@ -48,7 +48,7 @@ async def health(request: Request) -> Health:
         version=__version__,
         auth_required=st.guard.required,
         queue=st.queue.name,
-        workers=st.worker.busy if st.worker else 0,
+        running=st.store.count_runs("running"),
         queued=await st.queue.depth(),
     )
 

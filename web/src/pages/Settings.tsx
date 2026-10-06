@@ -64,7 +64,7 @@ export function Settings() {
               items={[
                 ["Version", health?.version ?? null],
                 ["Status", health?.status ?? null],
-                ["Queue", health ? `${health.queue}: ${health.workers} running, ${health.queued} waiting` : null],
+                ["Queue", health ? `${health.queue}: ${health.running} running, ${health.queued} waiting` : null],
               ]}
             />
           </Card>

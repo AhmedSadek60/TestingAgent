@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Is the server up
-         * @description Answers without a token. Says nothing about runs or data.
+         * @description Answers without a token. It reports counts only: runs in progress and jobs waiting.
          */
         get: operations["health_health_get"];
         put?: never;
@@ -2651,10 +2651,10 @@ export interface components {
              */
             queue: string;
             /**
-             * Workers
-             * @description Runs this process is working on right now (inline queue)
+             * Running
+             * @description Runs in progress, whichever process works on them (from the database)
              */
-            workers: number;
+            running: number;
             /**
              * Queued
              * @description Jobs waiting for a worker
