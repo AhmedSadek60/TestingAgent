@@ -231,6 +231,14 @@ URLs or instruction-like text, safe risk only, severity at most medium, simple m
 plus one judged criterion); and the tests are labelled *model-suggested (unverified)* and sit in the plan like any
 other, so a person can deselect them before anything runs.
 
+This is also how **business rules** are used (`--requirement "Never promise a refund"`, repeatable; the field in the
+web wizard): a rule written in words cannot be turned into a scenario by a template, so the model is given the rules,
+numbered, and asked for one scenario for each, before anything else. A test made for a rule records it (`context.requirement`,
+the tag `requirement`). A rule that has no test, because suggestions are off, no provider answered, the answer was
+refused by the filters or a regression run replays an earlier plan unchanged, is named in the plan's warnings
+(`requirement_not_tested`) and in the run's summary, with the reason. Rules are never dropped silently. To check one without
+a model, write the scenario yourself ([above](#writing-your-own-tests)).
+
 ## Re-running and comparing
 
 * `agentlab test --baseline RUN_ID` re-runs the tests of an earlier run unchanged (suite `regression`), so the two

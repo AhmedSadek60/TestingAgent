@@ -206,7 +206,12 @@ def test(
     ] = None,
     requirement: Annotated[
         list[str] | None,
-        typer.Option("--requirement", help="A business rule the agent must follow (repeatable).", rich_help_panel=RUN),
+        typer.Option(
+            "--requirement",
+            help="A business rule the agent must follow (repeatable). A model designs a test for it, which needs "
+            "evaluation.llm_test_generation; a rule that gets no test is named in the plan.",
+            rich_help_panel=RUN,
+        ),
     ] = None,
     no_second_wave: Annotated[
         bool,

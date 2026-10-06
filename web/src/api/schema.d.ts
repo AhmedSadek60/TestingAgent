@@ -2717,7 +2717,7 @@ export interface components {
             objective?: string | null;
             /**
              * Requirements
-             * @description Business rules the agent must follow
+             * @description Business rules the agent must follow. A model designs a test for each when evaluation.llm_test_generation is on; a rule that gets no test is named in the plan's warnings
              */
             requirements?: string[];
             /**

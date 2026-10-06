@@ -245,6 +245,25 @@ async def test_a_different_judge_is_accepted_and_recorded(tmp_path: Path) -> Non
     sv.store.db.dispose()
 
 
+async def test_an_unavailable_interface_is_reported_once_and_an_unchecked_rule_is_in_the_summary(
+    services: Services,
+) -> None:
+    from agentlab.core.models import ApiConfig
+
+    spec = TargetSpec(name="ws", api=ApiConfig(url="ws://127.0.0.1:9/chat", protocol="websocket"))
+    orch = TestOrchestratorAgent(services)
+    prepared = await orch.prepare(
+        spec, RunOptions(intensity="quick", plan_only=True, probe=False, requirements=["Never promise a refund"])
+    )
+    try:
+        said = [w for w in prepared.warnings if "WebSocket agent endpoints are not supported" in w]
+        assert len(said) == 1, prepared.warnings  # discovery and environment preparation both report it
+        assert len(prepared.warnings) == len(set(prepared.warnings))
+        assert any("business rule(s) have no test" in w and "Never promise a refund" in w for w in prepared.warnings)
+    finally:
+        await prepared.aclose()
+
+
 async def test_validation_rejects_unusable_requests_before_any_work(services: Services) -> None:
     orch = TestOrchestratorAgent(services)
     with pytest.raises(UserError, match="nothing to test"):

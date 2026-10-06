@@ -330,10 +330,10 @@ export function ObjectiveStep({ state, patch, problems, showProblems }: StepProp
   const adversarial = state.mode === "security" || state.mode === "full";
   return (
     <div className="stack">
-      <Field label="What do you want to learn? (optional)" htmlFor="objective" help="Your goal in your own words, such as “Can this assistant be trusted with leave requests?” It shapes which tests are chosen and how the report is written.">
+      <Field label="What do you want to learn? (optional)" htmlFor="objective" help="Your goal in your own words, such as “Can this assistant be trusted with leave requests?” It helps AgentLab recognise what kind of agent this is, and that decides which tests are chosen.">
         <textarea id="objective" className="textarea" value={state.objective} onChange={(e) => patch({ objective: e.target.value })} />
       </Field>
-      <Field label="Business rules the agent must follow (optional)" htmlFor="requirements" help="One per line. Each becomes a test of its own, for example “Refunds above 500 USD need manager approval”.">
+      <Field label="Business rules the agent must follow (optional)" htmlFor="requirements" help="One per line, for example “Refunds above 500 USD need manager approval”. A model designs a test for each rule, which needs “Model-suggested tests” to be on in the configuration (evaluation.llm_test_generation). A rule that gets no test is named in the plan, so it is never silently ignored.">
         <textarea id="requirements" className="textarea" value={state.requirements} onChange={(e) => patch({ requirements: e.target.value })} />
       </Field>
       <Card title="Authorisation and safety">

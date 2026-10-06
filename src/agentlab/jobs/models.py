@@ -33,7 +33,11 @@ class JobOptions(Model):
     max_tests: int | None = Field(default=None, ge=1, description="Upper bound on the number of tests")
     judge: bool = Field(default=True, description="Use the LLM judge where deterministic checks cannot decide")
     objective: str | None = Field(default=None, description="What the owner wants to learn")
-    requirements: list[str] = Field(default_factory=list, description="Business rules the agent must follow")
+    requirements: list[str] = Field(
+        default_factory=list,
+        description="Business rules the agent must follow. A model designs a test for each when "
+        "evaluation.llm_test_generation is on; a rule that gets no test is named in the plan's warnings",
+    )
     probe: bool = Field(default=True, description="Send harmless discovery probes to the target")
     baseline_run_id: str | None = Field(default=None, description="Regression: replay the tests of this earlier run")
     only_tests: list[str] = Field(default_factory=list, description="Run just these test ids (or MEM-* patterns)")

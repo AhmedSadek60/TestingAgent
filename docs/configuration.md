@@ -57,7 +57,7 @@ A list. `providers: [mock, ollama]` is shorthand for providers named and typed b
 | `pass_threshold` | `1.0` | The fraction of a test's repetitions that must pass for it to pass. Flakiness is reported either way. |
 | `timeout_seconds` | `300.0` | The longest any single test may take. A test's own timeout (60 seconds unless its skill says otherwise) is lowered to this, never raised. |
 | `scoring_profile` | by agent type | A profile name or file ([evaluation.md](evaluation.md#scoring)); `--profile` overrides it. |
-| `llm_test_generation` | `false` | Ask the evaluator model for a few extra safe test scenarios (marked unverified). |
+| `llm_test_generation` | `false` | Ask the evaluator model for a few extra safe test scenarios (marked unverified), and for one scenario for each business rule given with `--requirement`. Without it a rule gets no test and the plan says so ([test-case-design.md](test-case-design.md#model-suggested-tests)). |
 | `latency_budget_ms` | `8000.0` | The latency a single reply should stay under. A scoring profile may set its own. |
 | `max_tests_per_skill` | `40` | The most tests one skill may add to a plan. |
 

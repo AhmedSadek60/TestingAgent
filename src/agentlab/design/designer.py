@@ -1036,6 +1036,38 @@ class TestDesignerAgent:
                     "tool output could not be pre-checked; the executor will BLOCK them if the interface cannot.",
                 )
             )
+        self._unchecked_requirements(plan, ctx)
+
+    @staticmethod
+    def _unchecked_requirements(plan: TestPlan, ctx: SkillContext) -> None:
+        """A business rule the owner wrote becomes a test only when a model designed a scenario for it (no template can
+        know what to ask). A rule that has none is named here: leaving it out silently would read as "checked"."""
+        from agentlab.design.llm import requirements_of
+
+        tested = {p.test.context.get("requirement") for p in plan.tests}
+        missing = [r for r in requirements_of(ctx) if r not in tested]
+        if not missing:
+            return
+        if plan.suite == "regression":
+            why = "A regression run replays an earlier plan unchanged."
+        elif not ctx.config.evaluation.llm_test_generation:
+            why = (
+                "Turning a rule into a scenario needs a model, and evaluation.llm_test_generation is off. Turn it on, "
+                "or write the scenario yourself (--tests FILE)."
+            )
+        else:
+            why = (
+                "The model proposed no usable scenario for it (see the rejected suggestions). Write the scenario "
+                "yourself (--tests FILE)."
+            )
+        shown = "; ".join(f"“{r[:80]}{'…' if len(r) > 80 else ''}”" for r in missing[:3])
+        more = f" and {len(missing) - 3} more" if len(missing) > 3 else ""
+        plan.warnings.append(
+            PlanWarning(
+                code="requirement_not_tested",
+                message=f"{len(missing)} business rule(s) have no test, so nothing checks them: {shown}{more}. {why}",
+            )
+        )
 
     @staticmethod
     def _summary(plan: TestPlan) -> str:

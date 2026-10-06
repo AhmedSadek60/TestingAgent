@@ -437,6 +437,8 @@ class TestOrchestratorAgent:
                             "nothing is verified through it",
                         )
                     )
+                # a rule nobody checks must be visible in the run's summary, not only in the plan
+                warnings += [w.message for w in plan.warnings if w.code == "requirement_not_tested"]
                 suite = sv.store.save_suite(
                     project["id"],
                     target["id"],
@@ -530,7 +532,7 @@ class TestOrchestratorAgent:
                 workdir=workdir,
                 manifest=manifest,
                 phases=records,
-                warnings=warnings,
+                warnings=list(dict.fromkeys(warnings)),  # discovery and environment preparation can say the same thing
                 suite_id=suite["id"],
                 selected_skills=[m.skill for m in plan.skills if m.selected],
                 closers=[sv.close_browser],
