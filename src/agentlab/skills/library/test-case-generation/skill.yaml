@@ -1,0 +1,51 @@
+name: test-case-generation
+version: 1.0.0
+title: Test case generation
+description: Guidance the TestDesignerAgent follows to turn a profile into measurable, explainable, de-duplicated
+  test cases within budget.
+kind: meta
+status: stable
+taxonomy: []
+category: meta
+score_category: functional_quality
+id_prefix: GEN
+risk_class: safe
+applicability:
+  always: true
+prerequisites:
+  notes:
+  - Needs an AgentProfile; works best with repository analysis and documents.
+methodology: Select skills that apply to the profile, ask each to propose tests, give every test a stable id (`<PREFIX>-<TOPIC>-<NNN>`),
+  merge duplicates, classify risk through the safety gate, predict which tests would be BLOCKED (missing credentials,
+  interface, Docker, browser, judge) and keep the total within the step, time and cost budget. Prefer deterministic
+  oracles; add LLM-judge criteria only where no deterministic oracle exists, and say so.
+test_generation: 'The designer calls each applicable skill''s generator or templates with a read-only SkillContext.
+  Output is a TestPlan: tests, coverage over taxonomy A-Q, skipped skills with reasons, a budget estimate and warnings.
+  A second wave is generated adaptively after the first results (for example more tests around a discovered weakness).'
+execution: 'Planning is free of side effects: nothing is sent to the target while planning. The plan is shown to
+  the user and can be edited before execution.'
+evaluation_rules:
+- 'No random questions: each test has an objective, rationale, oracle and metrics.'
+- Test ids are unique and stable between runs when the profile does not change.
+- The plan states what is not covered and why.
+severity:
+  default: info
+  guidance:
+  - Not applicable.
+evidence_requirements:
+- rationale per test ('Observed X, therefore Y')
+- skill name and version per test
+- coverage table
+metrics:
+- coverage
+- estimated_cost
+dependencies:
+- agent-fingerprinting
+limitations:
+- Coverage is bounded by the skills installed; uncovered capabilities are reported so a skill can be added.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+  - https://developers.openai.com/api/docs/guides/evaluation-best-practices

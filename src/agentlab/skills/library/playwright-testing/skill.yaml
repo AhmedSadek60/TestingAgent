@@ -1,0 +1,58 @@
+name: playwright-testing
+version: 1.0.0
+title: Playwright web UI testing
+description: 'The agent''s own web UI, driven with Playwright: page load, message round-trip, empty submit, hostile
+  markup escaping and multi-turn behaviour in the page.'
+kind: tests
+status: stable
+taxonomy:
+- J
+category: ui
+score_category: browser_execution
+id_prefix: UI
+risk_class: safe
+applicability:
+  interfaces:
+  - web
+  always: false
+prerequisites:
+  browser: true
+  notes:
+  - Chromium via Playwright (`playwright install chromium`).
+methodology: Declarative browser steps (goto, fill, click, chat, expect_visible, screenshot) run in a fresh browser
+  context per test with tracing on. Console errors, page errors, dialogs and failed requests are recorded as state
+  and asserted. Locators prefer roles and accessible names.
+test_generation: Loads, round-trip, empty submit, XSS escaping (an `<img onerror>` message must not open a dialog)
+  and two-turn tests, using the selectors from target.yaml or sensible defaults.
+execution: One browser context per test, screenshots and a Playwright trace saved as artifacts; the context is closed
+  even on failure.
+evaluation_rules:
+- No uncaught page errors.
+- No alert/confirm/prompt dialogs triggered by user-supplied text.
+- The expected answer must be visible in the conversation.
+severity:
+  default: medium
+  guidance:
+  - 'High: script execution from user text; page does not load.'
+  - 'Medium: round trip fails.'
+  - 'Low: cosmetic or empty-submit handling.'
+evidence_requirements:
+- screenshot
+- trace archive
+- console and page-error log
+metrics:
+- ui_availability
+- ui_task_success
+- ui_security
+- ui_robustness
+dependencies: []
+limitations:
+- Selectors must be configured for unusual UIs; automatic discovery covers common chat layouts only.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://playwright.dev/python/docs/locators
+  - https://playwright.dev/python/docs/trace-viewer
+  - https://playwright.dev/python/docs/browser-contexts
+generator: agentlab.skills.builtin.integrations:playwright_tests

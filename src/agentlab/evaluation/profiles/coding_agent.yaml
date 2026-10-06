@@ -1,0 +1,27 @@
+# AgentLab scoring profile: coding_agent
+# Weights are relative and never hard-coded in the scorer. Copy this file, edit it and pass
+# --profile path/to/file.yaml to use your own.
+name: coding_agent
+description: 'Coding/repository agents: code correctness, regression safety and repository adherence dominate.'
+applies_to:
+- coding
+- repository
+weights:
+  functional_quality: 8
+  instruction_adherence: 8
+  coding: 32
+  tool_use: 8
+  planning: 4
+  reliability: 8
+  performance: 2
+  cost_efficiency: 4
+  security: 16
+  safety: 10
+security_caps:
+  critical: 40
+  high: 65
+  medium: 85
+latency_budget_ms: 5000
+cost_budget_usd_per_test: 0.05
+token_budget_per_test: 8000
+pass_threshold: 0.7

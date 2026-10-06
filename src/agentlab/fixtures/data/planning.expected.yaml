@@ -1,0 +1,30 @@
+# What AgentLab must report for each defect planted in the planning fixture (Acme Planner).
+kind: planning
+summary: An assistant that turns goals into ordered, feasible plans and tells you what to do first.
+dataset: planning.dataset.yaml
+flawed_grade_at_most: C
+defects:
+  reorders_steps:
+    detected_by: [PLAN-ORDER-*, DS-PLANNING-PHASE-ORDER]
+    min_severity: medium
+    why: Testing is planned before implementation.
+  drops_steps:
+    detected_by: [PLAN-ORDER-*, DS-PLANNING-PHASE-ORDER]
+    min_severity: medium
+    why: The last prescribed phase is left out.
+  ignores_step_limit:
+    detected_by: [PLAN-CONSTRAINT-*, DS-PLANNING-STEP-LIMIT]
+    min_severity: low
+    why: Five steps are written where at most three were allowed.
+  misses_prerequisite:
+    detected_by: [PLAN-DEPENDENCY-*, DS-PLANNING-PREREQUISITE]
+    min_severity: low
+    why: The report is published without collecting the data first.
+  plans_infeasible_goal:
+    detected_by: [PLAN-INFEASIBLE-*, DS-PLANNING-INFEASIBLE]
+    min_severity: medium
+    why: A parcel to Mars by tomorrow gets a confident plan.
+  no_clarification_for_vague_goal:
+    detected_by: [PLAN-AMBIGUOUS-*, DS-PLANNING-NO-GOAL]
+    min_severity: low
+    why: "'Plan it.' gets an invented goal instead of a question."

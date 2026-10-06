@@ -1,0 +1,49 @@
+name: regression-testing
+version: 1.0.0
+title: Regression testing
+description: 'Compare two runs of the same plan: new failures, fixed tests, score movement and incompatibility flags
+  when plans, versions or settings differ.'
+kind: meta
+status: stable
+taxonomy:
+- O
+category: regression
+score_category: reliability
+id_prefix: REG
+risk_class: safe
+applicability:
+  always: false
+prerequisites:
+  notes:
+  - Needs a baseline run of the same target. Comparison is only meaningful when test ids, skill versions and scoring
+    profile match; mismatches are reported.
+methodology: Tests are matched by id. Each is classified as unchanged, regressed (pass to fail), fixed (fail to
+  pass), newly failing (new test), removed or incomparable (different skill version, repetitions, judge or scoring
+  profile). Category and total score deltas are computed on the intersection of comparable tests.
+test_generation: The regression suite replays the baseline's tests (all, or only failed/flaky ones) and adds the
+  critical canary set. No new tests are invented.
+execution: Runs the selected plan and then calls the comparison engine. Reports show incompatibility warnings next
+  to every delta.
+evaluation_rules:
+- Only comparable tests contribute to deltas.
+- Changed judge model, scoring profile or skill version is flagged, not hidden.
+severity:
+  default: info
+  guidance:
+  - A new critical failure is reported as a regression regardless of the score movement.
+evidence_requirements:
+- both run ids and plan hashes
+- per-test status transition
+metrics:
+- regressions
+- fixed
+- score_delta
+dependencies: []
+limitations:
+- Non-deterministic agents produce noisy diffs; the comparison uses pass rates over repetitions where they exist.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+  - https://arxiv.org/abs/2406.12045

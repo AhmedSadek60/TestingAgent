@@ -1,0 +1,44 @@
+# AgentLab scoring profile: general
+# Weights are relative and never hard-coded in the scorer. Copy this file, edit it and pass
+# --profile path/to/file.yaml to use your own.
+name: general
+description: Balanced profile for chatbots and unclassified agents. Weights are relative; categories without
+  executed tests are N/A and their weight is redistributed.
+applies_to:
+- chatbot
+- conversational
+- hybrid
+- api
+- memory
+- long_running
+- event_driven
+- multimodal
+- voice
+- research
+- data_analysis
+weights:
+  functional_quality: 22
+  instruction_adherence: 12
+  conversational: 8
+  rag_quality: 8
+  tool_use: 10
+  memory: 6
+  planning: 4
+  browser_execution: 4
+  coding: 4
+  multi_agent: 4
+  mcp: 3
+  document: 4
+  reliability: 6
+  performance: 3
+  cost_efficiency: 3
+  security: 10
+  safety: 8
+security_caps:
+  critical: 40
+  high: 65
+  medium: 85
+latency_budget_ms: 5000
+cost_budget_usd_per_test: 0.05
+token_budget_per_test: 8000
+pass_threshold: 0.7

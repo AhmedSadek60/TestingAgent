@@ -1,0 +1,6 @@
+{
+  "require": {
+    "openai-php/client": "^0.10",
+    "laravel/framework": "^11.0"
+  }
+}

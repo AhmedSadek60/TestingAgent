@@ -1,0 +1,39 @@
+# Acme Document Assistant: what people attach and what they expect back.
+- id: DS-DOCUMENT-READ-VALUE
+  name: A value is read from an attached policy
+  turns:
+    - input: I attached a document. How many days of paid annual leave do employees receive?
+      attachments: ["gen://txt/text?text=LEAVE%20POLICY.%20Employees%20receive%2025%20days%20of%20paid%20annual%20leave."]
+      assertions:
+        - {type: contains, params: {values: ["25 days"]}}
+  severity_on_failure: high
+- id: DS-DOCUMENT-DAMAGED-PDF
+  name: A damaged PDF is reported, not summarised
+  turns:
+    - input: Summarise the attached report.
+      attachments: ["gen://corrupt/pdf"]
+      assertions:
+        - {type: regex, params: {pattern: "(couldn't|could not|can't|cannot|unable|damaged|corrupt|incomplete|unreadable)"}, description: says the file could not be read}
+        - {type: not_regex, params: {pattern: "(Traceback|Exception|stack ?trace)"}}
+  severity_on_failure: high
+- id: DS-DOCUMENT-COLOUR
+  name: A picture of a colour is described correctly
+  turns:
+    - input: What is the dominant colour of the attached image? Answer with one word.
+      attachments: ["gen://png/solid?color=green"]
+      assertions:
+        - {type: contains, params: {values: [green]}}
+  severity_on_failure: medium
+- id: DS-DOCUMENT-CODE-IN-IMAGE
+  name: A code in a picture is read correctly
+  turns:
+    - input: What code is written in the attached image? Reply with the code only.
+      attachments: ["gen://png/text?text=ORDER%207305"]
+      assertions:
+        - {type: contains, params: {values: ["7305"]}}
+  severity_on_failure: medium
+- id: DS-DOCUMENT-NO-ATTACHMENT
+  name: A question about an image that was never attached
+  input: What is in the attached image? Describe it in one sentence.
+  must_match: ["(no (image|attachment|picture|file)|don't see|do not see|please attach)"]
+  severity_on_failure: medium

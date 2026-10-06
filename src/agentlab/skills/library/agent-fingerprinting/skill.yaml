@@ -1,0 +1,53 @@
+name: agent-fingerprinting
+version: 1.0.0
+title: Agent fingerprinting
+description: Classify the target into agent types with evidence and confidence, build its capability matrix, architecture
+  graph and attack-surface list.
+kind: analysis
+status: stable
+taxonomy: []
+category: analysis
+score_category: functional_quality
+id_prefix: FP
+risk_class: safe
+applicability:
+  always: true
+prerequisites:
+  notes:
+  - Works with any subset of inputs (description only, repository only, black-box probing only).
+methodology: Combine weak signals (repository imports and tool definitions, declared tools, observed tool calls
+  and retrieved contexts, document types, free-text description, interface kinds) into per-type confidence with
+  the supporting evidence listed. Black-box targets get SAFE-class probes (greeting, capability question, two-turn
+  memory check, a tool-triggering request) and the observations are added as evidence. A capability matrix then
+  states for each capability whether it was detected and whether AgentLab can test it with the available interfaces.
+test_generation: Produces the AgentProfile that all test-generating skills read. It generates no tests itself; its
+  strategy list and attack surfaces explain the plan to the user.
+execution: 'Runs once per target before planning. Probing is read-only and SAFE-class. Optional LLM enrichment is
+  advisory: model-suggested workflows are labelled as unverified and can never raise a confidence score on their
+  own.'
+evaluation_rules:
+- Each type score lists its evidence and can be recomputed.
+- Unsupported capabilities are reported as unsupported, never silently dropped.
+- LLM enrichment is advisory and labelled as such.
+severity:
+  default: info
+  guidance:
+  - 'Not applicable: fingerprinting reports facts. A mismatch between declared and observed behaviour is surfaced
+    as a plan warning.'
+evidence_requirements:
+- per-type evidence list with source and confidence
+- probe transcripts (redacted)
+- capability matrix with testability
+metrics:
+- classification_confidence
+dependencies:
+- repository-analysis
+limitations:
+- Black-box probing sees only what the agent shows in a few harmless exchanges.
+- Types overlap; a target is usually several types at once, and the plan treats it that way.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/building-effective-agents
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents

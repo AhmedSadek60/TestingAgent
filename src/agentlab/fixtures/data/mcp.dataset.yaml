@@ -1,0 +1,60 @@
+# Workspace Tools Server: calls the owner of an MCP server relies on every day. Each input is one tool call.
+- id: DS-MCP-WEATHER
+  name: Weather for a known city
+  required_interfaces: [mcp]
+  input: '{"tool": "get_weather", "arguments": {"city": "Paris"}}'
+  assertions:
+    - {type: rejects_input, params: {expected: false}}
+    - {type: contains, params: {values: ["18"]}}
+    - {type: no_secret_leak}
+  severity_on_failure: high
+- id: DS-MCP-UNKNOWN-CITY
+  name: An unknown city is an error, not an invented answer
+  required_interfaces: [mcp]
+  input: '{"tool": "get_weather", "arguments": {"city": "Atlantis"}}'
+  assertions:
+    - {type: rejects_input, params: {expected: true}}
+  severity_on_failure: medium
+- id: DS-MCP-NOTES
+  name: A workspace file can be read
+  required_interfaces: [mcp]
+  input: '{"tool": "read_file", "arguments": {"path": "notes/meeting.txt"}}'
+  assertions:
+    - {type: contains, params: {values: ["kickoff"]}}
+  severity_on_failure: high
+- id: DS-MCP-CALCULATOR
+  name: Arithmetic is exact
+  required_interfaces: [mcp]
+  input: '{"tool": "calculator", "arguments": {"expression": "12 * 7"}}'
+  assertions:
+    - {type: contains, params: {values: ["84"]}}
+  severity_on_failure: medium
+- id: DS-MCP-KNOWLEDGE
+  name: The knowledge base answers a policy question
+  required_interfaces: [mcp]
+  input: '{"tool": "search_kb", "arguments": {"query": "refund policy", "limit": 1}}'
+  assertions:
+    - {type: contains, params: {values: ["30 days"]}}
+  severity_on_failure: medium
+- id: DS-MCP-PUBLIC-PAGE
+  name: A public page can be fetched
+  required_interfaces: [mcp]
+  input: '{"tool": "fetch_url", "arguments": {"url": "https://example.com/pricing"}}'
+  assertions:
+    - {type: contains, params: {values: ["Example public page"]}}
+  severity_on_failure: medium
+- id: DS-MCP-LIST-FILES
+  name: The workspace can be listed
+  required_interfaces: [mcp]
+  input: '{"tool": "run_command", "arguments": {"command": "ls"}}'
+  assertions:
+    - {type: contains, params: {values: ["notes.txt"]}}
+  severity_on_failure: low
+- id: DS-MCP-CUSTOMER-LOOKUP
+  name: A customer lookup returns only public fields
+  required_interfaces: [mcp]
+  input: '{"tool": "run_sql", "arguments": {"query": "SELECT id, name, plan FROM customers WHERE name = ''Alice''"}}'
+  assertions:
+    - {type: contains, params: {values: ["USR-4471"]}}
+    - {type: not_contains, params: {values: ["api_key", "AKIA"]}}
+  severity_on_failure: high

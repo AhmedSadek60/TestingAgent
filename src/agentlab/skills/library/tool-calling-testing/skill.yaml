@@ -1,0 +1,71 @@
+name: tool-calling-testing
+version: 1.0.0
+title: Tool-calling testing
+description: Tool selection, argument accuracy, result use, unnecessary calls, invalid arguments and tool failures
+  for every discovered tool.
+kind: tests
+status: stable
+taxonomy:
+- E
+category: tool_calling
+score_category: tool_use
+id_prefix: TOOL
+risk_class: safe
+applicability:
+  types:
+  - tool_calling
+  - function_calling
+  - react
+  - autonomous
+  - planning
+  - workflow
+  - supervisor
+  - mcp
+  needs_tools: true
+  always: false
+prerequisites:
+  notes:
+  - Tool calls must be observable on the interface (reports_tool_calls); otherwise the skill states that and generates
+    nothing.
+methodology: 'Per tool, a natural-language request is derived from its name, description and schema (with a confirmation
+  sentence for tools with side effects so that a careful agent is not penalised). The oracle is the trajectory:
+  the expected tool was called, its arguments match (subset match with `contains` matchers), no duplicate calls.
+  Deterministic tools (calculators) verify that the result is used; failing tools verify honest error reporting.'
+test_generation: Tools are ordered read-only first, then side-effecting, bounded by intensity. The generator adds
+  a no-tool-needed test, result-use and invalid-argument tests when a calculator-like tool exists, and tool-failure
+  tests when the interface can replace a tool result.
+execution: Read-only tools run as SAFE; side-effecting tools are classified CONTROLLED or HIGH_IMPACT by the safety
+  gate and only run when the target's policy allows it.
+evaluation_rules:
+- '`tool_called` matches name and argument subset.'
+- Duplicate identical calls are flagged.
+- Tool-failure tests require the interface to be able to replace a tool result; otherwise they are BLOCKED, never
+  simulated.
+severity:
+  default: medium
+  guidance:
+  - 'High: wrong tool or wrong arguments for a side-effecting tool.'
+  - 'Medium: wrong argument for a read-only tool; result not used.'
+  - 'Low: redundant call; extra clarification.'
+evidence_requirements:
+- tool-call trajectory with arguments and results
+- expected vs observed call
+- tool schema excerpt
+metrics:
+- tool_selection_accuracy
+- argument_accuracy
+- tool_success
+- unnecessary_calls
+- result_utilization
+dependencies: []
+limitations:
+- Natural-language prompts for unusual tools are inferred from their descriptions and may need a hand-written override
+  in target.yaml.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://www.anthropic.com/engineering/writing-tools-for-agents
+  - https://gorilla.cs.berkeley.edu/leaderboard.html
+  - https://docs.langchain.com/langsmith/trajectory-evals
+generator: agentlab.skills.builtin.tools:tool_calling_tests

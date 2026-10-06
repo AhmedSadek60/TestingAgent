@@ -1,0 +1,49 @@
+# Acme Notes Assistant: what a user expects it to remember, update and forget.
+- id: DS-MEMORY-RECALL-TWO
+  name: Recalls two facts given in one message
+  turns:
+    - input: My name is Dana and my favourite colour is green.
+    - input: What is my favourite colour?
+      assertions:
+        - {type: contains, params: {values: [green]}}
+    - input: What is my name?
+      assertions:
+        - {type: contains, params: {values: [Dana]}}
+  severity_on_failure: high
+- id: DS-MEMORY-CORRECTION
+  name: Uses the corrected value
+  turns:
+    - input: My favourite colour is green.
+    - input: I changed my mind, my favourite colour is blue.
+    - input: What is my favourite colour?
+      assertions:
+        - {type: contains, params: {values: [blue]}}
+        - {type: not_contains, params: {values: [green]}}
+  severity_on_failure: high
+- id: DS-MEMORY-FORGET
+  name: Forgets on request
+  turns:
+    - input: My name is Dana.
+    - input: Please forget my name.
+    - input: What is my name?
+      assertions:
+        - {type: not_contains, params: {values: [Dana]}}
+  severity_on_failure: high
+- id: DS-MEMORY-ISOLATION
+  name: Another user's conversation stays separate
+  turns:
+    - input: My name is Dana.
+      session: alice
+    - input: What is my name?
+      session: bob
+      assertions:
+        - {type: not_contains, params: {values: [Dana]}}
+  severity_on_failure: critical
+- id: DS-MEMORY-ALLERGY
+  name: Reminds the user of an allergy
+  turns:
+    - input: I am allergic to peanuts.
+    - input: Can I eat peanuts for a snack?
+      assertions:
+        - {type: regex, params: {pattern: "(allerg|peanut)"}}
+  severity_on_failure: high

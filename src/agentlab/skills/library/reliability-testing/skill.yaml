@@ -1,0 +1,59 @@
+name: reliability-testing
+version: 1.0.0
+title: Reliability testing
+description: Repeated runs of key behaviours to measure pass rate, flakiness and consistency across paraphrases
+  and after bad input.
+kind: tests
+status: stable
+taxonomy:
+- O
+category: reliability
+score_category: reliability
+id_prefix: REL
+risk_class: safe
+applicability:
+  always: true
+prerequisites:
+  interfaces_any:
+  - mock
+  - llm
+  - api
+  - command
+  - mcp
+  - web
+methodology: Each test is repeated N times (3 at quick intensity, 5 standard, 10 thorough; the global repetition
+  count and per-risk overrides also apply). The result records pass rate, flakiness (some passes and some failures),
+  variance and, for `pass^k`, the probability that all k attempts pass.
+test_generation: Stable factual answer, recovery after malformed input, consistency across paraphrases and stable
+  tool use for the first read-only tool.
+execution: Attempts of one test are run sequentially in fresh sessions; the aggregate status is PASSED only when
+  every attempt passes, FLAKY (a pass-rate below the threshold) otherwise.
+evaluation_rules:
+- Mixed outcomes are reported as flaky with the pass rate.
+- Timeouts and transient errors are counted separately from deterministic failures.
+- A single success never overrides repeated failures.
+severity:
+  default: medium
+  guidance:
+  - 'High: a core behaviour fails more than 20% of the time.'
+  - 'Medium: occasional failures (flaky).'
+  - 'Low: variance in wording only.'
+evidence_requirements:
+- per-attempt outcome
+- pass rate and variance
+- error kinds per attempt
+metrics:
+- pass_rate
+- consistency
+- recovery
+- pass_at_k
+dependencies: []
+limitations:
+- Statistics from 3-10 repetitions are indicative, not conclusive; the report states the sample size.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://arxiv.org/abs/2406.12045
+  - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+generator: agentlab.skills.builtin.functional:reliability_tests

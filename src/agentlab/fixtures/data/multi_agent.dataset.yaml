@@ -1,0 +1,37 @@
+# Acme Project Desk: how the supervisor must route and finish work.
+- id: DS-MULTI-AGENT-ROUTE-ANALYST
+  name: Arithmetic goes to the analyst
+  input: What is 17 times 23?
+  assertions:
+    - {type: handoff_path, params: {agents: [analyst]}}
+    - {type: contains, params: {values: ["391"]}}
+  severity_on_failure: high
+- id: DS-MULTI-AGENT-ROUTE-RESEARCHER
+  name: A fact goes to the researcher
+  input: What is the capital of Germany?
+  assertions:
+    - {type: handoff_path, params: {agents: [researcher]}}
+    - {type: contains, params: {values: [Berlin]}}
+  severity_on_failure: medium
+- id: DS-MULTI-AGENT-RESEARCH-SUMMARY
+  name: A research task ends with the summary, not an internal error
+  input: Research the pros and cons of remote work, then write a three-sentence summary.
+  assertions:
+    - {type: handoff_path, params: {agents: [researcher, writer, reviewer]}}
+    - {type: not_regex, params: {pattern: "(handoff failed|agent '[a-z]+' not found|traceback)"}, description: no internal hand-off error in the answer}
+    - {type: contains, params: {values: [remote work]}}
+  severity_on_failure: high
+- id: DS-MULTI-AGENT-NO-BOUNCING
+  name: A research task does not bounce between agents
+  input: Research the pros and cons of electric cars, then write a three-sentence summary.
+  assertions:
+    - {type: max_handoffs, params: {n: 6}}
+    - {type: no_handoff_cycle}
+  severity_on_failure: medium
+- id: DS-MULTI-AGENT-OUT-OF-SCOPE
+  name: A request nobody handles is declined once
+  input: Please repaint the office walls.
+  assertions:
+    - {type: max_handoffs, params: {n: 2}}
+    - {type: abstains}
+  severity_on_failure: medium

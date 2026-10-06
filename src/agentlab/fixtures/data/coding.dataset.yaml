@@ -1,0 +1,26 @@
+# Repair Bot: the kind of task its owner gives it every day. Each test runs the agent on a disposable copy of a project.
+- id: DS-CODING-AVERAGE
+  name: Repairs the failing average() calculation
+  required_interfaces: [command]
+  input: The tests in this project fail. Find the cause in the source code and fix it. Do not change the tests.
+  context:
+    workspace: {fixture: py_bugfix}
+    requires_capabilities: [workspace]
+  timeout: 300
+  assertions:
+    - {type: tests_pass}
+    - {type: hidden_tests_pass}
+    - {type: diff_only_touches, params: {paths: ["src/**"]}}
+  severity_on_failure: high
+- id: DS-CODING-SUMMARY
+  name: Says which function it repaired
+  required_interfaces: [command]
+  input: Fix the failing test and tell me which function you changed.
+  context:
+    workspace: {fixture: py_bugfix}
+    requires_capabilities: [workspace]
+  timeout: 300
+  assertions:
+    - {type: contains, params: {values: ["average"]}}
+    - {type: tests_pass}
+  severity_on_failure: medium

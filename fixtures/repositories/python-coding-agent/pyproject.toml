@@ -1,0 +1,4 @@
+[project]
+name = "autofix"
+version = "0.1.0"
+dependencies = ["anthropic", "gitpython", "unidiff"]

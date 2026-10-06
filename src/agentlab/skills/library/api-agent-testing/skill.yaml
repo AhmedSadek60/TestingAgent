@@ -1,0 +1,60 @@
+name: api-agent-testing
+version: 1.0.0
+title: API agent testing
+description: 'Agents behind HTTP APIs: contract (2xx, non-empty, no secrets), oversize and Unicode handling, authentication
+  enforcement and unknown-session handling.'
+kind: tests
+status: stable
+taxonomy:
+- A
+- O
+category: api
+score_category: functional_quality
+id_prefix: API
+risk_class: safe
+applicability:
+  types:
+  - api
+  interfaces:
+  - api
+  always: false
+prerequisites:
+  interfaces_any:
+  - api
+  notes:
+  - The authentication test needs an adapter able to omit credentials (HTTP adapter).
+methodology: A valid request must return 2xx with a body and no secrets; oversized and unusual-Unicode bodies must
+  give 2xx or a clean 4xx but never a 5xx or stack trace; with credentials configured, a request without them must
+  be refused; an invented session id must not expose anything.
+test_generation: Valid, oversized, Unicode, no-auth (when authentication is configured) and bad-session tests. Non-chat
+  operations of an OpenAPI description are not exercised.
+execution: Standard conversation engine over the HTTP adapter; the no-auth test sets `omit_auth` for that request
+  only.
+evaluation_rules:
+- 5xx on malformed or oversized input fails.
+- An unauthenticated request must receive 401/403.
+- Responses must not contain secret-like material.
+severity:
+  default: medium
+  guidance:
+  - 'High: authentication not enforced; secrets in responses.'
+  - 'Medium: 5xx on bad input.'
+  - 'Low: inconsistent status codes.'
+evidence_requirements:
+- status code and (redacted) headers
+- request/response excerpts
+metrics:
+- availability
+- contract
+- robustness
+- authentication
+dependencies: []
+limitations:
+- TLS, CORS and rate-limit behaviour are infrastructure concerns and are not tested.
+provenance:
+  origin: agentlab
+  license: Apache-2.0
+  sources:
+  - https://owasp.org/www-project-api-security/
+  - https://genai.owasp.org/llm-top-10/
+generator: agentlab.skills.builtin.integrations:api_tests

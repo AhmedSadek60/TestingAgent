@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentlab"
+version = "0.1.0"
+description = "AgentLab: AI agent testing, evaluation and security platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "AgentLab contributors" }]
+dependencies = [
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "pyyaml>=6.0",
+  "httpx>=0.27",
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "fastapi>=0.111",
+  "uvicorn>=0.30",
+  "python-multipart>=0.0.9",
+  "typer>=0.12",
+  "rich>=13",
+  "jinja2>=3.1",
+  "cryptography>=42",
+  "jsonschema>=4.22",
+  "jsonpath-ng>=1.6",
+  "pypdf>=4.2",
+  "python-docx>=1.1",
+  "reportlab>=4.2",
+  "pillow>=10.3",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.45"]
+postgres = ["psycopg[binary]>=3.1"]
+redis = ["redis>=5.0"]
+mcp = ["mcp>=2.3,<3"]
+all = ["agentlab[browser,postgres,redis,mcp]"]
+dev = [
+  "agentlab[all]",
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "respx>=0.21",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+agentlab = "agentlab.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agentlab = ["py.typed", "reporting/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*", "fixtures/data/coding_agent/*", "api/static/*", "api/static/assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+markers = [
+  "docker: requires a running Docker daemon",
+  "browser: requires Playwright and a Chromium build",
+  "postgres: requires a PostgreSQL server (AGENTLAB_TEST_POSTGRES_URL)",
+  "redis: requires a Redis server (AGENTLAB_TEST_REDIS_URL)",
+  "ollama: requires a reachable Ollama server (AGENTLAB_TEST_OLLAMA_URL)",
+  "matrix: runs a whole fixture through the full suite (slow); deselect with -m 'not matrix'",
+]
+filterwarnings = ["ignore::DeprecationWarning:jsonpath_ng.*"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["fixtures/repositories", "src/agentlab/fixtures/data/rag", "web/node_modules", "scripts/ai"]  # scripts/ai: governance tooling, kept as shipped
+target-version = "py312"
+src = ["src", "tests", "fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101", "S603", "S607", "B008", "S311", "UP042", "UP046", "E501", "SIM105", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+"fixtures/**" = ["S"]
+"src/agentlab/fixtures/**" = ["S"]  # deliberately flawed simulations; they never touch the host
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = false
