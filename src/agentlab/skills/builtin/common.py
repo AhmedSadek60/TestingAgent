@@ -69,7 +69,7 @@ _NAME_VALUES: list[tuple[str, Any]] = [
     (r"date|day", "2026-03-15"),
     (r"time", "14:30"),
     (r"amount|price|total|balance|cost", 42),
-    (r"count|limit|n$|num|quantity|size|top_?k|page", 3),
+    (r"count|limit|^n$|num|quantity|size|top_?k|page", 3),
     (r"name", "Alice Martin"),
     (r"currency", "EUR"),
     (r"language|lang", "French"),
@@ -102,7 +102,7 @@ def sample_value(name: str, schema: dict[str, Any] | None) -> Any:
         item = sample_value(name.rstrip("s"), schema.get("items") or {"type": "string"})
         return [item]
     for rx, val in _NAME_VALUES:
-        if re.search(rx, name, re.I):
+        if re.search(rx, name, re.I) and (typ != "string" or isinstance(val, str)):  # a string parameter gets a string
             return val
     return f"sample-{name}"[:30]
 

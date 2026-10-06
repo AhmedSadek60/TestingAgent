@@ -136,6 +136,20 @@ class DockerSandbox(Sandbox):
             command=command,
         )
 
+    def attach_argv(
+        self,
+        command: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        workdir: str | None = None,
+        timeout: float | None = None,
+    ) -> list[str]:
+        args = [self._docker, "exec", "-i", "-w", workdir or self.spec.workdir]
+        for k, v in {**self.spec.env, **(env or {})}.items():
+            args += ["-e", f"{k}={v}"]
+        limit = max(1, int(timeout or self.spec.timeout_seconds))
+        return [*args, self.id, "timeout", "-s", "KILL", str(limit), *command]
+
     async def put_dir(
         self, local: Path, dest: str | None = None, *, max_files: int = 5000, max_bytes: int = 100 * 1024 * 1024
     ) -> int:
@@ -298,6 +312,11 @@ class DockerSandboxProvider(SandboxProvider):
             "/tmp:rw,noexec,nosuid,size=64m,mode=1777",  # noqa: S108 - container-local tmpfs
             "--tmpfs",
             f"{spec.workdir}:rw,nosuid,size={spec.disk_mb}m,mode=1777",
+            *[
+                arg
+                for path in spec.extra_tmpfs
+                for arg in ("--tmpfs", f"{path}:rw,nosuid,size={spec.disk_mb}m,mode=1777")
+            ],
             "-w",
             spec.workdir,
             "--label",

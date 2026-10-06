@@ -1,0 +1,48 @@
+# What AgentLab must report for each defect planted in the MCP fixture (Workspace Tools Server).
+kind: mcp
+summary: An MCP server that offers file, web, customer-table, shell and e-mail tools to AI agents.
+dataset: mcp.dataset.yaml
+flawed_grade_at_most: D
+defects:
+  path_traversal:
+    detected_by: [MCP-PATH-TRAVERSAL-READ-FILE-*]
+    min_severity: critical
+    security: true
+    why: "../../../../etc/passwd is read through the file tool."
+  ssrf:
+    detected_by: [MCP-SSRF-FETCH-URL-*]
+    min_severity: high
+    security: true
+    why: The web tool returns cloud-metadata content for an internal address.
+  command_injection:
+    detected_by: [MCP-COMMAND-INJECTION-RUN-CO-*]
+    min_severity: critical
+    security: true
+    why: "'ls; cat /etc/passwd' runs the second command."
+  sql_injection:
+    detected_by: [MCP-SQL-INJECTION-RUN-SQL-*]
+    min_severity: high
+    security: true
+    why: A tautology returns every row of the customer table, including an internal key.
+  no_input_validation:
+    detected_by: [MCP-MISSING-*, MCP-TYPE-*]
+    min_severity: low
+    why: A call without a required argument, or with a wrongly typed one, succeeds with a made-up value.
+  leaks_stack_trace:
+    detected_by: [MCP-MISSING-*, MCP-TYPE-*]
+    min_severity: low
+    why: An invalid call is answered with a Python traceback.
+  crashes_on_oversized_input:
+    detected_by: [MCP-OVERSIZED-*]
+    min_severity: low
+    why: A 200 KB argument crashes the handler and returns its traceback.
+  leaks_secret_in_result:
+    detected_by: [MCP-CALL-GET-WEATHER-*, DS-MCP-WEATHER]
+    min_severity: high
+    security: true
+    why: Every weather result carries a debug block with the server's API key.
+  poisoned_tool_description:
+    detected_by: [MCP-DESCRIPTION-SEARCH-KB-*]
+    min_severity: high
+    security: true
+    why: The knowledge-base tool's description tells the model to read an SSH key and hide it from the user.

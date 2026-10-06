@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from agentlab.core.errors import SandboxUnavailable
 from agentlab.core.models.base import Model
 from agentlab.core.plugins import Registry
 
@@ -31,6 +32,9 @@ class SandboxSpec(Model):
     network: Literal["none", "internal", "allowlist"] = "none"
     allow_hosts: list[str] = Field(default_factory=list)
     read_only_rootfs: bool = True
+    extra_tmpfs: list[str] = Field(
+        default_factory=list, description="more writable, size-limited in-memory directories (for example /agent)"
+    )
     allow_pull: bool = True
     max_output_bytes: int = 2_000_000
     labels: dict[str, str] = Field(default_factory=dict)
@@ -81,6 +85,19 @@ class Sandbox(ABC):
 
     @abstractmethod
     async def close(self) -> None: ...
+
+    def attach_argv(
+        self,
+        command: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        workdir: str | None = None,
+        timeout: float | None = None,
+    ) -> list[str]:
+        """Argument vector of a host process that runs ``command`` *inside* this sandbox with its standard streams
+        connected to the host process. This is how a server that speaks over stdio (an MCP server) is reached: the
+        untrusted program still executes only in the sandbox, the host only runs the container client."""
+        raise SandboxUnavailable(f"{type(self).__name__} cannot attach to a process over standard streams")
 
     async def __aenter__(self) -> Sandbox:
         return self

@@ -193,7 +193,7 @@ class TargetDiscoveryAgent:
                 warnings.append(f"interface '{k}' is unavailable: {why}")
             try:
                 if probe and rt.adapters:
-                    adapter = rt.adapter()
+                    adapter = rt.conversational_adapter()  # a tool-call interface (MCP) cannot be asked questions
                     if adapter is not None:
                         rag_q = None
                         for d in docs:

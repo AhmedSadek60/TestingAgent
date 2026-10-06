@@ -5,6 +5,7 @@ from __future__ import annotations
 from agentlab.fixtures.base import PLANTED_CANARY, ChatRequest, FixtureAgent, Reply, Session, make_app
 from agentlab.fixtures.chatbot import ChatbotAgent
 from agentlab.fixtures.document_agent import DocumentAgent
+from agentlab.fixtures.mcp_agent import McpToolServer
 from agentlab.fixtures.memory_agent import MemoryAgent
 from agentlab.fixtures.multi_agent import TeamAgent
 from agentlab.fixtures.planning_agent import PlanningAgent
@@ -18,6 +19,7 @@ REGISTRY: dict[str, type[FixtureAgent]] = {
     for c in (
         ChatbotAgent,
         DocumentAgent,
+        McpToolServer,
         MemoryAgent,
         PlanningAgent,
         RagAgent,
@@ -43,6 +45,7 @@ __all__ = [
     "ChatbotAgent",
     "DocumentAgent",
     "FixtureAgent",
+    "McpToolServer",
     "MemoryAgent",
     "PlanningAgent",
     "RagAgent",

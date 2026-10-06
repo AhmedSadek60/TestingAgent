@@ -61,8 +61,48 @@ class AttemptOutcome:
         return [c for r in self.responses for c in r.tool_calls]
 
 
+def save_artifact(
+    env: AttemptEnv,
+    data: Any,
+    *,
+    kind: str,
+    name: str,
+    test_id: str,
+    media_type: str | None = None,
+    sensitivity: str = "restricted",
+) -> str | None:
+    """Store evidence an engine collected (a screenshot, a workspace diff) and register it, returning its id.
+
+    Returns ``None`` when the run keeps no artifacts (an in-memory run); the evidence is then only in the trace."""
+    store = env.extras.get("artifacts")
+    if store is None:
+        return None
+    if media_type is None:
+        ref = store.put_json(data, kind=kind, name=name, run_id=env.run_id, test_key=test_id, sensitivity=sensitivity)
+    else:
+        ref = store.put(
+            data,
+            kind=kind,
+            media_type=media_type,
+            name=name,
+            run_id=env.run_id,
+            test_key=test_id,
+            sensitivity=sensitivity,
+        )
+    registry = env.extras.get("store")
+    if registry is not None:
+        try:
+            registry.register_artifact(ref)
+        except Exception:  # noqa: S110 - identical evidence was already registered by an earlier attempt
+            pass
+    return str(ref.id)
+
+
 class ExecutionEngine(ABC):
     name = "abstract"
+    #: whether the engine talks to the target through an adapter. An engine that does not (``StaticEngine``) can run
+    #: for a target that has no interface at all.
+    needs_adapter = True
 
     @abstractmethod
     def handles(self, test: TestCase) -> bool: ...
@@ -201,6 +241,37 @@ class ConversationEngine(ExecutionEngine):
 
 
 ENGINES.register("conversation", ConversationEngine, replace=True)
+
+
+class StaticEngine(ExecutionEngine):
+    """Tests that look at what discovery found (tool names, descriptions, schemas) and send nothing to the target.
+
+    The check still goes through the normal assertion pipeline, so it is scored, traced and reported like any other. The
+    one empty observation exists so that an assertion has a response to be attached to; it is not something the target
+    said, and ``observed.static`` marks it as such."""
+
+    name = "static"
+    needs_adapter = False
+
+    def handles(self, test: TestCase) -> bool:
+        return test.context.get("engine") == "static"
+
+    async def run(self, test: TestCase, env: AttemptEnv) -> AttemptOutcome:
+        out = AttemptOutcome(inputs=[test.input or test.name], sessions=["static"])
+        out.responses.append(AgentResponse(observed={"static": True}))
+        return out
+
+
+ENGINES.register("static", StaticEngine, replace=True)
+
+
+def default_engines() -> dict[str, ExecutionEngine]:
+    return {name: cls() for name, cls in ENGINES.items()}
+
+
+def needs_adapter(test: TestCase, engines: dict[str, ExecutionEngine] | None = None) -> bool:
+    """Whether the engine that will run ``test`` has to talk to the target (the planner and the executor agree)."""
+    return pick_engine(test, engines or default_engines()).needs_adapter
 
 
 def pick_engine(test: TestCase, engines: dict[str, ExecutionEngine]) -> ExecutionEngine:

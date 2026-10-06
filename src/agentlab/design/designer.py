@@ -45,6 +45,7 @@ from agentlab.design.taxonomy import (
     security_codes,
 )
 from agentlab.execution.capabilities import ENVIRONMENT_CAPABILITIES, describe_missing, missing_capabilities
+from agentlab.execution.engines import needs_adapter
 from agentlab.execution.limits import repetitions_for
 from agentlab.security.credentials import CredentialManager
 from agentlab.security.gate import AuthorizationGate
@@ -657,6 +658,8 @@ class TestDesignerAgent:
             )
             return d.risk, reasons, "prerequisite", why
         kind = self._interface_for(ctx, test)
+        if kind is None and not needs_adapter(test):
+            return d.risk, reasons, None, None  # a static check runs without any interface
         if kind is None:
             why = (
                 f"no usable interface for this test (wanted {test.required_interfaces or 'any'}, "

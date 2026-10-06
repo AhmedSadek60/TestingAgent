@@ -141,7 +141,7 @@ class AuthorizationGate:
                     f"required interface '{iface}' is not configured for this target "
                     f"(available: {sorted(self.interfaces) or 'none'})",
                 )
-        if self.spec.interfaces() == [] and not self.interfaces:
+        if self.spec.interfaces() == [] and not self.interfaces and test.context.get("engine") != "static":
             return block("prerequisite", "the target exposes no interface that AgentLab can drive")
         if test.browser_steps and not self.browser_available:
             return block(

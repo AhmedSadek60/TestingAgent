@@ -16,7 +16,7 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import EXIT_FINDINGS, EXIT_INPUT, console, emit_json, err, fail
-from agentlab.fixtures import REGISTRY, fixture_class, make_app
+from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.fixtures.selftest import verify
 from agentlab.fixtures.server import serve_forever
 
@@ -82,7 +82,7 @@ def fixtures_serve(
             f"[yellow]warning:[/yellow] {host} is not loopback; a fixture is deliberately flawed and must not be exposed"
         )
     console.print(f"serving [bold]{agent.title}[/bold] ({variant}) at http://{host}:{port}  (Ctrl-C stops it)")
-    serve_forever(make_app(agent, token=token), host=host, port=port)
+    serve_forever(agent.asgi_app(token=token), host=host, port=port, lifespan="on" if agent.lifespan else "off")
 
 
 @fixtures_app.command("target")

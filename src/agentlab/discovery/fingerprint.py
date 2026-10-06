@@ -335,7 +335,8 @@ def build_capability_matrix(
     def entry(cap: str, detected: bool, testable: Support, reason: str) -> None:
         out.append(CapabilityEntry(capability=cap, detected=detected, testable=testable, reason=reason))
 
-    conv = bool(ifaces & {"mock", "llm", "api", "web", "command", "mcp"})
+    chat_command = "command" in ifaces and (inp.spec.command is None or inp.spec.command.mode == "chat")
+    conv = bool(ifaces & {"mock", "llm", "api", "web"}) or chat_command
     entry(
         "conversation",
         bool(by.get(AgentType.CHATBOT) or by.get(AgentType.CONVERSATIONAL)),

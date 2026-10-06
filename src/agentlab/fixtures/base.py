@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -104,6 +105,10 @@ class FixtureAgent:
     requires_attachments: ClassVar[bool] = False
     #: whether ``POST /knowledge`` can add a document to a session's knowledge (the agent retrieves it like any other)
     accepts_knowledge: ClassVar[bool] = False
+    #: what the machine must provide to test this kind: "docker" (a sandbox) and/or "browser" (Playwright + Chromium)
+    requires: ClassVar[tuple[str, ...]] = ()
+    #: whether the served application needs ASGI lifespan events (an MCP server starts its session manager there)
+    lifespan: ClassVar[bool] = False
 
     def __init__(self, defects: Iterable[str] = (), *, seed: int = 0, version: str = "1.0.0") -> None:
         chosen = list(dict.fromkeys(defects))
@@ -171,6 +176,19 @@ class FixtureAgent:
             "completion_tokens": tout,
             "cost_usd": round((tin * 0.15 + tout * 0.6) / 1_000_000, 8),
         }
+
+    # ------------------------------------------------------------------------------------------------- serving
+    def asgi_app(self, *, token: str | None = None) -> Any:
+        """The HTTP application that serves this fixture."""
+        return make_app(self, token=token)
+
+    @contextmanager
+    def deployed(self, *, token: str | None = None) -> Iterator[dict[str, Any]]:
+        """Run the fixture where AgentLab can reach it and yield the ``target.yaml`` content that describes it."""
+        from agentlab.fixtures.server import serve  # local: the server module is only needed to run a fixture
+
+        with serve(self.asgi_app(token=token), lifespan="on" if self.lifespan else "off") as srv:
+            yield self.target(srv.url)
 
     # ----------------------------------------------------------------------------------------- target.yaml
     def target(self, url: str, *, credential: str | None = None, name: str | None = None) -> dict[str, Any]:

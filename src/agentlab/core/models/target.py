@@ -76,8 +76,13 @@ class WebConfig(Model):
 
 
 class CommandConfig(Model):
-    """A target run as a command inside the sandbox (coding/CLI agents)."""
+    """A target run as a command inside the sandbox (coding/CLI agents).
 
+    ``mode: chat`` runs the command once per message (the message on standard input, the answer on standard output).
+    ``mode: task`` is a coding agent: it is started on a disposable workspace with the task on standard input, and what
+    it did is judged from the files it left behind and the project's own tests."""
+
+    mode: Literal["chat", "task"] = "chat"
     image: str | None = None
     command: list[str]
     workdir: str = "/workspace"
@@ -88,11 +93,17 @@ class CommandConfig(Model):
 
 
 class McpConfig(Model):
+    """A Model Context Protocol server as the target. Over HTTP the server is already running; over stdio the owner's
+    ``command`` is started *inside the sandbox* from the target's repository (never on the evaluator host)."""
+
     transport: Literal["streamable_http", "sse", "stdio"] = "streamable_http"
     url: str | None = None
     command: list[str] | None = None
     headers: dict[str, str] = Field(default_factory=dict)
     auth_credential: str | None = None
+    timeout_seconds: float = 30.0
+    image: str | None = Field(default=None, description="stdio only: container image to run the server in")
+    env: dict[str, str] = Field(default_factory=dict, description="stdio only: environment of the server process")
 
 
 class LlmToolDef(Model):

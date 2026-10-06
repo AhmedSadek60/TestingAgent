@@ -26,6 +26,7 @@ from agentlab.storage.artifacts import ArtifactStore
 
 
 class AdapterCapabilities(Model):
+    conversational: bool = True  # takes free-text messages; False for tool-call interfaces (MCP) and task runners
     sessions: bool = True  # server-side conversation state addressed by session id
     parallel_sessions: bool = True  # safe to run independent sessions concurrently
     streaming: bool = False
@@ -141,6 +142,14 @@ class TargetRuntime:
         for k in self.PRIORITY:
             if k in self.adapters:
                 return self.adapters[k]
+        return None
+
+    def conversational_adapter(self) -> AgentAdapter | None:
+        """The preferred interface that takes free-text messages (what probing and chat-style tests use)."""
+        for k in self.PRIORITY:
+            a = self.adapters.get(k)
+            if a is not None and a.capabilities.conversational:
+                return a
         return None
 
     def available(self) -> list[str]:

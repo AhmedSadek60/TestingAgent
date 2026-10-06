@@ -160,7 +160,16 @@ class SkillContext:
 
     @property
     def has_conversation_interface(self) -> bool:
-        return bool(set(self.interfaces) & {"mock", "llm", "api", "command", "mcp", "web"})
+        """Some interface takes free-text messages. A tool-call interface (MCP) or a task runner (a coding agent in the
+        sandbox) does not, so message-based tests are not generated for it."""
+        for iface in self.interfaces:
+            caps = self.adapter_capabilities.get(iface)
+            if caps is not None:
+                if caps.conversational:
+                    return True
+            elif iface in {"mock", "llm", "api", "web"}:
+                return True
+        return False
 
     @property
     def authenticated(self) -> bool:

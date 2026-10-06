@@ -339,7 +339,14 @@ class TestOrchestratorAgent:
                 sandbox_provider=cfg.security.sandbox.provider,
             )
             with self._phase(run_id, Phase.ENVIRONMENT_PREPARATION, records) as ph:
-                runtime = await open_runtime(sv, spec, run_id=run_id, resolver=resolver, workdir=workdir)
+                runtime = await open_runtime(
+                    sv,
+                    spec,
+                    run_id=run_id,
+                    resolver=resolver,
+                    workdir=workdir,
+                    extras={"repo_path": str(ingested.repo.path)} if ingested.repo else None,
+                )
                 held_runtime = runtime
                 report.interface_errors = dict(runtime.errors)
                 await check_reachability(runtime, report)

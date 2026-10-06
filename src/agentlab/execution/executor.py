@@ -15,6 +15,7 @@ from statistics import mean
 from typing import Any
 
 from agentlab.adapters.base import AgentAdapter, TargetRuntime
+from agentlab.adapters.static import NullAdapter
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.enums import ErrorKind, EventType, RiskClass, TestStatus
 from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked
@@ -42,6 +43,7 @@ from agentlab.execution.engines import (
     AttemptEnv,
     AttemptOutcome,
     ExecutionEngine,
+    needs_adapter,
     pick_engine,
 )
 from agentlab.execution.evaluate import (
@@ -147,6 +149,8 @@ class TestExecutor:
             )
 
         adapter = self._adapter_for(test)
+        if adapter is None and not needs_adapter(test, d.engines):
+            adapter = NullAdapter(d.runtime.spec, d.runtime.ctx)  # a static check needs no live interface
         if adapter is None:
             return self._finish(
                 TestResult(
@@ -239,7 +243,14 @@ class TestExecutor:
             limits=d.limits,
             cancel=d.cancel,
             resolver=d.resolver,
-            extras={"artifacts": d.artifacts, "config": d.config, "runtime": d.runtime, **d.extras},
+            extras={
+                "artifacts": d.artifacts,
+                "store": d.store,
+                "config": d.config,
+                "runtime": d.runtime,
+                "gate": d.gate,
+                **d.extras,
+            },
         )
         t0 = time.perf_counter()
         outcome = AttemptOutcome()

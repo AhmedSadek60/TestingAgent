@@ -44,7 +44,7 @@ def mcp_tests(sk: SkillRun) -> None:
         sk.note("no MCP tools were discovered; MCP tests need the tool list (connect the server or declare its tools)")
         return
     # ---- static review of what the server tells every client about its tools (tool poisoning)
-    for t in tools[: sk.n(4, 12, 40)]:
+    for t in tools[:60]:  # reading metadata costs the target nothing, so every tool is checked at every intensity
         sk.add(
             f"DESCRIPTION-{t.name}",
             f"Tool metadata of {t.name} is clean",

@@ -1,6 +1,13 @@
 """Test execution: limits, engines, executor and scheduler."""
 
-from agentlab.execution.engines import ENGINES, AttemptEnv, AttemptOutcome, ConversationEngine, ExecutionEngine
+from agentlab.execution.engines import (
+    ENGINES,
+    AttemptEnv,
+    AttemptOutcome,
+    ConversationEngine,
+    ExecutionEngine,
+    StaticEngine,
+)
 from agentlab.execution.executor import ExecutionDeps, TestExecutor
 from agentlab.execution.limits import CancellationToken, CancelledByUser, LimitReached, LimitTracker
 from agentlab.execution.load import LoadEngine
@@ -19,6 +26,7 @@ __all__ = [
     "LimitTracker",
     "LoadEngine",
     "Scheduler",
+    "StaticEngine",
     "TestExecutor",
     "isolation_key",
     "plan_groups",

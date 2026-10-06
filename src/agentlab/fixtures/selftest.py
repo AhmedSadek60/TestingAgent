@@ -37,8 +37,7 @@ from agentlab.core.config import AgentLabConfig, ReportingConfig, SandboxConfig,
 from agentlab.core.enums import Severity, TestStatus
 from agentlab.core.models import TargetSpec
 from agentlab.core.models.base import Model
-from agentlab.fixtures import REGISTRY, fixture_class, make_app
-from agentlab.fixtures.server import serve
+from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.services import Services
 
@@ -171,11 +170,11 @@ def run_fixture(
     """Serve one build of a fixture on a free loopback port and run AgentLab against it (blocking)."""
     agent = fixture_class(kind).build(variant)
     summary = RunSummary(variant=variant)
-    with tempfile.TemporaryDirectory(prefix="agentlab-selftest-") as raw, serve(make_app(agent, token=token)) as srv:
+    with tempfile.TemporaryDirectory(prefix="agentlab-selftest-") as raw, agent.deployed(token=token) as target:
         tmp = Path(raw)
         services = Services.create(_config(tmp, config or {}), base_dir=tmp)
         try:
-            spec = TargetSpec(**agent.target(srv.url))
+            spec = TargetSpec(**target)
             options = RunOptions(
                 intensity=intensity,
                 second_wave=False,

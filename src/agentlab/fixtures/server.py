@@ -17,12 +17,12 @@ import uvicorn
 class ThreadedServer:
     """An ASGI app on its own thread and event loop, listening on a free port of ``host``."""
 
-    def __init__(self, app: Any, host: str = "127.0.0.1", port: int = 0) -> None:
+    def __init__(self, app: Any, host: str = "127.0.0.1", port: int = 0, lifespan: str = "off") -> None:
         sock = socket.socket()
         sock.bind((host, port))
         self.port = sock.getsockname()[1]
         self.host = host
-        self.server = uvicorn.Server(uvicorn.Config(app, log_level="error", lifespan="off"))
+        self.server = uvicorn.Server(uvicorn.Config(app, log_level="error", lifespan=lifespan))  # type: ignore[arg-type]
         self._sock = sock
         self.thread = threading.Thread(target=self._run, daemon=True)
 
@@ -48,13 +48,13 @@ class ThreadedServer:
 
 
 @contextmanager
-def serve(app: Any) -> Iterator[ThreadedServer]:
-    srv = ThreadedServer(app).start()
+def serve(app: Any, *, lifespan: str = "off") -> Iterator[ThreadedServer]:
+    srv = ThreadedServer(app, lifespan=lifespan).start()
     try:
         yield srv
     finally:
         srv.stop()
 
 
-def serve_forever(app: Any, host: str = "127.0.0.1", port: int = 8765) -> None:
-    uvicorn.run(app, host=host, port=port, log_level="warning", lifespan="off")
+def serve_forever(app: Any, host: str = "127.0.0.1", port: int = 8765, lifespan: str = "off") -> None:
+    uvicorn.run(app, host=host, port=port, log_level="warning", lifespan=lifespan)  # type: ignore[arg-type]
