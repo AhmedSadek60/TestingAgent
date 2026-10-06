@@ -345,7 +345,19 @@ class AgentApiAdapter(AgentAdapter):
             return resp
         self._map(data, resp)
         resp.raw = data if len(text) < 20_000 else None
+        if self.cfg.protocol == "graphql" and not resp.output:
+            resp.error = self._graphql_error(data)
         return resp
+
+    @staticmethod
+    def _graphql_error(data: Any) -> str | None:
+        """GraphQL reports a failed query with status 200 and an ``errors`` list; an answer that is missing because of one
+        is the target's error, not an empty reply. (An answer that arrived alongside an error is kept as it is.)"""
+        errors = data.get("errors") if isinstance(data, dict) else None
+        if not isinstance(errors, list) or not errors:
+            return None
+        messages = [str(e.get("message", e) if isinstance(e, dict) else e)[:160] for e in errors[:3]]
+        return "GraphQL error: " + get_redactor().redact_text("; ".join(messages))[0]
 
     def _map(self, data: Any, resp: AgentResponse) -> None:
         m = self.cfg.response
