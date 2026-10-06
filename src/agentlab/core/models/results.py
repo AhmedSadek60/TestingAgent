@@ -47,11 +47,19 @@ class JudgeResult(Model):
     passed: bool
     confidence: float = Field(ge=0.0, le=1.0)
     rubric: str
+    weight: float = Field(
+        default=1.0, description="How much this criterion counts in the attempt's score next to its other checks"
+    )
     votes: list[JudgeVote] = Field(default_factory=list)
     strategy: str = "single"
     agreement: float = 1.0
     uncertain: bool = False
     error: str | None = None
+    prompt_hash: str | None = Field(
+        default=None,
+        description="SHA-256 of the exact prompt, the judges and the strategy: equal hashes mean the same question "
+        "was put to the same judges",
+    )
 
 
 class AttemptResult(Model):

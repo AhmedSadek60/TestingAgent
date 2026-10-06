@@ -105,9 +105,21 @@ class TestCase(Model):
     max_cost: float = 0.5
     max_tokens: int = 20_000
     repetitions: int | None = None
-    cleanup_strategy: str = "none"
-    evidence_requirements: list[str] = Field(default_factory=list)
-    applicable_agent_types: list[AgentType] = Field(default_factory=list)
+    cleanup_strategy: str = Field(
+        default="none",
+        description="What a person should undo after the test, if anything. A note: AgentLab itself tears down only "
+        "what it created (sandboxes, test sites, sessions)",
+    )
+    evidence_requirements: list[str] = Field(
+        default_factory=list,
+        description="The evidence a reviewer should expect for this test. A note: every attempt's trace is kept "
+        "whatever this says",
+    )
+    applicable_agent_types: list[AgentType] = Field(
+        default_factory=list,
+        description="The kinds of agent the test was written for. A note: the skill's applicability rules decide "
+        "whether a test is planned",
+    )
     isolation_key: str | None = Field(
         default=None, description="Tests sharing a key share mutable state and never run in parallel"
     )

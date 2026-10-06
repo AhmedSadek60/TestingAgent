@@ -863,9 +863,9 @@ browser_steps: Steps to perform in a browser
 timeout: Seconds before the test is stopped
 max_steps: Most agent steps allowed
 max_cost: Most money the test may spend, in US dollars
-cleanup_strategy: What to undo afterwards
-evidence_requirements: Evidence the test must collect
-applicable_agent_types: Kinds of agent the test applies to
+cleanup_strategy: What a person should undo afterwards (a note; AgentLab tears down only what it created itself)
+evidence_requirements: Evidence a reviewer should expect (a note; every attempt's trace is kept regardless)
+applicable_agent_types: Kinds of agent the test was written for (a note; the skill's applicability decides what is planned)
 score_category: Scorecard category the result counts toward
 
 [TestDelta]

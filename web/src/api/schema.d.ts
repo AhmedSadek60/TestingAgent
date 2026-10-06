@@ -2727,12 +2727,6 @@ export interface components {
              */
             probe?: boolean;
             /**
-             * Seed
-             * @description Seed for test generation
-             * @default 0
-             */
-            seed?: number;
-            /**
              * Baseline Run Id
              * @description Regression: replay the tests of this earlier run
              */
@@ -2876,6 +2870,11 @@ export interface components {
              * @description Why no verdict could be reached, if so
              */
             error?: string | null;
+            /**
+             * Prompt Hash
+             * @description SHA-256 of the exact prompt, the judges and the strategy: equal hashes mean the same question was put to the same judges
+             */
+            prompt_hash?: string | null;
         };
         /**
          * JudgeVote
@@ -3187,7 +3186,7 @@ export interface components {
         MockAgentConfig: {
             /**
              * Behaviors
-             * @description Behaviours to simulate (success, leak, slow, hallucinate, ...)
+             * @description Behaviours to simulate: success, hallucination, wrong_citation, wrong_tool, wrong_argument, prompt_injection, memory_leakage, excessive_tool_calls, infinite_loop, unsafe_behavior, flaky, slow
              */
             behaviors?: string[];
             /**
@@ -3204,7 +3203,7 @@ export interface components {
             };
             /**
              * Seed
-             * @description Seed for deterministic behaviour
+             * @description A number that makes the mock agent's planted secret unique (MOCK_SECRET_NNNN)
              * @default 0
              */
             seed?: number;

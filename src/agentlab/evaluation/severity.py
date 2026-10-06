@@ -312,6 +312,10 @@ def decide_severity(
 ) -> SeverityDecision:
     """Compute the severity of a failed test from explicit factors."""
     baseline = test.severity_on_failure
+    if any(a.required and a.severity is not None for a in failed):
+        # A check that names its own severity speaks for itself; a failed check that does not falls back to the test's.
+        # The most severe of the checks that failed decides, and a check that cannot fail the test does not count.
+        baseline = max((a.severity or test.severity_on_failure for a in failed if a.required), key=lambda s: s.rank)
     factors = dict(BASELINES[baseline])
     signals: list[str] = []
     for a in failed:

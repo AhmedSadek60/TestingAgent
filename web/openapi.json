@@ -7213,12 +7213,6 @@
             "description": "Send harmless discovery probes to the target",
             "default": true
           },
-          "seed": {
-            "type": "integer",
-            "title": "Seed",
-            "description": "Seed for test generation",
-            "default": 0
-          },
           "baseline_run_id": {
             "anyOf": [
               {
@@ -7446,6 +7440,18 @@
             ],
             "title": "Error",
             "description": "Why no verdict could be reached, if so"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash",
+            "description": "SHA-256 of the exact prompt, the judges and the strategy: equal hashes mean the same question was put to the same judges"
           }
         },
         "additionalProperties": false,
@@ -7899,7 +7905,7 @@
             },
             "type": "array",
             "title": "Behaviors",
-            "description": "Behaviours to simulate (success, leak, slow, hallucinate, ...)"
+            "description": "Behaviours to simulate: success, hallucination, wrong_citation, wrong_tool, wrong_argument, prompt_injection, memory_leakage, excessive_tool_calls, infinite_loop, unsafe_behavior, flaky, slow"
           },
           "tools": {
             "items": {
@@ -7921,7 +7927,7 @@
             "type": "integer",
             "title": "Seed",
             "default": 0,
-            "description": "Seed for deterministic behaviour"
+            "description": "A number that makes the mock agent's planted secret unique (MOCK_SECRET_NNNN)"
           }
         },
         "additionalProperties": false,
