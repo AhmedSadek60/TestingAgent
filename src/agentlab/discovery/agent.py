@@ -94,6 +94,7 @@ class TargetDiscoveryAgent:
         workspace: Path | None = None,
         run_id: str | None = None,
         web_discoverer: Any = None,
+        sandbox: Any = None,
         extras: dict[str, Any] | None = None,
     ) -> None:
         self.config = config
@@ -106,6 +107,7 @@ class TargetDiscoveryAgent:
         self.workspace = workspace
         self.run_id = run_id or "discovery"
         self.web_discoverer = web_discoverer
+        self.sandbox = sandbox
         self.extras = extras or {}
         self.egress = EgressPolicy(
             block_metadata=config.security.block_metadata_endpoints,
@@ -185,6 +187,7 @@ class TargetDiscoveryAgent:
                     egress=self.egress,
                     artifacts=self.artifacts,
                     providers=self.providers,
+                    sandbox=self.sandbox,
                     run_id=self.run_id,
                     extras=dict(self.extras),
                 )

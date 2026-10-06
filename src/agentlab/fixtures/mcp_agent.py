@@ -216,6 +216,7 @@ class McpToolServer(FixtureAgent):
     summary = "An MCP server that offers file, web, customer-table, shell and e-mail tools to AI agents."
     declared_types = ("mcp", "tool_calling")
     lifespan: ClassVar[bool] = True  # the MCP session manager starts and stops with the application
+    transport: ClassVar[str] = "mcp"
     DEFECTS: ClassVar[dict[str, str]] = {
         "path_traversal": "the file tool follows ../ paths out of the workspace",
         "ssrf": "the web tool fetches internal and cloud-metadata addresses",

@@ -16,6 +16,9 @@ Every fixture kind ships three things next to its code (``fixtures/data``):
 
 The self-test runs without any LLM judge (it must be repeatable offline), so tests that need one are BLOCKED, never
 passed; the expectation files list the defects that only a judge could separate from a pass.
+
+Kinds whose agent executes code (a coding agent) or needs a browser declare ``requires``. When the machine lacks it, the
+kind is *skipped* and the report says why; the agent is never run unprotected to get around the missing sandbox.
 """
 
 from __future__ import annotations
@@ -37,8 +40,10 @@ from agentlab.core.config import AgentLabConfig, ReportingConfig, SandboxConfig,
 from agentlab.core.enums import Severity, TestStatus
 from agentlab.core.models import TargetSpec
 from agentlab.core.models.base import Model
+from agentlab.execution.environment import browser_status
 from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
+from agentlab.sandbox.docker import DockerSandboxProvider
 from agentlab.services import Services
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -216,6 +221,7 @@ class Check:
 class KindReport:
     kind: str
     checks: list[Check] = field(default_factory=list)
+    skipped: str = ""  # why this kind could not be verified on this machine (it was not run, and nothing was faked)
 
     @property
     def ok(self) -> bool:
@@ -229,11 +235,30 @@ class KindReport:
         return {
             "kind": self.kind,
             "ok": self.ok,
+            "skipped": self.skipped or None,
             "checks": [
                 {"name": c.name, "ok": c.ok, "detail": c.detail, "run": c.run.to_dict() if c.run else None}
                 for c in self.checks
             ],
         }
+
+
+def prerequisite_problems(kind: str) -> list[str]:
+    """What this machine lacks to verify ``kind`` (empty when it can). A fixture that executes code needs the sandbox it is
+    meant to be tested in; without one the kind is skipped and reported as such, never run on the host."""
+    problems: list[str] = []
+    for need in fixture_class(kind).requires:
+        if need == "docker":
+            ok, why = asyncio.run(DockerSandboxProvider().available())
+            if not ok:
+                problems.append(f"Docker is required: {why}")
+        elif need == "browser":
+            ok, why = browser_status(AgentLabConfig())
+            if not ok:
+                problems.append(f"a browser is required: {why}")
+        else:
+            problems.append(f"unknown prerequisite '{need}'")
+    return problems
 
 
 def _match(patterns: Iterable[str], names: Iterable[str]) -> list[str]:
@@ -377,8 +402,12 @@ def verify(
     plan: dict[str, dict[str, Job]] = {}
     for kind in chosen:
         problems = audit_expectation(kind)
+        missing = [] if problems else prerequisite_problems(kind)
         if problems:
             reports[kind] = KindReport(kind, [Check("expected-findings file is complete", False, "; ".join(problems))])
+        elif missing:
+            reports[kind] = KindReport(kind, skipped="; ".join(missing))
+            say(f"{kind}: skipped ({reports[kind].skipped})")
         else:
             plan[kind] = jobs_for(kind, defects=defects, all_defects=all_defects)
     with _executor(workers) as pool:

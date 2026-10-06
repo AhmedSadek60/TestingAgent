@@ -132,6 +132,7 @@ async def _discover(services: Services, spec: TargetSpec, *, probe: bool) -> Dis
             docker_available=docker_ok,
             browser_available=browser_ok,
             web_discoverer=services.web_discoverer,
+            sandbox=services.sandbox,
         )
         return await agent.discover(spec, probe=probe)
     finally:

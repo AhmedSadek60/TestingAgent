@@ -294,6 +294,7 @@ class TestOrchestratorAgent:
                 workspace=workdir,
                 run_id=run_id,
                 web_discoverer=sv.web_discoverer,
+                sandbox=sv.sandbox,
                 extras={"canary_secret": resolver.canary("system_secret")},
             )
 

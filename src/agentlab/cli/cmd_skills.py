@@ -329,7 +329,11 @@ def skills_forge(
     async def go() -> list[Path]:
         try:
             agent = TargetDiscoveryAgent(
-                cfg, providers=services.providers, credentials=services.credentials, artifacts=services.artifacts
+                cfg,
+                providers=services.providers,
+                credentials=services.credentials,
+                artifacts=services.artifacts,
+                sandbox=services.sandbox,
             )
             profile = (await agent.discover(spec)).profile
             gaps = uncovered_capabilities(profile, reg)

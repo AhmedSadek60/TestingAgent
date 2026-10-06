@@ -23,6 +23,7 @@ import math
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, ClassVar
 
 from fastapi import FastAPI, Request
@@ -109,6 +110,8 @@ class FixtureAgent:
     requires: ClassVar[tuple[str, ...]] = ()
     #: whether the served application needs ASGI lifespan events (an MCP server starts its session manager there)
     lifespan: ClassVar[bool] = False
+    #: how AgentLab reaches the agent: "http" (a service), "mcp" (a tool server) or "command" (a program started in the sandbox)
+    transport: ClassVar[str] = "http"
 
     def __init__(self, defects: Iterable[str] = (), *, seed: int = 0, version: str = "1.0.0") -> None:
         chosen = list(dict.fromkeys(defects))
@@ -181,6 +184,12 @@ class FixtureAgent:
     def asgi_app(self, *, token: str | None = None) -> Any:
         """The HTTP application that serves this fixture."""
         return make_app(self, token=token)
+
+    def write_to(self, directory: Path) -> Path:
+        """Write the agent's code to ``directory``. Only a command-line fixture (a coding agent) is a program to write."""
+        raise TypeError(
+            f"the '{self.kind}' fixture is served over {self.transport}; there is no code to write to a folder"
+        )
 
     @contextmanager
     def deployed(self, *, token: str | None = None) -> Iterator[dict[str, Any]]:

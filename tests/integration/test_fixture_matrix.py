@@ -38,6 +38,8 @@ def test_expected_detectors_are_specific(kind: str) -> None:
 @pytest.mark.parametrize("kind", KINDS)
 def test_agentlab_finds_the_planted_defects(kind: str) -> None:
     report = verify_kind(kind, workers=4)
+    if report.skipped:  # a kind that executes code is never run without its sandbox
+        pytest.skip(report.skipped)
     assert report.ok, f"{kind}:\n" + "\n".join(f"  {c.name}: {c.detail}" for c in report.failures)
     planted = len(fixture_class(kind).DEFECTS)
     assert len(report.checks) == planted + 2  # correct build, every defect, all defects together

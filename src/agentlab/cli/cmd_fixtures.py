@@ -8,6 +8,7 @@ Fixtures bind to loopback only and hold no real data, credentials or capabilitie
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -77,6 +78,12 @@ def fixtures_serve(
         agent = fixture_class(kind).build(variant)
     except ValueError as exc:
         raise fail(str(exc)) from exc
+    if agent.transport == "command":
+        raise fail(
+            f"'{kind}' is a command-line agent, not a service: write it to a folder with "
+            f"`agentlab fixtures target {kind} --dir DIR --variant {variant}` and test that target",
+            EXIT_INPUT,
+        )
     if host not in {"127.0.0.1", "localhost", "::1"}:
         err.print(
             f"[yellow]warning:[/yellow] {host} is not loopback; a fixture is deliberately flawed and must not be exposed"
@@ -92,12 +99,26 @@ def fixtures_target(
     credential: Annotated[
         str | None, typer.Option("--credential", help="Credential name to send as the bearer token.")
     ] = None,
+    variant: Annotated[str, typer.Option("--variant", "-V", help=VARIANT_HELP)] = "correct",
+    directory: Annotated[
+        Path | None,
+        typer.Option("--dir", help="Command-line fixtures only: the folder to write the agent's code to."),
+    ] = None,
 ) -> None:
-    """Print the target.yaml an owner would write for a fixture."""
+    """Print the target.yaml an owner would write for a fixture.
+
+    A command-line fixture (the coding agent) is a repository, not a service: ``--dir`` writes it to a folder and the
+    printed target points at that folder."""
     try:
-        agent = fixture_class(kind).build("correct")
+        agent = fixture_class(kind).build(variant)
     except ValueError as exc:
         raise fail(str(exc)) from exc
+    if agent.transport == "command":
+        if directory is None:
+            raise fail(f"'{kind}' is a command-line agent: pass --dir to say where to write it", EXIT_INPUT)
+        agent.write_to(directory)
+        sys.stdout.write(yaml.safe_dump(agent.target(str(directory.resolve())), sort_keys=False))
+        return
     sys.stdout.write(yaml.safe_dump(agent.target(url, credential=credential), sort_keys=False))
 
 
@@ -110,6 +131,13 @@ def fixtures_verify(
         bool, typer.Option("--skip-all-defects", help="Skip the run with every defect planted.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Print JSON.")] = False,
+    require_all: Annotated[
+        bool,
+        typer.Option(
+            "--require-all",
+            help="Fail when a kind had to be skipped (Docker or a browser is missing) instead of warning.",
+        ),
+    ] = False,
 ) -> None:
     """Prove that AgentLab finds the planted defects, and only those.
 
@@ -123,10 +151,20 @@ def fixtures_verify(
         raise fail(f"unknown fixture(s) {', '.join(unknown)}; available: {', '.join(sorted(REGISTRY))}", EXIT_INPUT)
     err.print(f"[dim]verifying {', '.join(chosen)} with {max(1, workers)} worker(s)...[/dim]")
     reports = verify(chosen, workers=workers, defects=defect or None, all_defects=not skip_all)
+    skipped = [r for r in reports if r.skipped]
     if as_json:
-        emit_json({"ok": all(r.ok for r in reports), "fixtures": [r.to_dict() for r in reports]})
+        emit_json(
+            {
+                "ok": all(r.ok for r in reports) and not (require_all and skipped),
+                "skipped": [r.kind for r in skipped],
+                "fixtures": [r.to_dict() for r in reports],
+            }
+        )
     else:
         for report in reports:
+            if report.skipped:
+                console.print(f"[yellow]{report.kind}: SKIPPED[/yellow] {report.skipped}")
+                continue
             table = Table(box=box.SIMPLE_HEAD, title=f"{report.kind}: {'OK' if report.ok else 'NOT OK'}")
             table.add_column("Check")
             table.add_column("Result")
@@ -134,5 +172,10 @@ def fixtures_verify(
             for check in report.checks:
                 table.add_row(check.name, "[green]ok[/green]" if check.ok else "[red]FAILED[/red]", check.detail)
             console.print(table)
-    if not all(r.ok for r in reports):
+    if skipped and not as_json:
+        err.print(
+            f"[yellow]warning:[/yellow] {len(skipped)} kind(s) were not verified on this machine ({', '.join(r.kind for r in skipped)}); "
+            "that is not a pass"
+        )
+    if not all(r.ok for r in reports) or (require_all and skipped):
         raise typer.Exit(EXIT_FINDINGS)

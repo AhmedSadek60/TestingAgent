@@ -114,6 +114,16 @@ class FingerprintInputs:
     browser_available: bool = False
 
 
+def _takes_messages(inp: FingerprintInputs) -> bool:
+    """Some interface accepts free-text messages. A tool server (MCP) and a coding agent that is started on a workspace
+    with a task do not, so exposing only those says nothing about being a chatbot."""
+    for iface in inp.available_interfaces:
+        if iface == "mcp" or (iface == "command" and inp.spec.command is not None and inp.spec.command.mode == "task"):
+            continue
+        return True
+    return False
+
+
 def noisy_or(weights: list[float]) -> float:
     p = 1.0
     for w in weights:
@@ -232,7 +242,7 @@ def classify(inp: FingerprintInputs) -> list[TypeScore]:
         if probe.streaming:
             _add(ev, AgentType.CONVERSATIONAL, "probe", "streaming responses", 0.3)
     # --- baseline: any conversational interface is at least a chatbot
-    if inp.available_interfaces and not ev.get(AgentType.CHATBOT):
+    if _takes_messages(inp) and not ev.get(AgentType.CHATBOT):
         _add(ev, AgentType.CHATBOT, "interface", "exposes a conversational interface", 0.4)
     if (
         any(t in ev for t in (AgentType.TOOL_CALLING, AgentType.RAG))

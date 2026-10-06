@@ -12,6 +12,7 @@ from agentlab.execution.executor import ExecutionDeps, TestExecutor
 from agentlab.execution.limits import CancellationToken, CancelledByUser, LimitReached, LimitTracker
 from agentlab.execution.load import LoadEngine
 from agentlab.execution.scheduler import Scheduler, isolation_key, plan_groups
+from agentlab.execution.workspace import WorkspaceEngine
 
 __all__ = [
     "ENGINES",
@@ -28,6 +29,7 @@ __all__ = [
     "Scheduler",
     "StaticEngine",
     "TestExecutor",
+    "WorkspaceEngine",
     "isolation_key",
     "plan_groups",
 ]

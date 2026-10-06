@@ -118,26 +118,30 @@ class CommandAdapter(AgentAdapter):
             return self.cfg.workdir
         return AGENT_DIR if self.cfg.mode == "chat" and self._repo_path() else WORKSPACE_DIR
 
-    async def create_sandbox(self, *, env: dict[str, str] | None = None) -> Sandbox:
-        """A new sandbox holding a copy of the agent's code at ``/agent``. The caller closes it."""
+    async def create_sandbox(
+        self, *, env: dict[str, str] | None = None, with_agent: bool = True, image: str | None = None
+    ) -> Sandbox:
+        """A new sandbox. With ``with_agent`` (the default) it holds a copy of the agent's code at ``/agent`` and runs
+        with the network and environment the owner configured; without it, it is a clean room (no agent code, no
+        network, no owner environment) used to check a result. The caller closes it."""
         provider = self.ctx.sandbox
         if provider is None:
             raise SandboxUnavailable("no sandbox provider is configured; untrusted code is never run on the host")
         sandbox = await provider.create(
             SandboxSpec(
-                image=self.cfg.image or DEFAULT_IMAGE,
+                image=(self.cfg.image if with_agent else None) or image or DEFAULT_IMAGE,
                 workdir=WORKSPACE_DIR,
-                env={**self.cfg.env, **(env or {})},
+                env={**(self.cfg.env if with_agent else {}), **(env or {})},
                 timeout_seconds=self.cfg.timeout_seconds,
-                network=self.cfg.network,
-                allow_hosts=self.cfg.allow_hosts,
-                extra_tmpfs=[AGENT_DIR],
+                network=self.cfg.network if with_agent else "none",
+                allow_hosts=self.cfg.allow_hosts if with_agent else [],
+                extra_tmpfs=[AGENT_DIR] if with_agent else [],
                 labels={"run": self.ctx.run_id or ""},
             )
         )
         try:
             repo = self._repo_path()
-            if repo is not None:
+            if with_agent and repo is not None:
                 await sandbox.put_dir(repo, AGENT_DIR)
         except BaseException:
             await sandbox.close()
