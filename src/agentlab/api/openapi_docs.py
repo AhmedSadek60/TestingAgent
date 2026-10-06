@@ -637,7 +637,7 @@ contexts: JSONPath of the retrieved passages
 citations: JSONPath of the sources it cited
 events: JSONPath of its event list
 usage: JSONPath of its token usage
-session_id: JSONPath of the conversation id it returned
+session_id: JSONPath of the conversation id the agent assigned, in a JSON answer (not a stream). Later turns of the same conversation send it as {{session_id}} and in session_header
 
 [ReviewOut]
 id: Review id

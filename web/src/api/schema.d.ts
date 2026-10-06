@@ -3873,7 +3873,7 @@ export interface components {
             usage?: string | null;
             /**
              * Session Id
-             * @description JSONPath of the conversation id it returned
+             * @description JSONPath of the conversation id the agent assigned, in a JSON answer (not a stream). Later turns of the same conversation send it as {{session_id}} and in session_header
              */
             session_id?: string | null;
         };

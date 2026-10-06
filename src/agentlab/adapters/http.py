@@ -182,6 +182,12 @@ class AgentApiAdapter(AgentAdapter):
             omit_auth=bool(self.cfg.auth_credential),
         )
         self._client: httpx.AsyncClient | None = None
+        #: AgentLab's session id -> the conversation id the agent assigned (``response.session_id``)
+        self._assigned: dict[str, str] = {}
+
+    def _session_for(self, request: AgentRequest) -> str:
+        """The id the agent knows this conversation by: the one it returned, or AgentLab's own until it returns one."""
+        return self._assigned.get(request.session_id, request.session_id)
 
     async def open(self) -> None:
         if not self.cfg.url:
@@ -217,7 +223,7 @@ class AgentApiAdapter(AgentAdapter):
     def _body(self, request: AgentRequest) -> Any:
         values = {
             "input": request.input,
-            "session_id": request.session_id,
+            "session_id": self._session_for(request),
             "attachments": [a.model_dump() for a in request.attachments],
         }
         if self.cfg.protocol == "graphql":
@@ -244,7 +250,7 @@ class AgentApiAdapter(AgentAdapter):
             await self.open()
         assert self._client is not None
         omit_auth = bool(request.metadata.get("omit_auth"))
-        headers = self._headers(request.session_id, omit_auth=omit_auth, credential=request.credential)
+        headers = self._headers(self._session_for(request), omit_auth=omit_auth, credential=request.credential)
         body = self._body(request)
         url = self.cfg.url
         t0 = time.perf_counter()
@@ -271,7 +277,7 @@ class AgentApiAdapter(AgentAdapter):
                 retries=retries.count,
             )
         latency = (time.perf_counter() - t0) * 1000
-        response = self._to_response(r, latency)
+        response = self._to_response(r, latency, request.session_id)
         response.retries = retries.count
         return response
 
@@ -287,7 +293,7 @@ class AgentApiAdapter(AgentAdapter):
             # a hook on another origin gets headers built for *its* address, so a credential scoped to the agent is
             # refused there (a BLOCKED test) instead of being sent to a host it was never released for
             headers = self._headers(
-                request.session_id,
+                self._session_for(request),
                 omit_auth=bool(request.metadata.get("omit_auth")),
                 credential=request.credential,
                 url=self.cfg.knowledge_endpoint,
@@ -297,7 +303,7 @@ class AgentApiAdapter(AgentAdapter):
             r = await self._client.post(
                 self.cfg.knowledge_endpoint,
                 headers=headers,
-                json={"session_id": request.session_id, "name": name, "text": str(text)},
+                json={"session_id": self._session_for(request), "name": name, "text": str(text)},
             )
             if r.status_code >= 400:
                 raise TargetError(f"the knowledge endpoint refused document '{name}' (HTTP {r.status_code})")
@@ -329,7 +335,7 @@ class AgentApiAdapter(AgentAdapter):
             return r
         raise PolicyBlocked("too many redirects")
 
-    def _to_response(self, r: httpx.Response, latency: float) -> AgentResponse:
+    def _to_response(self, r: httpx.Response, latency: float, session_id: str | None = None) -> AgentResponse:
         if len(r.content) > MAX_BODY:
             return AgentResponse(error="response exceeded size limit", status_code=r.status_code, latency_ms=latency)
         text = r.text
@@ -349,6 +355,10 @@ class AgentApiAdapter(AgentAdapter):
             resp.output = text
             return resp
         self._map(data, resp)
+        if session_id is not None and self.cfg.response.session_id:
+            assigned = jp_first(self.cfg.response.session_id, data)
+            if assigned not in (None, ""):
+                self._assigned[session_id] = str(assigned)
         resp.raw = data if len(text) < 20_000 else None
         if self.cfg.protocol == "graphql" and not resp.output:
             resp.error = self._graphql_error(data)
