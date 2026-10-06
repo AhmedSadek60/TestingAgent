@@ -225,7 +225,6 @@ def test(
             rich_help_panel=RUN,
         ),
     ] = None,
-    seed: Annotated[int, typer.Option("--seed", help="Seed for test generation.", rich_help_panel=RUN)] = 0,
     project: Annotated[
         str, typer.Option("--project", help="Project the run belongs to.", rich_help_panel=RUN)
     ] = "default",
@@ -349,7 +348,6 @@ def test(
         objective=objective,
         requirements=list(requirement or []),
         probe=not no_probe,
-        seed=seed,
         project=project,
         plan_only=plan_only,
         run_id=new_id(),

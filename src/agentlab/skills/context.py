@@ -71,7 +71,6 @@ class SkillContext:
     fixtures_dir: Path | None = None  # writable directory for generated fixture files (attachments)
     doc_paths: dict[str, Path] = field(default_factory=dict)  # document name -> file the user supplied
     previous: list[TestResult] = field(default_factory=list)
-    seed: int = 0
     user_requirements: list[str] = field(default_factory=list)
 
     # ------------------------------------------------------------------ derived knowledge

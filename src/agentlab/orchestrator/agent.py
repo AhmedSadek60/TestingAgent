@@ -498,7 +498,6 @@ class TestOrchestratorAgent:
                 },
                 environment=redact(report.model_dump(mode="json")),
                 options={
-                    "seed": opts.seed,
                     "second_wave": opts.second_wave,
                     "intensity": opts.intensity,
                     "baseline_run_id": opts.baseline_run_id,

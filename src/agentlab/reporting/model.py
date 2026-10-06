@@ -64,7 +64,6 @@ class RunInfo(Model):
     waves: int = 1
     error: str | None = None
     baseline_run_id: str | None = None
-    seed: int | None = None
     complete: bool = True
     incomplete_reason: str | None = None
 

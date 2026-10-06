@@ -45,7 +45,6 @@ class RunOptions:
     objective: str | None = None
     requirements: list[str] = field(default_factory=list)
     probe: bool = True
-    seed: int = 0
     project: str = "default"
     plan_only: bool = False
     run_id: str | None = None

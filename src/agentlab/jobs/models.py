@@ -35,7 +35,6 @@ class JobOptions(Model):
     objective: str | None = Field(default=None, description="What the owner wants to learn")
     requirements: list[str] = Field(default_factory=list, description="Business rules the agent must follow")
     probe: bool = Field(default=True, description="Send harmless discovery probes to the target")
-    seed: int = Field(default=0, description="Seed for test generation")
     baseline_run_id: str | None = Field(default=None, description="Regression: replay the tests of this earlier run")
     only_tests: list[str] = Field(default_factory=list, description="Run just these test ids (or MEM-* patterns)")
     user_tests: list[TestCase] = Field(default_factory=list, description="The person's own test cases")
@@ -100,7 +99,6 @@ class JobSpec(Model):
             objective=o.objective,
             requirements=list(o.requirements),
             probe=o.probe,
-            seed=o.seed,
             project=self.project,
             plan_only=self.kind == "plan",
             run_id=self.run_id,

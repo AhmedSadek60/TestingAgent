@@ -260,7 +260,6 @@ def compare_manifests(base: Mapping[str, Any], current: Mapping[str, Any]) -> li
         "caveat",
         "budgets differ, which can stop tests earlier in one run",
     )
-    add("options.seed", _get(base, "options.seed"), _get(current, "options.seed"), "caveat", "generation seeds differ")
     for key in ("docker", "browser"):
         add(
             f"environment.{key}",

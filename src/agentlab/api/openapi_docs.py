@@ -517,9 +517,9 @@ capabilities: What the model can do: chat, tool_calling, json_schema, multimodal
 
 [MockAgentConfig]
 tools: Names of the tools the mock agent offers
-behaviors: Behaviours to simulate (success, leak, slow, hallucinate, ...)
+behaviors: Behaviours to simulate: success, hallucination, wrong_citation, wrong_tool, wrong_argument, prompt_injection, memory_leakage, excessive_tool_calls, infinite_loop, unsafe_behavior, flaky, slow
 knowledge: Documents the mock agent answers from, by name
-seed: Seed for deterministic behaviour
+seed: A number that makes the mock agent's planted secret unique (MOCK_SECRET_NNNN)
 
 [PlanOut]
 run_id: Id of the plan (it is a run of kind `plan`)

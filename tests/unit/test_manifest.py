@@ -15,7 +15,7 @@ BASE = {
     "skills": [{"name": "rag-testing", "version": "1.0.0", "content_hash": "c1"}],
     "judges": {"enabled": True, "judges": [{"provider": "j", "model": "m"}]},
     "config": {"evaluation": {"repetitions": 1}, "limits": {"max_cost_usd": 10}},
-    "options": {"seed": 0},
+    "options": {"second_wave": True, "intensity": "standard"},
     "environment": {"docker": True, "browser": False},
 }
 
