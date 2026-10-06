@@ -121,16 +121,14 @@ def origin_of(url: str) -> str:
 async def guard_requests(
     context: Any, egress: EgressPolicy, inject_headers: dict[str, dict[str, str]] | None = None
 ) -> list[str]:
-    """Abort every request the egress policy refuses and remember what was refused (the list is returned live)."""
+    """Abort every request the egress policy refuses and remember what was refused (the list is returned live).
+
+    A WebSocket a page opens is a request too: it is closed when the policy refuses its address and passed through when it
+    does not."""
     blocked: list[str] = []
     verdicts: dict[str, str | None] = {}
 
-    async def handler(route: Any) -> None:
-        url = route.request.url
-        scheme = urlparse(url).scheme
-        if scheme in LOCAL_SCHEMES:
-            await route.continue_()
-            return
+    async def verdict(url: str) -> str | None:
         host = urlparse(url).netloc
         if host not in verdicts:
             try:
@@ -138,8 +136,16 @@ async def guard_requests(
                 verdicts[host] = None
             except PolicyBlocked as exc:
                 verdicts[host] = str(exc)
-        if verdicts[host] is not None:
-            blocked.append(f"{url}: {verdicts[host]}")
+        return verdicts[host]
+
+    async def handler(route: Any) -> None:
+        url = route.request.url
+        if urlparse(url).scheme in LOCAL_SCHEMES:
+            await route.continue_()
+            return
+        refused = await verdict(url)
+        if refused is not None:
+            blocked.append(f"{url}: {refused}")
             await route.abort("blockedbyclient")
             return
         extra = (inject_headers or {}).get(origin_of(url))
@@ -148,5 +154,14 @@ async def guard_requests(
         else:
             await route.continue_()
 
+    async def web_socket(ws: Any) -> None:
+        refused = await verdict(ws.url)
+        if refused is not None:
+            blocked.append(f"{ws.url}: {refused}")
+            await ws.close(code=1008, reason="blocked by the egress policy")
+            return
+        ws.connect_to_server()
+
     await context.route("**/*", handler)
+    await context.route_web_socket("**/*", web_socket)
     return blocked

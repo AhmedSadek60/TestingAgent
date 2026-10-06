@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 from agentlab.netserve import serve
@@ -158,7 +158,8 @@ class LocalSite:
             )
 
         @app.post("/cart/add")
-        async def add(sku: str = Form("")) -> Response:
+        async def add(request: Request) -> Response:
+            sku = await _field(request, "sku")
             if sku in PRODUCTS:
                 st.cart.append(PRODUCTS[sku].lower())
             return RedirectResponse("/cart", status_code=303)
@@ -182,7 +183,8 @@ class LocalSite:
             return page("Newsletter", BANNER + form)
 
         @app.post("/newsletter", response_class=HTMLResponse)
-        async def subscribe(email: str = Form("")) -> HTMLResponse:
+        async def subscribe(request: Request) -> HTMLResponse:
+            email = await _field(request, "email")
             st.newsletter.append(email)
             return page("Subscribed", f"<h1>Thanks!</h1><p>{html.escape(email)} is subscribed.</p>")
 
@@ -229,7 +231,8 @@ class LocalSite:
             return page("Log in", _login_form("/login", "Log in"))
 
         @app.post("/login", response_class=HTMLResponse, response_model=None)
-        async def login(request: Request, username: str = Form(""), password: str = Form("")) -> Response:
+        async def login(request: Request) -> Response:
+            username = await _field(request, "username")
             if self._is_offsite(request):
                 st.offsite_credentials += 1
             if self.lookalike:
@@ -247,7 +250,7 @@ class LocalSite:
             )
 
         @app.post("/verify", response_class=HTMLResponse)
-        async def verify(request: Request, username: str = Form(""), password: str = Form("")) -> HTMLResponse:
+        async def verify(request: Request) -> HTMLResponse:
             if self._is_offsite(request):
                 st.offsite_credentials += 1
             return page("Thanks", "<h1>Thanks</h1><p>Verified.</p>")
@@ -257,6 +260,13 @@ class LocalSite:
     def _is_offsite(self, request: Request) -> bool:
         host = (urlparse(str(request.url)).hostname or "").lower()
         return host != self.host
+
+
+async def _field(request: Request, name: str) -> str:
+    """One field of a posted form, or an empty string. Read directly rather than declared with ``Form()``: the site's
+    handlers are tiny, and a declared form field makes FastAPI build a schema for it, which newer pydantic versions warn about."""
+    value = (await request.form()).get(name, "")
+    return value if isinstance(value, str) else ""
 
 
 def _login_form(action: str, label: str) -> str:

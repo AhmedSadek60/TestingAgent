@@ -13,6 +13,7 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import EXIT_INCOMPLETE, console, emit_json, make_services, run_async, state
+from agentlab.cli.markup import esc
 from agentlab.core.errors import UserError
 from agentlab.diagnostics import check_provider, key_status, provider_works
 from agentlab.security.redactor import redact
@@ -45,12 +46,12 @@ def providers_list(
         caps = ", ".join(r["capabilities"]) if isinstance(r["capabilities"], list) else ""
         key = str(r["key"])
         t.add_row(
-            str(r["name"]),
-            str(r["type"]),
-            str(r["base_url"] or "default"),
-            str(r["model"] or "-"),
-            caps or f"[red]{r['configured_error']}[/red]",
-            f"[red]{key}[/red]" if key.startswith(("MISSING", "invalid")) else key,
+            esc(r["name"]),
+            esc(r["type"]),
+            esc(r["base_url"] or "default"),
+            esc(r["model"] or "-"),
+            esc(caps) or f"[red]{esc(r['configured_error'])}[/red]",
+            f"[red]{esc(key)}[/red]" if key.startswith(("MISSING", "invalid")) else esc(key),
             "yes" if r["name"] in judges else "",
         )
     console.print(t)
@@ -85,7 +86,7 @@ def providers_check(
     ok = provider_works(res)
     for k, v in res.items():
         if v is not None:
-            console.print(f"[bold]{k}[/bold] {v}")
+            console.print(f"[bold]{esc(k)}[/bold] {esc(v)}")
     console.print("[green]provider works[/green]" if ok else "[red]provider check failed[/red]")
     if not ok:
         raise typer.Exit(EXIT_INCOMPLETE)
@@ -148,7 +149,7 @@ def models_list(
     t = Table("Provider", "Model", "Context", "Capabilities", box=box.SIMPLE_HEAD)
     for r in rows:
         if r["error"]:
-            t.add_row(r["provider"], f"[dim]{r['error']}[/dim]", "", "")
+            t.add_row(esc(r["provider"]), f"[dim]{esc(r['error'])}[/dim]", "", "")
         else:
-            t.add_row(r["provider"], r["model"], str(r["context"] or ""), ", ".join(r["capabilities"]))
+            t.add_row(esc(r["provider"]), esc(r["model"]), esc(r["context"] or ""), esc(", ".join(r["capabilities"])))
     console.print(t)

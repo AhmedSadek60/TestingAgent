@@ -12,6 +12,7 @@ from rich.table import Table
 
 from agentlab.cli import options as o
 from agentlab.cli.common import console, emit_json, err, fail, load_config, run_async, state
+from agentlab.cli.markup import esc, styled
 from agentlab.cli.targets import build_target
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import UserError
@@ -104,18 +105,18 @@ def skills_list(
         m = s.manifest
         mark = " [red]![/red]" if s.problems else ""
         t.add_row(
-            s.name + mark,
-            m.version,
-            f"[{TRUST_STYLE.get(m.trust, '')}]{m.trust}[/]",
-            m.status,
-            "".join(m.taxonomy) or "-",
-            m.risk_class.value,
-            m.title,
+            esc(s.name) + mark,
+            esc(m.version),
+            styled(m.trust, TRUST_STYLE.get(m.trust)),
+            esc(m.status),
+            esc("".join(m.taxonomy) or "-"),
+            esc(m.risk_class.value),
+            esc(m.title),
         )
     console.print(t)
     console.print(f"[dim]{len(skills)} skills. `agentlab skills show NAME` explains one.[/dim]")
     for p in reg.problems:
-        console.print(f"[yellow]problem[/yellow] {p}")
+        console.print(f"[yellow]problem[/yellow] {esc(p)}")
 
 
 @skills_app.command("show")
@@ -132,10 +133,10 @@ def skills_show(
         return
     m = skill.manifest
     console.print(
-        f"[bold]{m.title}[/bold]  [dim]{m.name} {m.version} · {m.trust} · {m.status} · risk {m.risk_class.value} · "
-        f"hash {skill.content_hash[:12]}[/dim]"
+        f"[bold]{esc(m.title)}[/bold]  [dim]{esc(m.name)} {esc(m.version)} · {esc(m.trust)} · {esc(m.status)} · "
+        f"risk {m.risk_class.value} · hash {skill.content_hash[:12]}[/dim]"
     )
-    console.print(m.description)
+    console.print(esc(m.description))
     a = m.applicability
     applies = [
         *(["every target"] if a.always else []),
@@ -144,7 +145,9 @@ def skills_show(
         *(f"interface {i}" for i in a.interfaces),
         *(f"tools matching {p}" for p in a.tool_patterns),
     ]
-    console.print("[bold]Applies to[/bold] " + (", ".join(applies) or "nothing by itself (select it with --skills)"))
+    console.print(
+        "[bold]Applies to[/bold] " + (esc(", ".join(applies)) or "nothing by itself (select it with --skills)")
+    )
     needs = [
         n
         for n, on in (
@@ -160,9 +163,9 @@ def skills_show(
     if m.limitations:
         console.print("[bold]Limitations[/bold]")
         for line in m.limitations:
-            console.print(f"  - {line}")
+            console.print(f"  - {esc(line)}")
     for p in skill.problems:
-        console.print(f"[red]problem[/red] {p}")
+        console.print(f"[red]problem[/red] {esc(p)}")
     if skill.doc:
         console.print(Markdown(skill.doc))
 
@@ -184,11 +187,11 @@ def skills_validate(
         skill = load_skill_dir(d, trust="local")
         if skill.problems:
             bad += 1
-            console.print(f"[red]x[/red] {d.name}")
+            console.print(f"[red]x[/red] {esc(d.name)}")
             for p in skill.problems:
-                console.print(f"    {p}")
+                console.print(f"    {esc(p)}")
         else:
-            console.print(f"[green]ok[/green] {skill.name} {skill.version} ({skill.content_hash[:12]})")
+            console.print(f"[green]ok[/green] {esc(skill.name)} {esc(skill.version)} ({skill.content_hash[:12]})")
     if bad:
         raise typer.Exit(2)
 
@@ -264,11 +267,11 @@ def skills_new(
     (dest / "SKILL.md").write_text(f"# {name.replace('-', ' ').title()}\n\n{body}", encoding="utf-8")
     problems = load_skill_dir(dest, trust="local").problems
     console.print(
-        f"created [bold]{dest}[/bold]" + (f" [yellow]({len(problems)} problem(s))[/yellow]" if problems else "")
+        f"created [bold]{esc(dest)}[/bold]" + (f" [yellow]({len(problems)} problem(s))[/yellow]" if problems else "")
     )
     if str(dest.parent.resolve()) not in {str((base / d).resolve()) for d in cfg.skill_dirs}:
-        console.print(f"[yellow]add `{dest.parent}` to skill_dirs in agentlab.yaml so AgentLab loads it[/yellow]")
-    console.print(f"edit it, then `agentlab skills validate {dest}` and `agentlab test --skills {name} ...`")
+        console.print(f"[yellow]add `{esc(dest.parent)}` to skill_dirs in agentlab.yaml so AgentLab loads it[/yellow]")
+    console.print(f"edit it, then `agentlab skills validate {esc(dest)}` and `agentlab test --skills {esc(name)} ...`")
 
 
 @skills_app.command("import")
@@ -283,13 +286,15 @@ def skills_import(
     report = import_skill(source, to or drafts_dir(cfg, base), name=name)
     if report.blocked:
         raise fail(f"nothing imported: {report.block_reason}")
-    console.print(f"imported [bold]{report.name}[/bold] -> {report.destination} (license: {report.license})")
+    console.print(
+        f"imported [bold]{esc(report.name)}[/bold] -> {esc(report.destination)} (license: {esc(report.license)})"
+    )
     console.print(
         "[yellow]This is an untrusted draft.[/yellow] It is never selected until a human adapts it and runs "
-        f"`agentlab skills promote {report.destination} --reviewer YOU`."
+        f"`agentlab skills promote {esc(report.destination)} --reviewer YOU`."
     )
     for w in report.warnings:
-        console.print(f"[yellow]warning[/yellow] {w}")
+        console.print(f"[yellow]warning[/yellow] {esc(w)}")
 
 
 @skills_app.command("forge")
@@ -364,7 +369,7 @@ def skills_forge(
         console.print("every detected capability is already covered by an installed skill; nothing to forge")
         return
     for d in made:
-        console.print(f"drafted [bold]{d.name}[/bold] -> {d}")
+        console.print(f"drafted [bold]{esc(d.name)}[/bold] -> {esc(d)}")
     err.print("[yellow]Generated drafts only cover a smoke check and are never selected until promoted.[/yellow]")
 
 
@@ -378,6 +383,6 @@ def skills_promote(
     """Move a reviewed draft into the local skills folder, where AgentLab can select it."""
     cfg, base = load_config(state(ctx))
     dest = promote_skill(draft, to or local_dir(cfg, base), reviewer=reviewer)
-    console.print(f"promoted -> {dest}")
+    console.print(f"promoted -> {esc(dest)}")
     if not cfg.skill_dirs:
         console.print("[yellow]add the folder to skill_dirs in agentlab.yaml so AgentLab loads it[/yellow]")

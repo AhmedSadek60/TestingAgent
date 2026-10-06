@@ -9,7 +9,8 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import console, emit_json, make_services, state
-from agentlab.cli.render import SEV_STYLE, STATUS_STYLE, render_outcome, render_plan, short
+from agentlab.cli.markup import esc, short, styled
+from agentlab.cli.render import SEV_STYLE, STATUS_STYLE, render_outcome, render_plan
 from agentlab.core.errors import UserError
 from agentlab.orchestrator.load import load_outcome
 from agentlab.services import Services
@@ -61,13 +62,15 @@ def runs_list(
         grade = str(tot.get("grade") or "")
         qualified = qualified or "(" in grade
         t.add_row(
-            str(r["id"])[:8],
-            str(r["manifest"].get("target", {}).get("name") or ""),
-            str(r["mode"]),
-            f"[{STATUS_STYLE.get(status, '')}]{status}[/]" if status in STATUS_STYLE else status,
-            str(tot.get("tests", tot.get("runnable", ""))),
-            str(tot.get("findings", "")),
-            "" if score is None else f"{score:.0f} {grade.split()[0] if grade else ''}{'*' if '(' in grade else ''}",
+            esc(str(r["id"])[:8]),
+            esc(r["manifest"].get("target", {}).get("name") or ""),
+            esc(r["mode"]),
+            styled(status, STATUS_STYLE.get(status)),
+            esc(tot.get("tests", tot.get("runnable", ""))),
+            esc(tot.get("findings", "")),
+            ""
+            if score is None
+            else esc(f"{score:.0f} {grade.split()[0] if grade else ''}{'*' if '(' in grade else ''}"),
         )
     console.print(t)
     if qualified:
@@ -106,11 +109,10 @@ def runs_show(
         t = Table("Test", "Category", "Status", "Score", "Why / reason", box=box.SIMPLE_HEAD, title="Tests")
         t.columns[0].no_wrap = True
         for r in outcome.results:
-            style = STATUS_STYLE.get(r.status.value, "")
             t.add_row(
-                r.test_id,
-                r.category,
-                f"[{style}]{r.status.value}[/]",
+                esc(r.test_id),
+                esc(r.category),
+                styled(r.status.value, STATUS_STYLE.get(r.status.value)),
                 f"{r.score:.2f}",
                 short(r.blocked_reason or r.test_name, 70),
             )
@@ -140,10 +142,10 @@ def _show_finding(f: object) -> None:
 
     assert isinstance(f, Finding)
     sev = f.severity.value
-    console.print(f"[{SEV_STYLE[sev]}]{sev.upper()}[/] [bold]{f.title}[/bold]")
+    console.print(f"{styled(sev.upper(), SEV_STYLE[sev])} [bold]{esc(f.title)}[/bold]")
     console.print(
-        f"test {f.test_id} · category {f.category} · confidence {f.confidence:.2f} · "
-        f"likely cause {f.root_cause.value.replace('_', ' ')} ({f.root_cause_confidence:.2f}) · {f.fact_kind}"
+        f"test {esc(f.test_id)} · category {esc(f.category)} · confidence {f.confidence:.2f} · "
+        f"likely cause {esc(f.root_cause.value.replace('_', ' '))} ({f.root_cause_confidence:.2f}) · {esc(f.fact_kind)}"
     )
     for label, text in (
         ("Expected", f.expected),
@@ -152,14 +154,14 @@ def _show_finding(f: object) -> None:
         ("Reproduction", f.reproduction),
         ("Recommendation", f.recommendation),
     ):
-        console.print(f"[bold]{label}[/bold] {text}")
+        console.print(f"[bold]{label}[/bold] {esc(text)}")
     for label, items in (("Facts", f.facts), ("Inferences", f.inferences), ("Judgments", f.judgments)):
         if items:
             console.print(f"[bold]{label}[/bold]")
             for i in items:
                 console.print(f"  - {short(i, 200)}")
     if f.evidence:
-        console.print("[bold]Evidence[/bold] " + ", ".join(f.evidence[:10]))
+        console.print("[bold]Evidence[/bold] " + esc(", ".join(f.evidence[:10])))
 
 
 def _close(services: Services) -> None:

@@ -4,7 +4,13 @@ Needs Playwright and a Chromium build (marker ``browser``)."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import base64
+import contextlib
+import hashlib
+import re
+import socketserver
+import threading
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +105,93 @@ async def test_private_networks_can_be_forbidden_for_the_browser_as_for_everythi
         await s.close()
     finally:
         await strict.aclose()
+
+
+class EchoSocket(socketserver.BaseRequestHandler):
+    """Just enough of a WebSocket server (RFC 6455) to accept one connection, answer one text message and close. The
+    server of the API cannot serve WebSockets without an optional library, and a test of the browser should not need one."""
+
+    def handle(self) -> None:
+        request = b""
+        while b"\r\n\r\n" not in request:
+            chunk = self.request.recv(4096)
+            if not chunk:
+                return
+            request += chunk
+        key = re.search(rb"Sec-WebSocket-Key: (\S+)", request, re.I)
+        assert key is not None
+        accept = base64.b64encode(hashlib.sha1(key.group(1) + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest())
+        self.request.sendall(
+            b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            b"Sec-WebSocket-Accept: " + accept + b"\r\n\r\n"
+        )
+        head = self._read(2)
+        length, mask = head[1] & 0x7F, self._read(4)
+        text = bytes(b ^ mask[i % 4] for i, b in enumerate(self._read(length)))
+        reply = b"echo:" + text
+        self.request.sendall(bytes([0x81, len(reply)]) + reply + bytes([0x88, 0]))
+
+    def _read(self, n: int) -> bytes:
+        data = b""
+        while len(data) < n:
+            chunk = self.request.recv(n - len(data))
+            if not chunk:
+                raise ConnectionError("closed")
+            data += chunk
+        return data
+
+
+@contextlib.contextmanager
+def echo_socket() -> Iterator[int]:
+    server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), EchoSocket)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield server.server_address[1]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def socket_page(url: str) -> FastAPI:
+    """A page that opens a WebSocket to ``url`` and shows in the page what became of it."""
+    app = FastAPI()
+
+    @app.get("/page", response_class=HTMLResponse)
+    async def page() -> str:
+        return (
+            "<p id=out>waiting</p><script>const out = document.getElementById('out');"
+            f"const ws = new WebSocket('{url}');"
+            "ws.onopen = () => ws.send('hello'); ws.onmessage = (e) => { out.textContent = e.data; };"
+            "ws.onerror = () => { out.textContent = 'error'; };"
+            "ws.onclose = () => { if (out.textContent === 'waiting') out.textContent = 'closed'; };</script>"
+        )
+
+    return app
+
+
+async def test_a_websocket_the_page_opens_works_when_the_policy_allows_its_address(pool: BrowserPool) -> None:
+    """A chat page that streams over a WebSocket must keep working: the guard passes an allowed connection through."""
+    with echo_socket() as port, serve(socket_page(f"ws://127.0.0.1:{port}/")) as target:
+        s = await new_session(pool)
+        out = await s.run_step(step("goto", value=target.url + "/page"))
+        assert out.ok
+        await s.page.wait_for_function("document.getElementById('out').textContent !== 'waiting'", timeout=4000)
+        assert await s.page.text_content("#out") == "echo:hello"
+        assert s.blocked_requests == []
+        await s.close()
+
+
+async def test_a_websocket_to_a_forbidden_address_is_refused_and_recorded_like_any_request(pool: BrowserPool) -> None:
+    """Playwright's ``route`` does not see WebSockets, so without their own guard a page could open one to an address the
+    policy forbids, and nothing would say so."""
+    with serve(socket_page("ws://169.254.169.254/ws")) as target:
+        s = await new_session(pool)
+        await s.run_step(step("goto", value=target.url + "/page"))
+        await s.page.wait_for_function("document.getElementById('out').textContent !== 'waiting'", timeout=4000)
+        assert any("169.254.169.254" in b for b in s.blocked_requests), s.blocked_requests
+        assert s.state()["blocked_requests"] >= 1
+        await s.close()
 
 
 # --------------------------------------------------------------------------------------------------------- credentials

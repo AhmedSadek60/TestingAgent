@@ -14,6 +14,7 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import console, emit_json, make_services, run_async, state
+from agentlab.cli.markup import esc
 from agentlab.diagnostics import Check, Level, run_checks
 
 MARK: dict[Level, str] = {
@@ -49,7 +50,7 @@ def doctor(
     else:
         t = Table("", "Check", "Result", box=box.SIMPLE_HEAD)
         for c in checks:
-            t.add_row(MARK[c.level], c.name, c.detail + (f"\n[dim]-> {c.fix}[/dim]" if c.fix else ""))
+            t.add_row(MARK[c.level], esc(c.name), esc(c.detail) + (f"\n[dim]-> {esc(c.fix)}[/dim]" if c.fix else ""))
         console.print(t)
         warns = sum(c.level == "warn" for c in checks)
         console.print(

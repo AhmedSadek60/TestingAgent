@@ -17,6 +17,7 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import console, emit_json, make_services, run_async, state
+from agentlab.cli.markup import esc
 from agentlab.core.errors import UserError
 from agentlab.security.credentials import CredentialKind, CredentialProfile
 
@@ -47,10 +48,10 @@ def credentials_list(
     t = Table("Name", "Kind", "Scope (hosts)", "Fields", "Expires", "Version", box=box.SIMPLE_HEAD)
     for r in rows:
         t.add_row(
-            r["name"],
-            r["kind"],
-            ", ".join(r.get("scopes") or []) or "[yellow]any host[/yellow]",
-            ", ".join(r.get("fields") or []) or "stored encrypted",
+            esc(r["name"]),
+            esc(r["kind"]),
+            esc(", ".join(r.get("scopes") or [])) or "[yellow]any host[/yellow]",
+            esc(", ".join(r.get("fields") or [])) or "stored encrypted",
             str(r.get("expires_at") or "-"),
             str(r.get("secret_version")),
         )
@@ -121,8 +122,10 @@ def credentials_add(
     finally:
         run_async(services.aclose())
     where = "references environment variables only" if references and not secrets else "stored encrypted"
-    console.print(f"credential [bold]{name}[/bold] ({kind}) {where}; scope: {', '.join(scope or []) or 'any host'}")
-    console.print(f"use it with `agentlab test --credentials {name} ...`")
+    console.print(
+        f"credential [bold]{esc(name)}[/bold] ({esc(kind)}) {where}; scope: {esc(', '.join(scope or []) or 'any host')}"
+    )
+    console.print(f"use it with `agentlab test --credentials {esc(name)} ...`")
 
 
 def _collect_secrets(
@@ -189,4 +192,4 @@ def credentials_remove(
         services.credentials.remove(name)
     finally:
         run_async(services.aclose())
-    console.print(f"removed {name}")
+    console.print(f"removed {esc(name)}")

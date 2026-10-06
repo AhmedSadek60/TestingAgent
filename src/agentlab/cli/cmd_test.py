@@ -25,6 +25,7 @@ from agentlab.cli.common import (
     run_async,
     state,
 )
+from agentlab.cli.markup import esc
 from agentlab.cli.progress import ProgressPrinter
 from agentlab.cli.render import render_outcome, render_plan, render_profile
 from agentlab.cli.targets import build_target
@@ -122,7 +123,7 @@ def discover(
         return
     render_profile(console, profile, result.warnings)
     if save:
-        console.print(f"[dim]profile written to {save}[/dim]")
+        console.print(f"[dim]profile written to {esc(save)}[/dim]")
 
 
 async def _discover(services: Services, spec: TargetSpec, *, probe: bool) -> DiscoveryResult:
@@ -450,14 +451,14 @@ async def _after_prepare(orch: TestOrchestratorAgent, prepared: PreparedRun, opt
         if flags.as_json:
             emit_json({"run_id": prepared.run_id, "plan": plan.model_dump(mode="json"), "warnings": prepared.warnings})
         else:
-            console.print(f"[dim]plan stored with run {prepared.run_id}; nothing was run against the target[/dim]")
+            console.print(f"[dim]plan stored with run {esc(prepared.run_id)}; nothing was run against the target[/dim]")
         return EXIT_OK if plan.counts()["runnable"] else EXIT_NOT_TESTED
     if flags.confirm:
         if not sys.stdin.isatty():
             raise UserError("--confirm needs an interactive terminal; use --plan-only to review a plan, then run it")
         if not typer.confirm("Run this plan against the target?", default=False):
             orch.finish_plan_only(prepared)
-            console.print(f"[yellow]not run[/yellow] (the plan is stored with run {prepared.run_id})")
+            console.print(f"[yellow]not run[/yellow] (the plan is stored with run {esc(prepared.run_id)})")
             return EXIT_OK
     outcome = await orch.execute(prepared, cancel=orch.token_for(prepared.run_id))
     if flags.as_json:

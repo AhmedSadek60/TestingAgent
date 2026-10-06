@@ -222,7 +222,7 @@ ordinary target error.
 The policy is applied when an adapter opens, to the OpenAPI document, the knowledge endpoint and the MCP endpoint, to
 **every hop of a redirect** (at most three are followed, by AgentLab and not by the HTTP client), to a repository URL
 before anything is fetched (only `https` is accepted; `git@` addresses are refused), and to **every request a browser page
-makes**, which is aborted when refused and reported. A target that is in a forbidden network is refused before a single
+makes**, WebSockets included, which is aborted (or closed) when refused and reported. A target that is in a forbidden network is refused before a single
 request is made.
 
 A redirect to another origin also drops the credential and every header the owner configured; only `Content-Type` and
