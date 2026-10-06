@@ -118,6 +118,25 @@ def test_skills_list_show_new_validate(project: Path) -> None:
     assert bad.exit_code == 2 and "invalid manifest" in bad.stdout
 
 
+def test_skills_validate_rejects_tests_that_could_never_run_and_accepts_the_ones_that_do(project: Path) -> None:
+    """A skill whose assertions are written ``{type: contains, value: x}`` used to validate as "ok" and then yield no tests."""
+    assert run("skills", "new", "refund-policy").exit_code == 0
+    manifest = project / "skills" / "refund-policy" / "skill.yaml"
+    text = manifest.read_text(encoding="utf-8")
+    assert "- {type: not_empty}" in text
+    manifest.write_text(text.replace("- {type: not_empty}", '- {type: contains, value: "30"}'), encoding="utf-8")
+    bad = run("skills", "validate", str(manifest.parent))
+    assert bad.exit_code == 2 and "params" in bad.stdout, bad.stdout
+    manifest.write_text(
+        text.replace("- {type: not_empty}", '- {type: contains, params: {value: "30"}}'), encoding="utf-8"
+    )
+    assert run("skills", "validate", str(manifest.parent)).exit_code == 0
+    plan = run(
+        "test", "--mock", "success", "--skills", "refund-policy", "--suite", "functional", "--plan-only", "--no-probe"
+    )
+    assert plan.exit_code == 0 and "1 tests from 1 skills" in plan.stdout, plan.stdout
+
+
 def test_imported_skill_is_an_untrusted_draft_that_cannot_be_promoted_unreviewed(project: Path) -> None:
     src = project / "third-party.md"
     src.write_text(

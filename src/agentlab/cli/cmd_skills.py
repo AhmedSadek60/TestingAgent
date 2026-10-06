@@ -16,6 +16,7 @@ from agentlab.cli.common import console, emit_json, err, fail, load_config, run_
 from agentlab.cli.targets import build_target
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import UserError
+from agentlab.services import load_plugin_modules
 from agentlab.skills import SkillRegistry
 from agentlab.skills.forge import forge_skill, suggest_methodology, uncovered_capabilities
 from agentlab.skills.importer import import_skill, promote_skill
@@ -168,9 +169,13 @@ def skills_show(
 
 @skills_app.command("validate")
 def skills_validate(
+    ctx: typer.Context,
     path: Annotated[Path, typer.Argument(help="A skill directory, or a folder of skill directories.")],
 ) -> None:
-    """Check skills for problems the loader would reject (manifest, required SKILL.md sections, templates)."""
+    """Check skills for problems the loader would reject: the manifest, SKILL.md, and every test a template describes."""
+    cfg, _ = load_config(state(ctx))
+    for warning in load_plugin_modules(cfg.plugins):  # plug-ins may add assertion kinds a skill uses
+        err.print(f"warning: {warning}", markup=False)
     dirs = discover_skill_dirs(path)
     if not dirs:
         raise UserError(f"no skill (a folder with skill.yaml) found under {path}")
