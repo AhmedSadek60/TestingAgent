@@ -79,7 +79,12 @@ def discover(
     objective: o.Objective = None,
     credentials: o.Credentials = None,
     no_probe: Annotated[
-        bool, typer.Option("--no-probe", help="Do not contact the target; analyse the files you gave only.")
+        bool,
+        typer.Option(
+            "--no-probe",
+            help="Send the target no probe questions. An MCP server's tool list and a web page are still read, "
+            "because that is how those are discovered.",
+        ),
     ] = False,
     save: Annotated[Path | None, typer.Option("--save", help="Also write the profile as JSON to this file.")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Print the profile as JSON.")] = False,
@@ -211,7 +216,12 @@ def test(
         bool, typer.Option("--no-judge", help="Deterministic checks only; no LLM judge.", rich_help_panel=RUN)
     ] = False,
     no_probe: Annotated[
-        bool, typer.Option("--no-probe", help="Do not send discovery probes to the target.", rich_help_panel=RUN)
+        bool,
+        typer.Option(
+            "--no-probe",
+            help="Do not send discovery probes (questions) to the target. Its reachability is still checked.",
+            rich_help_panel=RUN,
+        ),
     ] = False,
     baseline: Annotated[
         str | None,

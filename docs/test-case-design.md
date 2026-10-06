@@ -9,8 +9,9 @@ run, and can be read before it runs.
 $ agentlab test --mock success --suite functional --plan-only --plan-detail --no-probe
 ```
 
-`--plan-only` designs and shows the plan and sends nothing but harmless probes (`--no-probe` sends nothing at all);
-`--plan-detail` lists every test; `--plan-output plan.md` (or `.json`) writes it to a file; `--confirm` shows it and
+`--plan-only` designs and shows the plan and runs no test: it sends the target only harmless discovery probes and one
+reachability check per interface (an `OPTIONS` or `HEAD` request; the plan says so when one cannot be reached);
+`--no-probe` leaves the probe questions out. `--plan-detail` lists every test; `--plan-output plan.md` (or `.json`) writes it to a file; `--confirm` shows it and
 asks before running; `agentlab runs plan RUN` shows the plan a finished run used.
 
 ## The taxonomy
