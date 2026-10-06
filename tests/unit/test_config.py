@@ -90,3 +90,10 @@ def test_the_database_url_can_come_from_the_environment_so_its_password_stays_ou
     assert AgentLabConfig.load().storage.database_url == url, "also with no file at all"
     monkeypatch.delenv("AGENTLAB_DATABASE_URL")
     assert AgentLabConfig.load().storage.database_url == "sqlite:///.agentlab/agentlab.db"
+
+
+def test_running_untrusted_code_outside_a_sandbox_cannot_be_switched_on(tmp_path: Path) -> None:
+    """The setting used to be read by nothing, so `false` did nothing while looking like a choice."""
+    assert AgentLabConfig.load(write(tmp_path, "security:\n  sandbox_required: true\n")).security.sandbox_required
+    with pytest.raises(UserError, match=r"(?s)sandbox_required cannot be false.*never runs untrusted code"):
+        AgentLabConfig.load(write(tmp_path, "security:\n  sandbox_required: false\n"))

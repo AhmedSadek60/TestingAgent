@@ -82,13 +82,28 @@ class SandboxConfig(Model):
 
 
 class SecurityConfig(Model):
-    sandbox_required: bool = True
+    sandbox_required: bool = Field(
+        default=True,
+        description="Repositories, coding agents and MCP servers started by a command run only inside a sandbox. This "
+        "cannot be turned off, so false is refused: when Docker is unavailable the tests that need it are blocked, "
+        "never run on this machine",
+    )
     allow_production_targets: bool = False
     block_metadata_endpoints: bool = True
     allow_private_networks: bool = True
     custom_secret_patterns: list[str] = Field(default_factory=list)
     canary_prefix: str = "AGENTLAB_CANARY"
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
+
+    @field_validator("sandbox_required")
+    @classmethod
+    def _never_off(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError(
+                "security.sandbox_required cannot be false: AgentLab never runs untrusted code outside a sandbox. "
+                "Without Docker, the tests that need it are blocked"
+            )
+        return value
 
 
 class BrowserConfig(Model):
