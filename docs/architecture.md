@@ -159,7 +159,7 @@ so the interface needs no CORS and holds its API token only in the tab's session
   as `failed` after `queue.worker_timeout_seconds`. Cancellation is cooperative and stops at a safe point.
 * **Interface:** React 19, TypeScript, Vite, react-router (hash routing). The server's types are generated from
   its OpenAPI document. Text that came from an agent is rendered as text only; reports are shown in a sandboxed
-  frame from a short-lived signed link. See [security.md](security.md#web-interface).
+  frame from a short-lived signed link. See [security.md](security.md#web-interface-and-api).
 
 ## Extension points
 

@@ -14,7 +14,7 @@ promise. To report a vulnerability *in AgentLab*, see [SECURITY.md](../SECURITY.
 * [Untrusted content and the evaluator](#untrusted-content-and-the-evaluator)
 * [Repositories, archives and documents](#repositories-archives-and-documents)
 * [Sandbox](#sandbox)
-* [Web interface and API](#web-interface)
+* [Web interface and API](#web-interface-and-api)
 * [Evidence and restricted artifacts](#evidence-and-restricted-artifacts)
 * [What this does not promise](#what-this-does-not-promise)
 
@@ -25,7 +25,7 @@ promise. To report a vulnerability *in AgentLab*, see [SECURITY.md](../SECURITY.
 | The **target** and its owner | AgentLab attacking a system nobody agreed to test, or damaging one that was agreed | The [authorization gate](#the-authorization-gate); [canary-based](#canaries) tests that use made-up values; limits on cost, steps and time ([configuration.md](configuration.md#limits)) |
 | The **evaluator** (AgentLab and the machine it runs on) | Text, code or documents from the target that try to steer or attack it | [Fences around untrusted content](#untrusted-content-and-the-evaluator); deterministic checks outrank the judge; [safe ingestion](#repositories-archives-and-documents); the [sandbox](#sandbox); the [egress policy](#network-egress) |
 | **Secrets** | Ending up in a trace, report, log or database row | An [encrypted, host-scoped store](#credentials); [redaction](#redaction) before anything is written; [restricted artifacts](#evidence-and-restricted-artifacts) |
-| AgentLab's **server** | A caller (or a web page in a caller's browser) making it send requests, start containers or read files | [Token, host and origin checks, confined paths, signed report links](#web-interface) |
+| AgentLab's **server** | A caller (or a web page in a caller's browser) making it send requests, start containers or read files | [Token, host and origin checks, confined paths, signed report links](#web-interface-and-api) |
 
 Every control below names the test that exercises it. Those tests live in `tests/security/` and `tests/api/`; the ones that
 need Docker are marked `docker` and are skipped, not faked, where Docker is absent
@@ -345,7 +345,7 @@ a target (its replies, tool results, retrieved documents, repository files, web 
   imported skill is only ever an untrusted draft and is never selected until a person has reviewed and promoted it
   ([skills.md](skills.md#trust-and-where-skills-come-from)).
 * **Reports escape what an agent said.** HTML reports escape agent text, and the web interface renders it as text, never
-  as markup ([Web interface and API](#web-interface)).
+  as markup ([Web interface and API](#web-interface-and-api)).
 
 Content sent to a hosted model provider leaves your machine. When a judge or a model-suggested test design is on, the fenced
 and redacted excerpts of what the target said go to that provider; use a local provider (Ollama, LM Studio, vLLM or

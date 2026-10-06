@@ -72,7 +72,7 @@ agentlab serve --host 0.0.0.0                            # with server.token_ref
 ```
 
 The interface asks for the token when it opens. There is no TLS in AgentLab: put a reverse proxy in front of it
-before you expose it ([security.md](security.md#web-interface)).
+before you expose it ([security.md](security.md#web-interface-and-api)).
 
 ## Configuration
 
