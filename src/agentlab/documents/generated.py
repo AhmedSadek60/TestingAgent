@@ -25,6 +25,7 @@ import io
 import random
 import re
 import struct
+import zipfile
 import zlib
 from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -228,6 +229,22 @@ def text_pdf(text: str) -> bytes:
     return buf.getvalue()
 
 
+#: A Word file is a zip archive, and zip stamps every member with the time it was written. Stamping them all the same makes
+#: the same reference give the same bytes, whatever the time is, which is what "deterministic" has to mean here.
+FIXED_ZIP_TIME = (2000, 1, 1, 0, 0, 0)
+
+
+def _stable_zip(data: bytes) -> bytes:
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
+        for info in source.infolist():
+            member = zipfile.ZipInfo(info.filename, date_time=FIXED_ZIP_TIME)
+            member.compress_type = zipfile.ZIP_DEFLATED
+            member.external_attr = info.external_attr
+            target.writestr(member, source.read(info.filename))
+    return out.getvalue()
+
+
 def text_docx(text: str) -> bytes:
     import docx
 
@@ -236,7 +253,7 @@ def text_docx(text: str) -> bytes:
         document.add_paragraph(paragraph)
     buf = io.BytesIO()
     document.save(buf)
-    return buf.getvalue()
+    return _stable_zip(buf.getvalue())
 
 
 # ----------------------------------------------------------------------------------------------------- the recipes

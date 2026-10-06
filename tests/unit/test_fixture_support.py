@@ -34,6 +34,19 @@ def test_generated_attachments_are_deterministic() -> None:
         assert is_generated(ref)
 
 
+def test_generated_documents_do_not_depend_on_the_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Word file is a zip archive that stamps its members with the time. The same reference must still give the same
+    bytes, or a test that compares two generations fails whenever a second ticks over between them."""
+    import time
+
+    ref = "gen://docx/text?text=Hello"
+    monkeypatch.setattr(time, "time", lambda: 1_000_000_000.0)
+    morning = generate(ref).data
+    monkeypatch.setattr(time, "time", lambda: 1_000_086_400.0)
+    next_day = generate(ref).data
+    assert morning == next_day
+
+
 def test_unknown_recipes_and_other_schemes_are_refused() -> None:
     with pytest.raises(ValueError, match="unknown gen:// recipe"):
         generate("gen://png/unicorn")
