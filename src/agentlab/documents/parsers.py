@@ -23,6 +23,7 @@ import yaml
 from agentlab.core.errors import ParserError
 from agentlab.core.plugins import Registry
 from agentlab.documents.models import Heading, TableData
+from agentlab.security import safeyaml
 
 MAX_CHARS = 2_000_000
 
@@ -98,7 +99,9 @@ def parse_markdown(data: bytes, name: str) -> Parsed:
         end = body.find("\n---", 3)
         if end > 0:
             try:
-                out.metadata = yaml.safe_load(body[3:end]) or {}
+                out.metadata = safeyaml.load(body[3:end]) or {}
+            except safeyaml.YamlRefused as exc:
+                out.warnings.append(f"front matter was not read: {exc}")
             except yaml.YAMLError:
                 pass
             body = body[end + 4 :]
@@ -188,16 +191,30 @@ def parse_csv(data: bytes, name: str) -> Parsed:
     return out
 
 
-def _flatten(node: Any, path: str = "") -> list[tuple[str, str]]:
+def _flatten(
+    root: Any, *, max_items: int = 3000, max_visits: int = 100_000, max_depth: int = 40
+) -> list[tuple[str, str]]:
+    """``(path, value)`` pairs for the leaves of a parsed JSON or YAML value, in document order.
+
+    The walk is bounded in the number of values it visits and the depth it descends, so a document that is small on disk
+    and enormous in memory costs a fixed amount of work; whatever lies past the bounds is left out."""
     out: list[tuple[str, str]] = []
-    if isinstance(node, dict):
-        for k, v in node.items():
-            out += _flatten(v, f"{path}.{k}" if path else str(k))
-    elif isinstance(node, list):
-        for i, v in enumerate(node[:500]):
-            out += _flatten(v, f"{path}[{i}]")
-    else:
-        out.append((path, str(node)))
+    stack: list[tuple[Any, str, int]] = [(root, "", 0)]
+    visits = 0
+    while stack and len(out) < max_items and visits < max_visits:
+        node, path, depth = stack.pop()
+        visits += 1
+        if isinstance(node, dict | list):
+            if depth >= max_depth:
+                out.append((path, "(nested too deeply to read)"))
+                continue
+            if isinstance(node, dict):
+                children = [(v, f"{path}.{k}" if path else str(k), depth + 1) for k, v in node.items()]
+            else:
+                children = [(v, f"{path}[{i}]", depth + 1) for i, v in enumerate(node[:500])]
+            stack.extend(reversed(children))
+        else:
+            out.append((path, str(node)))
     return out
 
 
@@ -205,8 +222,8 @@ def _flatten(node: Any, path: str = "") -> list[tuple[str, str]]:
 def parse_json(data: bytes, name: str) -> Parsed:
     try:
         obj = json.loads(_decode(data))
-    except ValueError as exc:
-        raise ParserError(f"{name}: invalid JSON ({exc})") from exc
+    except (ValueError, RecursionError) as exc:
+        raise ParserError(f"{name}: invalid JSON ({type(exc).__name__}: {str(exc)[:120]})") from exc
     out = Parsed(metadata={"top_level": type(obj).__name__})
     for path, val in _flatten(obj)[:3000]:
         if len(val) > 3:
@@ -217,7 +234,9 @@ def parse_json(data: bytes, name: str) -> Parsed:
 @register(".yaml", ".yml")
 def parse_yaml(data: bytes, name: str) -> Parsed:
     try:
-        obj = yaml.safe_load(_decode(data))
+        obj = safeyaml.load(_decode(data))
+    except safeyaml.YamlRefused as exc:
+        raise ParserError(f"{name}: not read ({exc})") from exc
     except yaml.YAMLError as exc:
         raise ParserError(f"{name}: invalid YAML ({exc})") from exc
     out = Parsed(metadata={"top_level": type(obj).__name__})

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-import yaml
 from rich import box
 from rich.markdown import Markdown
 from rich.table import Table
@@ -16,6 +15,7 @@ from agentlab.cli.common import console, emit_json, err, fail, load_config, run_
 from agentlab.cli.targets import build_target
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import UserError
+from agentlab.security import safeyaml
 from agentlab.services import load_plugin_modules
 from agentlab.skills import SkillRegistry
 from agentlab.skills.forge import forge_skill, suggest_methodology, uncovered_capabilities
@@ -62,7 +62,7 @@ def _registry(ctx: typer.Context, *, with_drafts: bool = False) -> tuple[SkillRe
 
 def _draft_trust(path: Path) -> str:
     try:
-        origin = (yaml.safe_load((path / "skill.yaml").read_text(encoding="utf-8")) or {}).get("provenance", {})
+        origin = (safeyaml.load((path / "skill.yaml").read_text(encoding="utf-8")) or {}).get("provenance", {})
     except Exception:
         return "imported"
     return "generated" if str(origin.get("origin", "")) == "agentlab-skillforge" else "imported"

@@ -33,7 +33,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
 from pydantic import Field
 
 from agentlab.browser.environment import browser_status
@@ -44,6 +43,7 @@ from agentlab.core.models.base import Model
 from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.sandbox.docker import DockerSandboxProvider
+from agentlab.security import safeyaml
 from agentlab.services import Services
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -82,7 +82,7 @@ def load_expectation(kind: str) -> KindExpectation:
     path = expectation_path(kind)
     if not path.is_file():
         raise FileNotFoundError(f"fixture '{kind}' has no expected-findings file ({path.name})")
-    return KindExpectation.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    return KindExpectation.model_validate(safeyaml.load(path.read_text(encoding="utf-8")))
 
 
 def dataset_path(kind: str) -> Path | None:

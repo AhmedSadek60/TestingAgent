@@ -28,6 +28,7 @@ from agentlab.documents.models import AnalyzedDocument
 from agentlab.repository.analyzer import RepositoryAnalyzer
 from agentlab.repository.ingest import IngestedRepo, RepositoryIngestor
 from agentlab.repository.models import RepositoryAnalysis
+from agentlab.security import safeyaml
 from agentlab.security.egress import EgressPolicy
 from agentlab.security.untrusted import EVALUATOR_POLICY, wrap_untrusted
 from agentlab.tracing import EventBus
@@ -302,12 +303,12 @@ class TargetDiscoveryAgent:
                     data = (
                         r.json()
                         if "json" in r.headers.get("content-type", "") or url.endswith(".json")
-                        else yaml.safe_load(r.text)
+                        else safeyaml.load(r.text)
                     )
             elif repo is not None and an and an.openapi_specs:
                 p = repo.path / an.openapi_specs[0].path
                 text = p.read_text(encoding="utf-8", errors="replace")
-                data = json.loads(text) if p.suffix == ".json" else yaml.safe_load(text)
+                data = json.loads(text) if p.suffix == ".json" else safeyaml.load(text)
         except (httpx.HTTPError, ValueError, yaml.YAMLError, AgentLabError, OSError) as exc:
             warnings.append(f"OpenAPI specification could not be read: {type(exc).__name__}: {str(exc)[:150]}")
         if isinstance(data, dict) and ("openapi" in data or "swagger" in data):

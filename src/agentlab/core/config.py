@@ -16,6 +16,7 @@ from pydantic import Field, field_validator
 
 from agentlab.core.errors import UserError
 from agentlab.core.models.base import Model
+from agentlab.security import safeyaml
 
 
 class Pricing(Model):
@@ -290,7 +291,7 @@ class AgentLabConfig(Model):
         if not p.exists():
             raise UserError(f"config file not found: {p}")
         try:
-            data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            data = safeyaml.load(p.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError as exc:
             raise UserError(f"invalid YAML in {p}: {exc}") from exc
         if isinstance(data.get("providers"), list):

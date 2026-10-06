@@ -26,6 +26,7 @@ from pydantic import ValidationError
 
 from agentlab.core.models import TestCase
 from agentlab.evaluation.assertions import ASSERTIONS
+from agentlab.security import safeyaml
 
 MAX_FILE_BYTES = 1_000_000
 MAX_TESTS = 500
@@ -83,7 +84,7 @@ def load_user_tests(paths: Iterable[str | Path]) -> tuple[list[TestCase], list[s
             continue
         try:
             text = p.read_text(encoding="utf-8")
-            data = json.loads(text) if p.suffix.lower() == ".json" else yaml.safe_load(text)
+            data = json.loads(text) if p.suffix.lower() == ".json" else safeyaml.load(text)
         except (OSError, ValueError, yaml.YAMLError) as exc:
             problems.append(f"{p}: cannot be read ({type(exc).__name__}: {exc})")
             continue

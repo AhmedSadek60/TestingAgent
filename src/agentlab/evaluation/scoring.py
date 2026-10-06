@@ -13,13 +13,13 @@ from __future__ import annotations
 from pathlib import Path
 from statistics import mean
 
-import yaml
 from pydantic import Field
 
 from agentlab.core.enums import AgentType, ScoreCategory, Severity, TestStatus
 from agentlab.core.errors import UserError
 from agentlab.core.models import AgentProfile, CategoryScore, Finding, Scorecard, TestCase, TestResult
 from agentlab.core.models.base import Model
+from agentlab.security import safeyaml
 
 PROFILE_DIR = Path(__file__).parent / "profiles"
 SEVERITY_WEIGHT = {
@@ -68,7 +68,7 @@ def load_profile(name_or_path: str, extra_dirs: list[str] | None = None) -> Scor
     for c in candidates:
         if c.is_file():
             try:
-                prof = ScoringProfile.model_validate(yaml.safe_load(c.read_text(encoding="utf-8")))
+                prof = ScoringProfile.model_validate(safeyaml.load(c.read_text(encoding="utf-8")))
             except Exception as exc:
                 raise UserError(f"invalid scoring profile {c}: {exc}") from exc
             prof.validate_categories()

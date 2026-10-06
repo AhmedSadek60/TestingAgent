@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from agentlab.core.models import AssertionSpec, TestCase
 from agentlab.core.models.base import Model
 from agentlab.core.models.testcase import BrowserStep, ExpectedToolCall, JudgeCriterion, Turn
+from agentlab.security import safeyaml
 from agentlab.skills.model import REQUIRED_DOC_SECTIONS, UNTRUSTED, Skill, SkillManifest, TestTemplate
 
 MAX_MANIFEST_BYTES = 256 * 1024
@@ -66,7 +67,7 @@ def load_skill_dir(path: Path, *, trust: str = "local", require_doc: bool = True
             problems=[f"{path.name}: skill.yaml exceeds {MAX_MANIFEST_BYTES} bytes"],
         )
     try:
-        data: Any = yaml.safe_load(raw.decode("utf-8")) or {}
+        data: Any = safeyaml.load(raw.decode("utf-8")) or {}
     except (yaml.YAMLError, UnicodeDecodeError) as exc:
         return Skill(manifest=placeholder, source=str(path), problems=[f"{path.name}: invalid YAML ({exc})"])
     if not isinstance(data, dict):

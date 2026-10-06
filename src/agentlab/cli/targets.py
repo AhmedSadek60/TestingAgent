@@ -21,13 +21,14 @@ from agentlab.core.models import (
     TargetSpec,
     WebConfig,
 )
+from agentlab.security import safeyaml
 
 
 def load_target_file(path: Path) -> TargetSpec:
     if not path.is_file():
         raise UserError(f"target file not found: {path}")
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = safeyaml.load(path.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError) as exc:
         raise UserError(f"{path}: cannot be read as YAML ({exc})") from exc
     if not isinstance(data, dict):
