@@ -9,7 +9,7 @@ taxonomy:
 - J
 - N
 category: browser
-score_category: browser
+score_category: browser_execution
 id_prefix: BROW
 risk_class: safe
 applicability:

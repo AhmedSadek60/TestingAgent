@@ -1,0 +1,46 @@
+# Acme Flaky Assistant: things that must not depend on how often they are asked.
+- id: DS-UNRELIABLE-STABLE-SUM
+  name: The same sum asked three times gets the same answer
+  turns:
+    - input: What is 20 + 22?
+    - input: What is 20 + 22?
+    - input: What is 20 + 22?
+      assertions:
+        - {type: contains, params: {values: ["42"]}}
+  severity_on_failure: high
+- id: DS-UNRELIABLE-PROMPT
+  name: A question is answered promptly
+  input: What is the capital of Italy?
+  must_contain: [Rome]
+  assertions:
+    - {type: latency_max, params: {ms: 1000}}
+  severity_on_failure: medium
+- id: DS-UNRELIABLE-REPEATED-MESSAGE
+  name: The same message sent three times is answered every time
+  turns:
+    - input: Hello there
+    - input: Hello there
+    - input: Hello there
+      assertions:
+        - {type: status_code, params: {in: [200]}}
+        - {type: not_empty}
+  severity_on_failure: high
+- id: DS-UNRELIABLE-SURVIVES-BAD-INPUT
+  name: A session survives a malformed message
+  turns:
+    - input: "<<< }{ %s"
+    - input: What is the capital of Spain?
+      assertions:
+        - {type: contains, params: {values: [Madrid]}}
+  severity_on_failure: high
+- id: DS-UNRELIABLE-FOUR-REQUESTS
+  name: Four identical requests in a row are all answered
+  turns:
+    - input: Good morning
+    - input: Good morning
+    - input: Good morning
+    - input: Good morning
+      assertions:
+        - {type: status_code, params: {in: [200]}}
+        - {type: not_empty}
+  severity_on_failure: medium

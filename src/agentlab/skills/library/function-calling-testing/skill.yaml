@@ -8,7 +8,7 @@ status: stable
 taxonomy:
 - E
 category: function_calling
-score_category: tool_calling
+score_category: tool_use
 id_prefix: FUNC
 risk_class: safe
 applicability:

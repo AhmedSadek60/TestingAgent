@@ -373,3 +373,33 @@ def test_templates_run_in_a_sandbox(tmp_path):
 
 def test_builtin_dir_is_the_packaged_library():
     assert (BUILTIN_DIR / "memory-testing" / "skill.yaml").is_file()
+
+
+# ------------------------------------------------------------------------------------- score categories
+def test_every_skill_scores_under_a_category_the_profiles_weigh() -> None:
+    """A test scored under a category no profile knows silently drops out of the overall score (it did, for tool
+    tests, until the names were checked): every skill, and every test it generates, must use a real category."""
+    from agentlab.core.enums import ScoreCategory
+    from agentlab.skills import SkillRegistry
+
+    known = {c.value for c in ScoreCategory}
+    for skill in SkillRegistry.default([]).all():
+        assert skill.manifest.score_category in known, skill.manifest.name
+
+
+def test_score_category_aliases_are_normalised_and_unknown_names_rejected() -> None:
+    from agentlab.core.enums import normalize_score_category
+
+    assert normalize_score_category("tool_calling") == "tool_use"
+    assert normalize_score_category("Browser") == "browser_execution"
+    assert normalize_score_category("functional") == "functional_quality"
+    with pytest.raises(ValueError, match="unknown score category"):
+        normalize_score_category("vibes")
+
+
+def test_every_scoring_profile_weighs_only_known_categories_and_every_type_has_one() -> None:
+    from agentlab.evaluation.scoring import list_profiles, load_profile
+
+    for name in list_profiles():
+        load_profile(name).validate_categories()
+    assert {"planning_agent", "memory_agent", "document_agent"} <= set(list_profiles())

@@ -9,7 +9,7 @@ taxonomy:
 - G
 - N
 category: autonomy
-score_category: autonomy
+score_category: planning
 id_prefix: AUTO
 risk_class: safe
 applicability:

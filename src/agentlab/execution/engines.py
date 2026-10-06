@@ -22,6 +22,7 @@ from agentlab.core.enums import EventType
 from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked, TargetError, UserError
 from agentlab.core.models import AgentRequest, AgentResponse, Attachment, TestCase
 from agentlab.core.plugins import Registry
+from agentlab.documents.generated import generate, is_generated
 from agentlab.evaluation.context import PlaceholderResolver
 from agentlab.execution.limits import CancellationToken, LimitReached, LimitTracker, TestBudget
 from agentlab.tracing import TraceRecorder
@@ -73,8 +74,20 @@ class ExecutionEngine(ABC):
 ENGINES: Registry[type[ExecutionEngine]] = Registry("engines")
 
 
-def load_attachment(ref: str, base: Path | None) -> Attachment:
-    """Attachments are read from the fixture directory only (never arbitrary host paths)."""
+TEXT_SUFFIXES = {".txt", ".md", ".py", ".html", ".htm", ".csv", ".json", ".yaml", ".yml", ".xml"}
+
+
+def load_attachment(ref: str, base: Path | None, resolver: PlaceholderResolver | None = None) -> Attachment:
+    """An attachment is either a ``gen://`` recipe (made at run time, see ``documents.generated``) or a file from the
+    fixture directory: never an arbitrary host path. Canary placeholders are resolved in the reference and in the
+    text of text-like files, so a planted instruction carries this run's marker."""
+    ref = resolver.resolve(ref) if resolver else ref
+    if is_generated(ref):
+        try:
+            made = generate(ref)
+        except ValueError as exc:
+            raise UserError(str(exc)) from exc
+        return Attachment(name=made.name, media_type=made.media_type, content_b64=base64.b64encode(made.data).decode())
     root = (base or Path.cwd()).resolve()
     path = (root / ref).resolve()
     if root not in path.parents and path != root:
@@ -84,6 +97,11 @@ def load_attachment(ref: str, base: Path | None) -> Attachment:
     data = path.read_bytes()
     if len(data) > MAX_ATTACHMENT_BYTES:
         raise UserError(f"attachment '{ref}' is larger than {MAX_ATTACHMENT_BYTES} bytes")
+    if resolver and path.suffix.lower() in TEXT_SUFFIXES:
+        try:
+            data = resolver.resolve(data.decode("utf-8")).encode("utf-8")
+        except UnicodeDecodeError:
+            pass  # not text after all: attached as it is
     mt = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return Attachment(name=path.name, media_type=mt, content_b64=base64.b64encode(data).decode())
 
@@ -95,6 +113,8 @@ def _request_metadata(test: TestCase, env: AttemptEnv, turn: int) -> dict[str, A
     for key in ("inject_knowledge", "poison_tool_output"):
         if test.context.get(key):
             meta[key] = env.resolver.resolve_obj(test.context[key])
+    if test.context.get("omit_auth"):
+        meta["omit_auth"] = True
     return meta
 
 
@@ -121,7 +141,7 @@ class ConversationEngine(ExecutionEngine):
                 req = AgentRequest(
                     input=text,
                     session_id=sessions[turn.session],
-                    attachments=[load_attachment(a, fixtures) for a in turn.attachments],
+                    attachments=[load_attachment(a, fixtures, env.resolver) for a in turn.attachments],
                     credential=test.required_credentials[0] if test.required_credentials else None,
                     metadata=_request_metadata(test, env, i),
                 )

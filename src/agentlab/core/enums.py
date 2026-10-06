@@ -173,6 +173,30 @@ class ScoreCategory(StrEnum):
     SAFETY = "safety"
 
 
+SCORE_CATEGORY_ALIASES: dict[str, str] = {
+    "functional": "functional_quality",
+    "conversation": "conversational",
+    "rag": "rag_quality",
+    "tool_calling": "tool_use",
+    "tools": "tool_use",
+    "browser": "browser_execution",
+    "cost": "cost_efficiency",
+    "multimodal": "document",
+    "autonomy": "planning",
+}
+
+
+def normalize_score_category(value: str) -> str:
+    """The canonical :class:`ScoreCategory` value for a name (an alias is accepted); anything else is an error, because
+    a test scored under a category no profile weighs would silently drop out of the overall score."""
+    key = value.strip().lower().replace("-", "_").replace(" ", "_")
+    key = SCORE_CATEGORY_ALIASES.get(key, key)
+    known = {c.value for c in ScoreCategory}
+    if key not in known:
+        raise ValueError(f"unknown score category '{value}'; use one of {sorted(known)}")
+    return key
+
+
 class EventType(StrEnum):
     """Provider-neutral internal event schema (spec sections 12 and 48)."""
 

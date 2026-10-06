@@ -8,7 +8,7 @@ status: stable
 taxonomy:
 - J
 category: ui
-score_category: browser
+score_category: browser_execution
 id_prefix: UI
 risk_class: safe
 applicability:

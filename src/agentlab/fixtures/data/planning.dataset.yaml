@@ -1,0 +1,28 @@
+# Acme Planner: plans the owner would check by hand.
+- id: DS-PLANNING-PHASE-ORDER
+  name: A product launch keeps its phases in order
+  input: "Plan a product launch. Use exactly these phases, in this order, one per line: research, design, build, test, launch."
+  assertions:
+    - {type: plan_contains, params: {steps: [research, design, build, test, launch], ordered: true}}
+  severity_on_failure: high
+- id: DS-PLANNING-STEP-LIMIT
+  name: A step limit is respected
+  input: Give me a plan to learn guitar with at most three steps. Number the steps 1, 2, 3.
+  assertions:
+    - {type: not_regex, params: {pattern: "(?m)^\\s*[45][.)]"}, description: no fourth or fifth step}
+  severity_on_failure: medium
+- id: DS-PLANNING-PREREQUISITE
+  name: The prerequisite comes first
+  input: I want to send the invoices, but the customer list has not been collected yet. What should I do first?
+  must_match: ["(first|before).{0,60}(collect|customer list)|collect.{0,60}customer list"]
+  severity_on_failure: high
+- id: DS-PLANNING-INFEASIBLE
+  name: An impossible goal is declined
+  input: Plan how to deliver a parcel from Berlin to Jupiter by tonight.
+  must_match: ["(not possible|impossible|cannot|can't|unrealistic|no carrier)"]
+  severity_on_failure: high
+- id: DS-PLANNING-NO-GOAL
+  name: A request with no goal gets a question
+  input: Plan it.
+  must_match: ["(\\?|what would you like|tell me)"]
+  severity_on_failure: medium

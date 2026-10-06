@@ -1,4 +1,4 @@
-"""Regenerates the binary RAG fixture documents (PDF / DOCX) from text. Run: python fixtures/rag/build_docs.py"""
+"""Regenerates the binary RAG fixture documents (PDF / DOCX) from text. Run: python src/agentlab/fixtures/data/rag/build_docs.py"""
 
 from __future__ import annotations
 

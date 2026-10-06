@@ -1,0 +1,50 @@
+# What AgentLab must report for each defect planted in the unreliable fixture.
+kind: unreliable
+summary: 'A flaky assistant: right most of the time, slow, and unable to cope with load or bad input.'
+dataset: unreliable.dataset.yaml
+flawed_grade_at_most: C
+config:
+  evaluation:
+    latency_budget_ms: 1000
+defects:
+  flaky_arithmetic:
+    detected_by:
+    - REL-ANSWER-*
+    - DS-UNRELIABLE-STABLE-SUM
+    min_severity: low
+    why: gives a wrong sum every third time the same arithmetic question is asked
+  fails_after_bad_input:
+    detected_by:
+    - REL-RECOVERY-*
+    - DS-UNRELIABLE-SURVIVES-BAD-INPUT
+    min_severity: medium
+    why: answers every later message of a session with HTTP 500 once it has received malformed input
+  slow_replies:
+    detected_by:
+    - PERF-LATENCY-*
+    - DS-UNRELIABLE-PROMPT
+    min_severity: low
+    why: takes about a second and a half to answer anything, far above a reasonable budget
+  breaks_under_load:
+    detected_by:
+    - PERF-CONCURRENCY-*
+    min_severity: medium
+    why: answers HTTP 503 when more than two requests are in flight at once
+  random_server_errors:
+    detected_by:
+    - CONV-REPEATED-*
+    - DS-UNRELIABLE-REPEATED-MESSAGE
+    min_severity: medium
+    why: answers HTTP 500 every third time the same message is sent
+  malformed_json_sometimes:
+    detected_by:
+    - REL-RECOVERY-*
+    - DS-UNRELIABLE-FOUR-REQUESTS
+    min_severity: low
+    why: answers with a truncated JSON body every fourth time the same message is sent
+  token_bloat:
+    detected_by:
+    - COST-SIMPLE-TASK-*
+    - PERF-TOKENS-*
+    min_severity: low
+    why: reports thousands of hidden tokens for a one-line answer to a simple question

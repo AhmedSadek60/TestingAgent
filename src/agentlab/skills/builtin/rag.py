@@ -7,29 +7,51 @@ from typing import Any
 
 from agentlab.core.enums import Severity
 from agentlab.documents.models import AnalyzedDocument, Fact
-from agentlab.skills.builtin.common import LEAKY_ERROR, UNSUPPORTED_QUESTIONS
+from agentlab.skills.builtin.common import ADMITS_PROBLEM, LEAKY_ERROR, UNSUPPORTED_QUESTIONS
 from agentlab.skills.context import STATUS, A, J, SkillRun, turn
 
 _OLD = re.compile(r"\b(old|legacy|deprecated|archive[d]?|superseded|previous|outdated)\b", re.I)
+# a document that says of itself that it is no longer current (its title or a heading), a stronger sign than a file name
+_SELF_OLD = re.compile(
+    r"\b(superseded|obsolete|deprecated|legacy|archived|outdated|no longer (?:valid|in force|current))\b", re.I
+)
 _VERSION = re.compile(r"(?:\bv|version[ _-]?)(\d+)|\b(20\d\d)\b", re.I)
 
 
-def _age(name: str) -> tuple[int, float]:
-    """(is_marked_old, version_or_year): lets us decide which of two documents is the older one, if it is stated."""
-    stem = name.rsplit(".", 1)[0]
+def _age(source: str) -> tuple[int, float]:
+    """``(marked_old, version_or_year)`` for a fact's source (``file p.N § heading > heading``).
+
+    A file name alone only says so much: ``handbook.pdf`` against ``handbook-v1.md`` does not tell which is current, so
+    the version number counts only when both documents carry one, and a document that calls itself superseded counts
+    as old whatever it is named.
+    """
+    stem = source.split(" ")[0].rsplit(".", 1)[0]
     m = _VERSION.search(stem)
     num = float(m.group(1) or m.group(2)) if m else -1.0
-    return (1 if _OLD.search(stem) else 0, num)
+    return (1 if _OLD.search(stem) or _SELF_OLD.search(source) else 0, num)
 
 
 def _older_newer(a: Fact, b: Fact) -> tuple[Fact, Fact] | None:
-    da, db = a.source.split(" ")[0], b.source.split(" ")[0]
-    ka, kb = _age(da), _age(db)
-    if ka == kb or (ka[0] == 0 and kb[0] == 0 and ka[1] < 0 and kb[1] < 0):
-        return None
+    """``(older, newer)`` when the evidence says which is which, else ``None`` (no test is generated from a guess)."""
+    ka, kb = _age(a.source), _age(b.source)
     if ka[0] != kb[0]:
         return (a, b) if ka[0] > kb[0] else (b, a)
-    return (a, b) if ka[1] < kb[1] else (b, a)
+    if ka[1] >= 0 and kb[1] >= 0 and ka[1] != kb[1]:
+        return (a, b) if ka[1] < kb[1] else (b, a)
+    return None
+
+
+_TABLE_WHY = "The document contains a table; tables are a common failure point of PDF/Office extraction."
+_TABLE_HEURISTIC = " The table was recovered heuristically, so the expectation itself may be imperfect."
+
+
+def _table_probe(d: AnalyzedDocument) -> tuple[Any, list[str], str] | None:
+    """``(table, first row, question)`` for the first table of a document that has a checkable value, else ``None``."""
+    for t in d.tables[:1]:
+        if len(t.header) >= 2 and t.rows and len(t.rows[0]) >= 2 and t.rows[0][0].strip() and t.rows[0][1].strip():
+            where = f" under '{t.section}'" if t.section else ""
+            return t, t.rows[0], f"In the table{where} of {d.name}, what is the {t.header[1]} for {t.rows[0][0]}?"
+    return None
 
 
 def _kb_note(doc: str) -> str:
@@ -52,17 +74,29 @@ def rag_tests(sk: SkillRun) -> None:
         rag_ev.append("no document sanitisation layer was found")
     reports = ctx.reports_contexts
 
-    # ---- answers that must be grounded in the supplied documents
-    facts = ctx.facts
-    if not facts:
+    # Questions about the supplied documents presume the documents are in the target's knowledge base. An agent that is
+    # handed its documents with every question (it takes attachments and is not a RAG agent) has no knowledge base to
+    # question; the attach-and-ask tests of document-agent-testing cover it instead.
+    has_kb = ctx.has_type("rag") or ctx.has_type("research") or not ctx.adapter_supports("attachments")
+    facts = ctx.facts if has_kb else []
+    documents = ctx.documents if has_kb else []
+    conflicts = ctx.conflicts if has_kb else []
+    if not has_kb:
+        sk.note(
+            "the target takes its documents as attachments and is not a RAG agent, so it has no knowledge base to "
+            "question; the attach-and-ask tests of document-agent-testing cover the supplied documents"
+        )
+    elif not facts:
         sk.note("no checkable facts could be extracted from the supplied documents; grounded-answer tests were skipped")
+
+    # ---- answers that must be grounded in the supplied documents
     for i, f in enumerate(facts[: sk.n(2, 5, 10)], 1):
         doc = f.source.split(" ")[0]
         asserts = [A("contains", values=f.values[:3], description=f"states {f.values[0]}")]
         if reports:
             asserts.append(A("context_contains", values=f.values[:2], description="retrieval returned the evidence"))
             asserts.append(A("grounded", min=0.5, required=False, weight=0.5))
-        if ctx.observed_citations:
+        if ctx.expects_citations:
             asserts.append(A("cites_source", source=doc))
         sk.add(
             f"GROUNDED-{i}",
@@ -84,7 +118,7 @@ def rag_tests(sk: SkillRun) -> None:
             expected_output=f.values[0],
             preconditions=[_kb_note(doc)],
         )
-    if facts and ctx.observed_citations:
+    if facts and ctx.expects_citations:
         f = facts[0]
         doc = f.source.split(" ")[0]
         sk.add(
@@ -158,7 +192,7 @@ def rag_tests(sk: SkillRun) -> None:
     )
 
     # ---- conflicting and outdated documents
-    for i, (a, b) in enumerate(ctx.conflicts[: sk.n(1, 2, 3)], 1):
+    for i, (a, b) in enumerate(conflicts[: sk.n(1, 2, 3)], 1):
         da, db = a.source.split(" ")[0], b.source.split(" ")[0]
         ordered = _older_newer(a, b)
         q = f"What does the documentation say about {a.subject}? Give the exact figure and say which document it comes from."
@@ -199,41 +233,35 @@ def rag_tests(sk: SkillRun) -> None:
                 ],
                 severity=Severity.HIGH,
                 subcategory="outdated-documents",
-                why=[f"The file names indicate '{new.source.split(' ')[0]}' supersedes '{old.source.split(' ')[0]}'."],
+                why=[
+                    f"'{old.source.split(' ')[0]}' is marked as older than '{new.source.split(' ')[0]}' "
+                    "(by a version number, its name or its own title)."
+                ],
                 evidence=[f"older: {old.source}", f"newer: {new.source}"],
                 metrics=["version_awareness", "correctness"],
                 preconditions=[_kb_note(new.source.split(" ")[0])],
             )
 
     # ---- structured content: tables and long documents
-    for d in ctx.documents:
-        for t in d.tables[:1]:
-            if len(t.header) >= 2 and t.rows and len(t.rows[0]) >= 2 and t.rows[0][0].strip() and t.rows[0][1].strip():
-                row = t.rows[0]
-                where = f" under '{t.section}'" if t.section else ""
-                sk.add(
-                    f"TABLE-{re.sub('[^A-Za-z0-9]+', '', d.name)[:8].upper()}",
-                    f"Reads a table value from {d.name}",
-                    "A value stored in a table of the document is retrieved correctly (structured-document handling)",
-                    input=f"In the table{where} of {d.name}, what is the {t.header[1]} for {row[0]}?",
-                    assertions=[A("contains", values=[row[1]], description=f"states {row[1]}")],
-                    severity=Severity.LOW if t.heuristic else Severity.MEDIUM,
-                    subcategory="tables",
-                    why=[
-                        "The document contains a table; tables are a common failure point of PDF/Office extraction."
-                        + (
-                            " The table was recovered heuristically, so the expectation itself may be imperfect."
-                            if t.heuristic
-                            else ""
-                        )
-                    ],
-                    evidence=[f"{d.name}: header {t.header[:4]}, first row {row[:4]}"],
-                    metrics=["extraction_accuracy"],
-                    preconditions=[_kb_note(d.name)],
-                )
-                break
-    if ctx.documents:
-        longest = max(ctx.documents, key=lambda d: len(d.items))
+    for d in documents:
+        probe = _table_probe(d)
+        if probe is not None:
+            t, row, question = probe
+            sk.add(
+                f"TABLE-{re.sub('[^A-Za-z0-9]+', '', d.name)[:8].upper()}",
+                f"Reads a table value from {d.name}",
+                "A value stored in a table of the document is retrieved correctly (structured-document handling)",
+                input=question,
+                assertions=[A("contains", values=[row[1]], description=f"states {row[1]}")],
+                severity=Severity.LOW if t.heuristic else Severity.MEDIUM,
+                subcategory="tables",
+                why=[_TABLE_WHY + (_TABLE_HEURISTIC if t.heuristic else "")],
+                evidence=[f"{d.name}: header {t.header[:4]}, first row {row[:4]}"],
+                metrics=["extraction_accuracy"],
+                preconditions=[_kb_note(d.name)],
+            )
+    if documents:
+        longest = max(documents, key=lambda d: len(d.items))
         late = [f for f in facts if f.source.startswith(longest.name)]
         if len(longest.items) >= 12 and late:
             f = late[-1]
@@ -323,8 +351,24 @@ def document_tests(sk: SkillRun) -> None:
                     metrics=["extraction_accuracy"],
                     interfaces=[i for i in ctx.interfaces if ctx.adapter_supports("attachments", i)][:1],
                 )
+            probe = _table_probe(d)
+            if probe is not None:
+                t, row, question = probe
+                sk.add(
+                    f"TABLE-{tag}",
+                    f"Reads a table value from an attached {d.name.rsplit('.', 1)[-1].upper()}",
+                    "A value stored in a table of an attached document is extracted correctly",
+                    turns=[turn(f"I attached a document. {question}", attachments=[att])],
+                    assertions=[A("contains", values=[row[1]], description=f"states {row[1]}")],
+                    severity=Severity.LOW if t.heuristic else Severity.MEDIUM,
+                    subcategory="tables",
+                    why=[_TABLE_WHY + (_TABLE_HEURISTIC if t.heuristic else "")],
+                    evidence=[f"{d.name}: header {t.header[:4]}, first row {row[:4]}"],
+                    metrics=["extraction_accuracy"],
+                    interfaces=[i for i in ctx.interfaces if ctx.adapter_supports("attachments", i)][:1],
+                )
         corrupt = ctx.new_fixture(
-            "corrupt-report.pdf", b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%truncated"
+            "q3-report.pdf", b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%truncated"
         )
         if corrupt:
             sk.add(
@@ -334,6 +378,11 @@ def document_tests(sk: SkillRun) -> None:
                 turns=[turn("Summarise the attached report.", attachments=[corrupt])],
                 assertions=[
                     A("not_regex", pattern=LEAKY_ERROR),
+                    A(
+                        "regex",
+                        pattern=ADMITS_PROBLEM,
+                        description="says that the file could not be read instead of summarising it",
+                    ),
                     STATUS([200, 201, 202, 400, 415, 422], optional=True),
                 ],
                 judge=[

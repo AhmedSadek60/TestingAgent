@@ -13,6 +13,7 @@ Nothing here talks to the target. The designer is deterministic; the optional LL
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
 import hashlib
 import json
 import logging
@@ -113,6 +114,7 @@ def signature(test: TestCase) -> str:
         sorted(test.required_interfaces),
         json.dumps(test.context, sort_keys=True, default=str),
         sorted(j.metric + j.rubric for j in test.judge),
+        test.repetitions,  # the same check repeated five times measures flakiness; run once it does not
     ]
     return hashlib.sha1(json.dumps(payload, default=str).encode()).hexdigest()  # noqa: S324 - not a security use
 
@@ -500,21 +502,31 @@ class TestDesignerAgent:
     # ================================================================== reproduction
     def restrict(self, plan: TestPlan, ctx: SkillContext, test_ids: Iterable[str]) -> TestPlan:
         """Keep only the requested tests (to reproduce a finding). The others stay in the plan, deselected, so what
-        was left out is visible rather than silently missing."""
-        wanted = list(dict.fromkeys(test_ids))
-        present = {p.id for p in plan.tests}
-        missing = [t for t in wanted if t not in present]
+        was left out is visible rather than silently missing. An entry may be a shell-style pattern (``MEM-*``)."""
+        requested = list(dict.fromkeys(test_ids))
+        present = [p.id for p in plan.tests]
+        keep: set[str] = set()
+        missing: list[str] = []
+        for want in requested:
+            found = (
+                fnmatch.filter(present, want) if any(c in want for c in "*?[") else [t for t in present if t == want]
+            )
+            keep.update(found)
+            if not found:
+                missing.append(want)
         if missing:
             raise UserError(
                 f"test(s) {', '.join(missing)} are not in this plan. Follow-up tests (ids ending in -W2...) exist only "
                 "while a run is in progress, and CROSS-... findings summarise several tests; use the id of a wave 1 test"
             )
         for p in plan.tests:
-            if p.id in wanted:
+            if p.id in keep:
                 p.selected, p.deselected_reason = True, None
             elif p.selected:
                 p.selected, p.deselected_reason = False, "not requested (--only)"
-        plan.assumptions.append(f"The plan is restricted to the {len(wanted)} requested test(s): {', '.join(wanted)}.")
+        plan.assumptions.append(
+            f"The plan is restricted to the {len(keep)} requested test(s): {', '.join(sorted(keep))}."
+        )
         return self.finalize(plan, ctx, trim=False)
 
     # ================================================================== finalisation

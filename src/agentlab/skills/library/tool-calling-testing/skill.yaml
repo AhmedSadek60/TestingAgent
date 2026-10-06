@@ -8,7 +8,7 @@ status: stable
 taxonomy:
 - E
 category: tool_calling
-score_category: tool_calling
+score_category: tool_use
 id_prefix: TOOL
 risk_class: safe
 applicability:

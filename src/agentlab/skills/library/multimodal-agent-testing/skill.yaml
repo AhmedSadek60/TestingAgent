@@ -9,7 +9,7 @@ taxonomy:
 - M
 - N
 category: multimodal
-score_category: multimodal
+score_category: document
 id_prefix: MM
 risk_class: safe
 applicability:

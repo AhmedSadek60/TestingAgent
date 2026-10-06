@@ -114,12 +114,21 @@ class AgentApiAdapter(AgentAdapter):
             raise UnsupportedCapability(
                 "WebSocket agent endpoints are not supported in this build; use REST, SSE or GraphQL"
             )
+        takes_attachments = "{{attachments}}" in json.dumps(self.cfg.request_template)
         self.capabilities = AdapterCapabilities(
             streaming=self.cfg.protocol == "sse",
             reports_usage=True,
             reports_tool_calls=bool(self.cfg.response.tool_calls),
             reports_contexts=bool(self.cfg.response.contexts),
+            reports_citations=bool(self.cfg.response.citations),
             reports_events=bool(self.cfg.response.events),
+            # attachments can be sent when the owner mapped them into the request body ...
+            attachments=takes_attachments,
+            # ... and images are understood when the owner also says the agent is multimodal
+            multimodal=takes_attachments and "multimodal" in spec.declared_types,
+            knowledge_injection=bool(self.cfg.knowledge_endpoint),
+            # a request can be sent without credentials when the target is configured with a credential
+            omit_auth=bool(self.cfg.auth_credential),
         )
         self._client: httpx.AsyncClient | None = None
 
@@ -131,11 +140,11 @@ class AgentApiAdapter(AgentAdapter):
         if self._client:
             await self._client.aclose()
 
-    def _headers(self, session_id: str) -> dict[str, str]:
+    def _headers(self, session_id: str, *, omit_auth: bool = False) -> dict[str, str]:
         headers = {"Content-Type": "application/json", "Accept": "application/json", **self.cfg.headers}
         if self.cfg.protocol == "sse":
             headers["Accept"] = "text/event-stream"
-        if self.cfg.auth_credential:
+        if self.cfg.auth_credential and not omit_auth:
             if self.ctx.credentials is None:
                 raise TargetError("credential requested but no CredentialManager is configured")
             headers.update(self.ctx.credentials.auth_headers(self.cfg.auth_credential, self.cfg.url))
@@ -172,11 +181,13 @@ class AgentApiAdapter(AgentAdapter):
         if self._client is None:
             await self.open()
         assert self._client is not None
-        headers = self._headers(request.session_id)
+        omit_auth = bool(request.metadata.get("omit_auth"))
+        headers = self._headers(request.session_id, omit_auth=omit_auth)
         body = self._body(request)
         url = self.cfg.url
         t0 = time.perf_counter()
         try:
+            await self._plant_knowledge(request, headers)
             if self.cfg.protocol == "sse":
                 return await self._send_sse(url, headers, body, t0)
             r = await self._request(url, headers, body)
@@ -193,6 +204,24 @@ class AgentApiAdapter(AgentAdapter):
             )
         latency = (time.perf_counter() - t0) * 1000
         return self._to_response(r, latency)
+
+    async def _plant_knowledge(self, request: AgentRequest, headers: dict[str, str]) -> None:
+        """Add the documents a test wants the agent to read, through the owner's test hook (``knowledge_endpoint``)."""
+        docs = request.metadata.get("inject_knowledge") or {}
+        if not docs:
+            return
+        if not self.cfg.knowledge_endpoint:
+            raise UnsupportedCapability("this target has no knowledge_endpoint, so documents cannot be planted")
+        assert self._client is not None
+        for name, text in docs.items():
+            self.ctx.egress.check(self.cfg.knowledge_endpoint)
+            r = await self._client.post(
+                self.cfg.knowledge_endpoint,
+                headers=headers,
+                json={"session_id": request.session_id, "name": name, "text": str(text)},
+            )
+            if r.status_code >= 400:
+                raise TargetError(f"the knowledge endpoint refused document '{name}' (HTTP {r.status_code})")
 
     async def _request(self, url: str, headers: dict[str, str], body: Any) -> httpx.Response:
         assert self._client is not None
@@ -220,6 +249,11 @@ class AgentApiAdapter(AgentAdapter):
         try:
             data = r.json()
         except ValueError:
+            if "json" in r.headers.get("content-type", "").lower():
+                # A plain-text agent is fine; one that says "JSON" and sends a broken body is a target defect.
+                resp.error = "the response is declared as JSON but is not valid JSON"
+                resp.raw = get_redactor().redact_text(text[:500])[0]
+                return resp
             resp.output = text
             return resp
         self._map(data, resp)

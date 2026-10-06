@@ -8,7 +8,7 @@ status: stable
 taxonomy:
 - L
 category: document
-score_category: rag_quality
+score_category: document
 id_prefix: DOC
 risk_class: safe
 applicability:

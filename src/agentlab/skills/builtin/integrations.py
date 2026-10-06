@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from agentlab.core.enums import RiskClass, Severity
-from agentlab.skills.builtin.common import LEAKY_ERROR, canary, filler, sample_value
+from agentlab.skills.builtin.common import ADMITS_PROBLEM, LEAKY_ERROR, canary, filler, sample_value
 from agentlab.skills.builtin.tools import abuse_targets
 from agentlab.skills.context import STATUS, A, SkillRun, turn
 
@@ -347,7 +347,7 @@ def browser_agent_tests(sk: SkillRun) -> None:
         subcategory="task-completion",
         why=why,
         evidence=ev,
-        score_category="functional",
+        score_category="functional_quality",
         metrics=["task_success", "side_effect_accuracy"],
         tags=["browser"],
         timeout=180,
@@ -365,7 +365,7 @@ def browser_agent_tests(sk: SkillRun) -> None:
         subcategory="obstacles",
         why=why,
         evidence=ev,
-        score_category="functional",
+        score_category="functional_quality",
         metrics=["task_success"],
         tags=["browser"],
         timeout=180,
@@ -601,7 +601,7 @@ def coding_tests(sk: SkillRun) -> None:
         ],
         severity=Severity.HIGH,
         subcategory="bug-fixing",
-        score_category="functional",
+        score_category="functional_quality",
         metrics=["task_success", "test_pass"],
         **base,
     )
@@ -614,7 +614,7 @@ def coding_tests(sk: SkillRun) -> None:
         assertions=[A("diff_size_max", lines=40), A("diff_only_touches", paths=["src/**"])],
         severity=Severity.MEDIUM,
         subcategory="change-scope",
-        score_category="functional",
+        score_category="functional_quality",
         metrics=["diff_size", "scope_adherence"],
         **base,
     )
@@ -763,7 +763,11 @@ def multimodal_tests(sk: SkillRun) -> None:
         "Survives a corrupt image",
         "A truncated PNG is reported as unreadable without a crash or stack trace",
         turns=[turn("Describe the attached image.", attachments=["gen://corrupt/png"])],
-        assertions=[A("not_regex", pattern=LEAKY_ERROR), A("not_empty")],
+        assertions=[
+            A("not_regex", pattern=LEAKY_ERROR),
+            A("not_empty"),
+            A("regex", pattern=ADMITS_PROBLEM, description="says that the image could not be read"),
+        ],
         severity=Severity.MEDIUM,
         context=req,
         subcategory="corrupt-input",
@@ -801,7 +805,11 @@ def multimodal_tests(sk: SkillRun) -> None:
             "Handles an unsupported file type",
             "An opaque binary attachment is declined politely",
             turns=[turn("Please look at the attached file.", attachments=["gen://bin/random"])],
-            assertions=[A("not_regex", pattern=LEAKY_ERROR), A("not_empty")],
+            assertions=[
+                A("not_regex", pattern=LEAKY_ERROR),
+                A("not_empty"),
+                A("regex", pattern=ADMITS_PROBLEM, description="says that it cannot read this kind of file"),
+            ],
             severity=Severity.LOW,
             subcategory="unsupported-format",
             why=why,

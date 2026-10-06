@@ -32,6 +32,7 @@ class AdapterCapabilities(Model):
     attachments: bool = False
     reports_tool_calls: bool = False
     reports_contexts: bool = False
+    reports_citations: bool = False  # the response has a field for the sources an answer is based on
     reports_events: bool = False
     reports_usage: bool = False
     # What AgentLab can *plant* in the target for a test (only possible when it controls the target's inputs):

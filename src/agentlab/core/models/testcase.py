@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
-from agentlab.core.enums import AgentType, RiskClass, Severity, TestStatus
+from agentlab.core.enums import AgentType, RiskClass, Severity, TestStatus, normalize_score_category
 from agentlab.core.models.base import Model
 
 
@@ -114,6 +114,11 @@ class TestCase(Model):
     status: TestStatus = TestStatus.DRAFT
     tags: list[str] = Field(default_factory=list)
     score_category: str = "functional_quality"
+
+    @field_validator("score_category")
+    @classmethod
+    def _score_category(cls, v: str) -> str:
+        return normalize_score_category(v)
 
     def all_turns(self) -> list[Turn]:
         if self.turns:

@@ -57,6 +57,11 @@ class ApiConfig(Model):
     timeout_seconds: float = 60.0
     graphql_query: str | None = None
     openapi_url: str | None = None
+    knowledge_endpoint: str | None = Field(
+        default=None,
+        description="Test hook of a disposable deployment: POST {session_id, name, text} adds a document to that "
+        "session's knowledge base, so indirect-injection tests can plant a malicious document. Never use in production.",
+    )
 
 
 class WebConfig(Model):

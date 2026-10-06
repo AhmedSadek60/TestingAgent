@@ -130,7 +130,14 @@ def conversational_tests(sk: SkillRun) -> None:
             STATUS(HTTP_OK_OR_REJECT, optional=True),
             A("not_empty"),
             A("not_regex", pattern=LEAKY_ERROR),
-            A("contains", values=["Paris"], required=False, description="answers the trailing question"),
+            A(
+                "any_of",
+                checks=[
+                    {"type": "rejects_input", "params": {}},
+                    {"type": "contains", "params": {"values": ["Paris"]}},
+                ],
+                description="answers the trailing question, or rejects the input explicitly (silent truncation is a defect)",
+            ),
         ],
         metrics=["robustness", "completeness"],
     )

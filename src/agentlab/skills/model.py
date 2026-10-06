@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
-from agentlab.core.enums import RiskClass, Severity
+from agentlab.core.enums import RiskClass, Severity, normalize_score_category
 from agentlab.core.models.base import Model
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.\-]+)?$")
@@ -130,6 +130,11 @@ class SkillManifest(Model):
         if not SEMVER.match(v):
             raise ValueError("version must be semantic (MAJOR.MINOR.PATCH)")
         return v
+
+    @field_validator("score_category")
+    @classmethod
+    def _score_category(cls, v: str) -> str:
+        return normalize_score_category(v)
 
     @field_validator("trust")
     @classmethod

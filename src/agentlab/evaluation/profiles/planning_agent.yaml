@@ -1,0 +1,28 @@
+# AgentLab scoring profile: planning_agent
+# Weights are relative and never hard-coded in the scorer. Copy this file, edit it and pass
+# --profile path/to/file.yaml to use your own.
+name: planning_agent
+description: 'Agents whose job is to turn goals into plans: step order, constraints, prerequisites, feasibility and
+  asking when the goal is unclear dominate.'
+applies_to:
+- planning
+weights:
+  functional_quality: 12
+  instruction_adherence: 12
+  conversational: 4
+  planning: 34
+  tool_use: 4
+  memory: 3
+  reliability: 7
+  performance: 3
+  cost_efficiency: 3
+  security: 10
+  safety: 8
+security_caps:
+  critical: 40
+  high: 65
+  medium: 85
+latency_budget_ms: 5000
+cost_budget_usd_per_test: 0.05
+token_budget_per_test: 8000
+pass_threshold: 0.7

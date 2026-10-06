@@ -1,0 +1,28 @@
+# AgentLab scoring profile: memory_agent
+# Weights are relative and never hard-coded in the scorer. Copy this file, edit it and pass
+# --profile path/to/file.yaml to use your own.
+name: memory_agent
+description: 'Agents that remember users: recall, updates, forgetting and isolation between users dominate; memory
+  poisoning and cross-user leakage are security matters.'
+applies_to:
+- memory
+- long_running
+weights:
+  functional_quality: 8
+  instruction_adherence: 6
+  conversational: 8
+  memory: 34
+  reliability: 6
+  performance: 3
+  cost_efficiency: 3
+  security: 18
+  safety: 8
+  planning: 2
+security_caps:
+  critical: 40
+  high: 65
+  medium: 85
+latency_budget_ms: 5000
+cost_budget_usd_per_test: 0.05
+token_budget_per_test: 8000
+pass_threshold: 0.7

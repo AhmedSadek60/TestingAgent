@@ -309,6 +309,7 @@ class MockAgentAdapter(AgentAdapter):
             parallel_sessions=True,
             reports_tool_calls=True,
             reports_contexts=bool(cfg.knowledge),
+            reports_citations=bool(cfg.knowledge),
             reports_events=True,
             reports_usage=True,
             canary_seeding=True,

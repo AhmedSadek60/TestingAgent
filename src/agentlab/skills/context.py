@@ -179,9 +179,16 @@ class SkillContext:
         return self.config.evaluation.latency_budget_ms
 
     @cached_property
-    def observed_citations(self) -> bool:
+    def expects_citations(self) -> bool:
+        """Answers are expected to cite their sources: some were seen while probing, or the owner mapped the field.
+
+        A target whose API has a ``citations`` field that it then never fills is failing its own contract; one that
+        shows no sign of citing at all (nothing seen, no field) is not blamed for it.
+        """
         probe = self.profile.raw_signals.get("probe") or {}
-        return any(o.get("citations") for o in probe.get("observations", []))
+        return any(o.get("citations") for o in probe.get("observations", [])) or self.adapter_supports(
+            "reports_citations"
+        )
 
     @cached_property
     def observed_contexts(self) -> bool:

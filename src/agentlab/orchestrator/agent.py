@@ -995,6 +995,14 @@ class TestOrchestratorAgent:
             "scope": scope.model_dump(mode="json") if scope else None,
         }
         # ---- 16. report generation, 17. artifact packaging ---------------------------------------------------
+        # A report is built from what is stored (exactly as `agentlab report` does later), so the run's analysis, its
+        # manifest and the run row are persisted first.
+        outcome.finished_at = utcnow()
+        analysis_ids = [
+            self._artifact(run_id, "analysis", "analysis.json", self._analysis_json(outcome)),
+            self._artifact(run_id, "manifest", "manifest.json", outcome.manifest),
+        ]
+        self._persist_run(outcome, records)
         rep = reporter or getattr(sv, "reporter", None)
         with self._phase(run_id, Phase.REPORT_GENERATION, records) as ph:
             if rep is None:
@@ -1009,25 +1017,10 @@ class TestOrchestratorAgent:
                     ph.set(error=f"{type(exc).__name__}: {exc}")
                     ph.status = "failed"
         with self._phase(run_id, Phase.ARTIFACT_PACKAGING, records) as ph:
-            ids = [
-                self._artifact(run_id, "analysis", "analysis.json", self._analysis_json(outcome)),
-                self._artifact(run_id, "manifest", "manifest.json", outcome.manifest),
-            ]
-            ph.set(artifacts=len(sv.store.list_artifacts(run_id)), analysis_artifacts=[i for i in ids if i])
+            ph.set(artifacts=len(sv.store.list_artifacts(run_id)), analysis_artifacts=[i for i in analysis_ids if i])
             if getattr(outcome.report, "bundle_id", None):
                 ph.set(bundle=outcome.report.bundle_id)
-        outcome.finished_at = utcnow()
-        sv.store.update_run(
-            run_id,
-            status=status.value,
-            finished_at=outcome.finished_at,
-            manifest=outcome.manifest,
-            totals={
-                **outcome.summary(),
-                "phases": [r.model_dump(mode="json", exclude={"detail"}) for r in records],
-            },
-            error=None if error is None else {"kind": "INFRASTRUCTURE_ERROR", "message": error[:500]},
-        )
+        self._persist_run(outcome, records)
         end_type = {
             RunStatus.COMPLETED: EventType.RUN_COMPLETED,
             RunStatus.CANCELLED: EventType.RUN_CANCELLED,
@@ -1037,6 +1030,20 @@ class TestOrchestratorAgent:
         self._active.discard(run_id)
         self._tokens.pop(run_id, None)
         return outcome
+
+    def _persist_run(self, o: RunOutcome, records: list[PhaseRecord]) -> None:
+        """Write the run row's final state (called before the report is built and again once packaging is done)."""
+        self.services.store.update_run(
+            o.run_id,
+            status=o.status.value,
+            finished_at=o.finished_at,
+            manifest=o.manifest,
+            totals={
+                **o.summary(),
+                "phases": [r.model_dump(mode="json", exclude={"detail"}) for r in records],
+            },
+            error=None if o.error is None else {"kind": "INFRASTRUCTURE_ERROR", "message": o.error[:500]},
+        )
 
     @staticmethod
     def _analysis_json(o: RunOutcome) -> dict[str, Any]:

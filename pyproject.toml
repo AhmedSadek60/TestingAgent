@@ -52,7 +52,7 @@ agentlab = "agentlab.cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentlab = ["py.typed", "reports/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*"]
+agentlab = ["py.typed", "reports/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -64,12 +64,13 @@ markers = [
   "postgres: requires a PostgreSQL server (AGENTLAB_TEST_POSTGRES_URL)",
   "redis: requires a Redis server (AGENTLAB_TEST_REDIS_URL)",
   "ollama: requires a reachable Ollama server (AGENTLAB_TEST_OLLAMA_URL)",
+  "matrix: runs a whole fixture through the full suite (slow); deselect with -m 'not matrix'",
 ]
 filterwarnings = ["ignore::DeprecationWarning:jsonpath_ng.*"]
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["fixtures/repositories", "fixtures/rag", "web/node_modules", "scripts/ai"]  # scripts/ai: governance tooling, kept as shipped
+extend-exclude = ["fixtures/repositories", "src/agentlab/fixtures/data/rag", "web/node_modules", "scripts/ai"]  # scripts/ai: governance tooling, kept as shipped
 target-version = "py312"
 src = ["src", "tests", "fixtures"]
 
@@ -80,6 +81,7 @@ ignore = ["S101", "S603", "S607", "B008", "S311", "UP042", "UP046", "E501", "SIM
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
 "fixtures/**" = ["S"]
+"src/agentlab/fixtures/**" = ["S"]  # deliberately flawed simulations; they never touch the host
 
 [tool.mypy]
 python_version = "3.12"
