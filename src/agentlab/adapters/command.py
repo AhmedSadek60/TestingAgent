@@ -33,7 +33,6 @@ AGENT_DIR = "/agent"
 WORKSPACE_DIR = "/workspace"
 EVENT_PREFIX = "AGENTLAB_EVENT "
 MAX_OUTPUT_CHARS = 200_000
-DEFAULT_IMAGE = SandboxSpec().image
 
 
 def split_events(stdout: str) -> tuple[str, list[dict[str, Any]]]:
@@ -128,8 +127,9 @@ class CommandAdapter(AgentAdapter):
         if provider is None:
             raise SandboxUnavailable("no sandbox provider is configured; untrusted code is never run on the host")
         sandbox = await provider.create(
-            SandboxSpec(
-                image=(self.cfg.image if with_agent else None) or image or DEFAULT_IMAGE,
+            SandboxSpec.from_config(
+                self.ctx.config.security.sandbox,
+                image=(self.cfg.image if with_agent else None) or image or self.ctx.config.security.sandbox.image,
                 workdir=WORKSPACE_DIR,
                 env={**(self.cfg.env if with_agent else {}), **(env or {})},
                 timeout_seconds=self.cfg.timeout_seconds,

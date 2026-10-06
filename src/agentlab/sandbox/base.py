@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field
 
+from agentlab.core.config import SandboxConfig
 from agentlab.core.errors import SandboxUnavailable
 from agentlab.core.models.base import Model
 from agentlab.core.plugins import Registry
@@ -38,6 +39,12 @@ class SandboxSpec(Model):
     allow_pull: bool = True
     max_output_bytes: int = 2_000_000
     labels: dict[str, str] = Field(default_factory=dict)
+
+    @classmethod
+    def from_config(cls, config: SandboxConfig, **overrides: Any) -> SandboxSpec:
+        """A spec that carries the operator's limits (``security.sandbox``: image, CPUs, memory, processes, disk, time and
+        user); the caller overrides what is particular to the sandbox it asks for."""
+        return cls(**{**config.model_dump(exclude={"provider"}), **overrides})
 
 
 class ExecResult(Model):
