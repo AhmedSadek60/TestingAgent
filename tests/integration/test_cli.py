@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -221,6 +222,20 @@ def test_plan_only_designs_and_stores_a_plan_but_runs_nothing(project: Path) -> 
     assert len(runs) == 1 and runs[0]["status"] == "completed"  # type: ignore[arg-type]
     shown = run_json("runs", "show", str(data["run_id"])[:8], "--json")  # type: ignore[index]
     assert shown["summary"]["tests"] == 0, "plan-only never executes a test"  # type: ignore[index]
+
+
+def test_runs_show_lists_every_finding_while_the_run_summary_lists_the_top_ten(project: Path) -> None:
+    ran = run("test", "--mock", "success", "--mock", "unsafe_behavior", "--intensity", "quick", "--no-second-wave")
+    assert ran.exit_code == 1, ran.output
+    run_id = json.loads(run("runs", "list", "--json").stdout)[0]["id"]
+    findings = run_json("runs", "show", run_id[:8], "--json")["findings"]  # type: ignore[index]
+    assert len(findings) > 10, "the example needs more findings than the summary shows"
+    assert "and" in ran.output and "more: `agentlab runs show" in ran.output
+    shown = run("runs", "show", run_id[:8], "--tests")
+    assert shown.exit_code == 0
+    assert "more: `agentlab runs show" not in shown.output, "show is where they are listed, not a pointer to itself"
+    rows = re.findall(r"^\s+(?:CRITICAL|HIGH|MEDIUM|LOW|INFO)\s{2,}", shown.output, re.M)
+    assert len(rows) == len(findings), f"{len(rows)} rows for {len(findings)} findings"
 
 
 def test_a_run_reports_exit_codes_json_and_can_be_inspected_and_replayed(project: Path) -> None:

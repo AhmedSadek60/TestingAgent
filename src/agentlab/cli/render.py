@@ -213,7 +213,10 @@ def render_outcome(c: Console, o: RunOutcome, *, top_findings: int = 10) -> None
             )
         c.print(t)
         if len(o.findings) > top_findings:
-            c.print(f"  [dim]... and {len(o.findings) - top_findings} more (agentlab runs show {o.run_id})[/dim]")
+            c.print(
+                f"  [dim]... and {len(o.findings) - top_findings} more: `agentlab runs show {o.run_id[:8]}` lists them "
+                "all, `--finding TEST_ID` shows one in full[/dim]"
+            )
     blocked = Counter(
         short(r.blocked_reason or "prerequisite missing", 110) for r in o.results if r.status == TestStatus.BLOCKED
     )

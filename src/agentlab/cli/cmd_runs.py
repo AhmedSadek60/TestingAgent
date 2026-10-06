@@ -101,7 +101,7 @@ def runs_show(
             raise UserError(f"no finding '{finding}' in run {run_id}")
         _show_finding(hit)
         return
-    render_outcome(console, outcome)
+    render_outcome(console, outcome, top_findings=len(outcome.findings))  # `show` is where the rest are listed
     if tests:
         t = Table("Test", "Category", "Status", "Score", "Why / reason", box=box.SIMPLE_HEAD, title="Tests")
         t.columns[0].no_wrap = True

@@ -279,6 +279,10 @@ class TargetDiscoveryAgent:
         an = DocumentAnalyzer()
         docs: list[AnalyzedDocument] = []
         for ref in spec.documents:
+            if ref.startswith(("http://", "https://")):
+                # documents are read from this machine only: nothing is fetched on a target file's say-so
+                warnings.append(f"{ref}: a URL is not downloaded; save the document and give its path")
+                continue
             p = Path(ref)
             if p.is_dir():
                 paths = sorted(x for x in p.rglob("*") if x.is_file())[:200]
