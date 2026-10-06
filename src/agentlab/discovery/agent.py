@@ -7,7 +7,6 @@ enrichment. Discovery never performs side effects, and nothing destructive runs 
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,7 +15,13 @@ import httpx
 import yaml
 
 from agentlab.adapters.base import AdapterContext, TargetRuntime
-from agentlab.adapters.openapi import OpenApiAnalysis, analyze_openapi
+from agentlab.adapters.openapi import (
+    MAX_DOCUMENT_BYTES,
+    OpenApiAnalysis,
+    analyze_openapi,
+    parse_openapi_text,
+    resolve_api,
+)
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.enums import EventType
 from agentlab.core.errors import AgentLabError, UserError
@@ -28,7 +33,6 @@ from agentlab.documents.models import AnalyzedDocument
 from agentlab.repository.analyzer import RepositoryAnalyzer
 from agentlab.repository.ingest import IngestedRepo, RepositoryIngestor
 from agentlab.repository.models import RepositoryAnalysis
-from agentlab.security import safeyaml
 from agentlab.security.egress import EgressPolicy
 from agentlab.security.untrusted import EVALUATOR_POLICY, wrap_untrusted
 from agentlab.tracing import EventBus
@@ -60,6 +64,8 @@ class IngestedTarget:
     repo_analysis: RepositoryAnalysis | None = None
     documents: list[AnalyzedDocument] = field(default_factory=list)
     openapi: OpenApiAnalysis | None = None
+    #: the target with the ``api`` settings the OpenAPI document supplied (None when it supplied nothing)
+    spec: TargetSpec | None = None
     warnings: list[str] = field(default_factory=list)
 
     def cleanup(self) -> None:
@@ -144,8 +150,17 @@ class TargetDiscoveryAgent:
             except AgentLabError as exc:
                 warnings.append(f"repository could not be analysed ({exc.kind.value}): {exc}")
         docs = self._documents(spec, warnings)
-        openapi = await self._openapi(spec, repo_ing, repo_an, warnings)
-        return IngestedTarget(repo=repo_ing, repo_analysis=repo_an, documents=docs, openapi=openapi, warnings=warnings)
+        openapi, document_url = await self._openapi(spec, repo_ing, repo_an, warnings)
+        resolved = resolve_api(spec, openapi, document_url=document_url)
+        warnings += [*resolved.notes, *resolved.warnings]
+        return IngestedTarget(
+            repo=repo_ing,
+            repo_analysis=repo_an,
+            documents=docs,
+            openapi=openapi,
+            spec=resolved.spec if resolved.spec is not spec else None,
+            warnings=warnings,
+        )
 
     # ------------------------------------------------------------------ main
     async def discover(
@@ -172,6 +187,7 @@ class TargetDiscoveryAgent:
         )
         own_ingest = ingested is None
         ing = ingested if ingested is not None else await self.ingest(spec)
+        spec = ing.spec or spec  # the endpoint the OpenAPI document supplied, when the owner gave only the document
         warnings: list[str] = list(ing.warnings)
         repo_ing, repo_an, docs, openapi = ing.repo, ing.repo_analysis, ing.documents, ing.openapi
 
@@ -291,29 +307,50 @@ class TargetDiscoveryAgent:
 
     async def _openapi(
         self, spec: TargetSpec, repo: IngestedRepo | None, an: RepositoryAnalysis | None, warnings: list[str]
-    ) -> OpenApiAnalysis | None:
-        data: dict[str, Any] | None = None
+    ) -> tuple[OpenApiAnalysis | None, str | None]:
+        """The analysed OpenAPI document and the URL it was read from (None for a document inside the repository)."""
+        data: Any = None
+        document_url: str | None = None
         try:
             if spec.api and spec.api.openapi_url:
-                url = spec.api.openapi_url
-                self.egress.check(url)
-                async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
-                    r = await client.get(url)
-                    r.raise_for_status()
-                    data = (
-                        r.json()
-                        if "json" in r.headers.get("content-type", "") or url.endswith(".json")
-                        else safeyaml.load(r.text)
-                    )
+                document_url = spec.api.openapi_url
+                data = parse_openapi_text(await self._download(document_url))
             elif repo is not None and an and an.openapi_specs:
                 p = repo.path / an.openapi_specs[0].path
-                text = p.read_text(encoding="utf-8", errors="replace")
-                data = json.loads(text) if p.suffix == ".json" else safeyaml.load(text)
-        except (httpx.HTTPError, ValueError, yaml.YAMLError, AgentLabError, OSError) as exc:
+                if p.stat().st_size > MAX_DOCUMENT_BYTES:
+                    raise UserError(
+                        f"{an.openapi_specs[0].path} is larger than {MAX_DOCUMENT_BYTES // 1024 // 1024} MiB"
+                    )
+                data = parse_openapi_text(p.read_text(encoding="utf-8", errors="replace"))
+        except (httpx.HTTPError, ValueError, yaml.YAMLError, AgentLabError, OSError, RecursionError) as exc:
             warnings.append(f"OpenAPI specification could not be read: {type(exc).__name__}: {str(exc)[:150]}")
         if isinstance(data, dict) and ("openapi" in data or "swagger" in data):
-            return analyze_openapi(data)
-        return None
+            return analyze_openapi(data), document_url
+        if data is not None:
+            warnings.append(
+                "the OpenAPI document is not an OpenAPI 3 or Swagger 2 document (no 'openapi' or 'swagger' key)"
+            )
+        return None, document_url
+
+    async def _download(self, url: str) -> str:
+        """The document at ``url``, read through the egress policy without following redirects, at most
+        ``MAX_DOCUMENT_BYTES`` of it."""
+        self.egress.check(url)
+        async with (
+            httpx.AsyncClient(timeout=20, follow_redirects=False) as client,
+            client.stream("GET", url) as response,
+        ):
+            response.raise_for_status()
+            chunks: list[bytes] = []
+            size = 0
+            async for chunk in response.aiter_bytes():
+                size += len(chunk)
+                if size > MAX_DOCUMENT_BYTES:
+                    raise UserError(
+                        f"the document is larger than {MAX_DOCUMENT_BYTES // 1024 // 1024} MiB and is not read"
+                    )
+                chunks.append(chunk)
+        return b"".join(chunks).decode("utf-8", errors="replace")
 
     async def _enrich(
         self, profile: AgentProfile, repo: RepositoryAnalysis | None, docs: list[AnalyzedDocument], warnings: list[str]

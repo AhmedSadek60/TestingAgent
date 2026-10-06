@@ -140,7 +140,7 @@ export function DetailsStep(props: StepProps) {
       {s === "api" && (
         <Card title="API endpoint">
           <div className="form-grid">
-            <Field label="Endpoint address" htmlFor="t-api" error={err("apiUrl")} className="wide">
+            <Field label="Endpoint address" htmlFor="t-api" error={err("apiUrl")} className="wide" help="Where messages are sent. May be left empty when an OpenAPI document is given below.">
               <input id="t-api" className="input" value={state.apiUrl} onChange={(e) => patch({ apiUrl: e.target.value })} placeholder="https://agent.example.com/v1/chat" aria-invalid={bad("apiUrl")} />
             </Field>
             <Field label="Method" htmlFor="t-method">
@@ -150,11 +150,11 @@ export function DetailsStep(props: StepProps) {
                 ))}
               </select>
             </Field>
-            <Field label="Protocol" htmlFor="t-proto">
-              <select id="t-proto" className="select" value={state.apiProtocol} onChange={(e) => patch({ apiProtocol: e.target.value as WizardState["apiProtocol"] })}>
+            <Field label="Protocol" htmlFor="t-proto" error={err("apiProtocol")}>
+              <select id="t-proto" className="select" value={state.apiProtocol} onChange={(e) => patch({ apiProtocol: e.target.value as WizardState["apiProtocol"] })} aria-invalid={bad("apiProtocol")}>
                 <option value="rest">REST (JSON)</option>
                 <option value="sse">Server-sent events</option>
-                <option value="websocket">WebSocket</option>
+                <option value="websocket" disabled>WebSocket (not supported in this build)</option>
                 <option value="graphql">GraphQL</option>
               </select>
             </Field>
@@ -164,7 +164,7 @@ export function DetailsStep(props: StepProps) {
             <Field label="Where the answer is (optional)" htmlFor="t-output" help="A JSONPath such as $.reply. AgentLab guesses common shapes when empty.">
               <input id="t-output" className="input mono" value={state.outputPath} onChange={(e) => patch({ outputPath: e.target.value })} />
             </Field>
-            <Field label="OpenAPI document (optional)" htmlFor="t-openapi" error={err("openapiUrl")} help="Lets discovery learn the endpoint's tools and schema.">
+            <Field label="OpenAPI document (optional)" htmlFor="t-openapi" error={err("openapiUrl")} help="Lets discovery learn the endpoint's schema. With no endpoint address, the chat endpoint is found in this document, on the host the document came from.">
               <input id="t-openapi" className="input" value={state.openapiUrl} onChange={(e) => patch({ openapiUrl: e.target.value })} aria-invalid={bad("openapiUrl")} />
             </Field>
           </div>

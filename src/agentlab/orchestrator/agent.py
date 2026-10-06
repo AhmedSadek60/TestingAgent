@@ -302,6 +302,9 @@ class TestOrchestratorAgent:
             with self._phase(run_id, Phase.TARGET_INGESTION, records) as ph:
                 ingested = await discoverer.ingest(spec)
                 held_ingest = ingested
+                # when the owner gave only an OpenAPI document, the endpoint it describes is what is tested from here
+                # on: the plan, the gate, the manifest and every request use this target
+                spec = ingested.spec or spec
                 ra = ingested.repo_analysis
                 ph.set(
                     repository=(
@@ -311,6 +314,7 @@ class TestOrchestratorAgent:
                     ),
                     documents=len(ingested.documents),
                     openapi_endpoints=len(ingested.openapi.endpoints) if ingested.openapi else 0,
+                    api_from_openapi=ingested.spec is not None,
                     warnings=len(ingested.warnings),
                 )
             token.raise_if_cancelled()

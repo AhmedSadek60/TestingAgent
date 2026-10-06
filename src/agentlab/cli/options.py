@@ -27,9 +27,20 @@ Ref = Annotated[str | None, typer.Option("--ref", help="Branch, tag or commit of
 WebUrl = Annotated[
     str | None, typer.Option("--url", help="Web UI of the agent (browser testing).", rich_help_panel=TARGET)
 ]
-ApiUrl = Annotated[str | None, typer.Option("--api-url", help="HTTP endpoint of the agent.", rich_help_panel=TARGET)]
+ApiUrl = Annotated[
+    str | None,
+    typer.Option(
+        "--api-url", help="HTTP endpoint that answers a message: where tests are sent.", rich_help_panel=TARGET
+    ),
+]
 OpenApi = Annotated[
-    str | None, typer.Option("--openapi", help="OpenAPI document URL of the agent's API.", rich_help_panel=TARGET)
+    str | None,
+    typer.Option(
+        "--openapi",
+        help="OpenAPI document URL of the agent's API. It says how to talk to the endpoint; with no --api-url it also "
+        "supplies the endpoint, when that is on the host the document came from.",
+        rich_help_panel=TARGET,
+    ),
 ]
 McpUrl = Annotated[str | None, typer.Option("--mcp-url", help="MCP server (streamable HTTP).", rich_help_panel=TARGET)]
 McpCommand = Annotated[

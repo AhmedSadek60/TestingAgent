@@ -4683,7 +4683,8 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "Address of the agent's endpoint"
+            "description": "Address of the endpoint that answers a message. May be left empty when openapi_url is given: AgentLab then looks for the chat endpoint in that document, uses it when it is on the host the document came from, and says which one it chose.",
+            "default": ""
           },
           "method": {
             "type": "string",
@@ -4795,9 +4796,6 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "url"
-        ],
         "title": "ApiConfig",
         "description": "Black-box HTTP/REST/SSE agent endpoint (spec section 19)."
       },
@@ -7402,6 +7400,12 @@
             "type": "string",
             "title": "Rubric",
             "description": "The instructions the judges were given"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "How much this criterion counts in the attempt's score next to its other checks",
+            "default": 1.0
           },
           "votes": {
             "items": {
@@ -11025,8 +11029,8 @@
           "cleanup_strategy": {
             "type": "string",
             "title": "Cleanup Strategy",
-            "default": "none",
-            "description": "What to undo afterwards"
+            "description": "What a person should undo after the test, if anything. A note: AgentLab itself tears down only what it created (sandboxes, test sites, sessions)",
+            "default": "none"
           },
           "evidence_requirements": {
             "items": {
@@ -11034,7 +11038,7 @@
             },
             "type": "array",
             "title": "Evidence Requirements",
-            "description": "Evidence the test must collect"
+            "description": "The evidence a reviewer should expect for this test. A note: every attempt's trace is kept whatever this says"
           },
           "applicable_agent_types": {
             "items": {
@@ -11042,7 +11046,7 @@
             },
             "type": "array",
             "title": "Applicable Agent Types",
-            "description": "Kinds of agent the test applies to"
+            "description": "The kinds of agent the test was written for. A note: the skill's applicability rules decide whether a test is planned"
           },
           "isolation_key": {
             "anyOf": [

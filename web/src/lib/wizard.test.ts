@@ -51,6 +51,10 @@ describe("reading what a person typed", () => {
     expect(isRemote(wizard({ apiUrl: "http://127.0.0.1:8000/chat" }))).toBe(false);
     expect(isRemote(wizard({ apiUrl: "https://agent.example.com/chat" }))).toBe(true);
     expect(isRemote(wizard({ webUrl: "http://localhost:3000", mcpUrl: "https://mcp.example.com" }))).toBe(true);
+    // with no endpoint address the tests go to the host of the OpenAPI document
+    expect(isRemote(wizard({ openapiUrl: "https://agent.example.com/openapi.json" }))).toBe(true);
+    expect(isRemote(wizard({ openapiUrl: "http://127.0.0.1:8000/openapi.json" }))).toBe(false);
+    expect(isRemote(wizard({ apiUrl: "http://127.0.0.1:8000/chat", openapiUrl: "https://docs.example.com/openapi.json" }))).toBe(false);
     expect(isRemote(wizard())).toBe(false);
   });
 
@@ -73,6 +77,10 @@ describe("what each step needs", () => {
     expect(validateStep("details", wizard({ source: "api", name: "x", apiUrl: "ftp://x" }))).toHaveProperty("apiUrl");
     expect(validateStep("details", wizard({ source: "api", name: "x", apiUrl: "https://x.test/chat", requestTemplate: "[1]" }))).toHaveProperty("requestTemplate");
     expect(validateStep("details", wizard({ source: "api", name: "x", apiUrl: "https://x.test/chat", requestTemplate: '{"q":"{{input}}"}' }))).toEqual({});
+    // an OpenAPI document can stand in for the endpoint address: the endpoint is found in it
+    expect(validateStep("details", wizard({ source: "api", name: "x", openapiUrl: "https://x.test/openapi.json" }))).toEqual({});
+    expect(validateStep("details", wizard({ source: "api", name: "x", openapiUrl: "x.test/openapi.json" }))).toHaveProperty("openapiUrl");
+    expect(validateStep("details", wizard({ source: "api", name: "x", apiUrl: "https://x.test/chat", apiProtocol: "websocket" }))).toHaveProperty("apiProtocol");
     expect(validateStep("details", wizard({ source: "repository", name: "x" }))).toHaveProperty("repoUrl");
     expect(validateStep("details", wizard({ source: "repository", name: "x", repoUrl: "http://insecure.test/r" }))).toHaveProperty("repoUrl");
     expect(validateStep("details", wizard({ source: "url", name: "x", webUrl: "https://app.test" }))).toEqual({});
@@ -151,6 +159,12 @@ describe("the request the answers become", () => {
       api: { url: "https://agent.example.com/chat", method: "POST", auth_credential: "staging", request_template: { message: "{{input}}" }, response: { output: "reply.text" } },
     });
     expect(target?.safety).toMatchObject({ production: false, authorized_risk_classes: ["safe", "controlled"] });
+  });
+
+  it("builds an API target from an OpenAPI document alone, without an address", () => {
+    const target = buildTarget(wizard({ source: "api", name: "Docs only", openapiUrl: " https://agent.example.com/openapi.json " }));
+    expect(target?.api).toMatchObject({ openapi_url: "https://agent.example.com/openapi.json" });
+    expect(target?.api).not.toHaveProperty("url");
   });
 
   it("builds repository, local, web and MCP targets", () => {

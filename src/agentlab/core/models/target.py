@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from agentlab.core.enums import RiskClass
 from agentlab.core.models.base import Model
@@ -38,17 +38,24 @@ class ResponseMapping(Model):
     session_id: str | None = None
 
 
+#: What an API target sends when the owner did not say how the request is shaped.
+DEFAULT_REQUEST_TEMPLATE: dict[str, Any] = {"input": "{{input}}", "session_id": "{{session_id}}"}
+
+
 class ApiConfig(Model):
     """Black-box HTTP/REST/SSE agent endpoint (spec section 19)."""
 
-    url: str
+    url: str = Field(
+        default="",
+        description="Address of the endpoint that answers a message. May be left empty when openapi_url is given: "
+        "AgentLab then looks for the chat endpoint in that document, uses it when it is on the host the document came "
+        "from, and says which one it chose.",
+    )
     method: Literal["POST", "GET", "PUT"] = "POST"
     protocol: Literal["rest", "sse", "websocket", "graphql"] = "rest"
     headers: dict[str, str] = Field(default_factory=dict)
     # A JSON body template. ``{{input}}``, ``{{session_id}}`` and ``{{attachments}}`` are substituted.
-    request_template: dict[str, Any] = Field(
-        default_factory=lambda: {"input": "{{input}}", "session_id": "{{session_id}}"}
-    )
+    request_template: dict[str, Any] = Field(default_factory=lambda: dict(DEFAULT_REQUEST_TEMPLATE))
     response: ResponseMapping = Field(default_factory=ResponseMapping)
     session_header: str | None = None
     auth_credential: str | None = Field(
@@ -62,6 +69,14 @@ class ApiConfig(Model):
         description="Test hook of a disposable deployment: POST {session_id, name, text} adds a document to that "
         "session's knowledge base, so indirect-injection tests can plant a malicious document. Never use in production.",
     )
+
+    @model_validator(mode="after")
+    def _has_an_address(self) -> ApiConfig:
+        if not self.url and not self.openapi_url:
+            raise ValueError(
+                "an api needs an address: set url, or openapi_url so the endpoint can be found in the document"
+            )
+        return self
 
 
 class WebConfig(Model):

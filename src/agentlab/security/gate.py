@@ -66,7 +66,8 @@ def classify_locality(spec: TargetSpec) -> str:
     rank = {"local": 0, "private": 1, "remote": 2}
     worst = "local"  # mock, llm, command (sandboxed) or repository-only targets have no remote host
     for url in (
-        spec.api.url if spec.api else None,
+        # an api given only as an OpenAPI document is tested at the host the document came from
+        (spec.api.url or spec.api.openapi_url) if spec.api else None,
         spec.web.url if spec.web else None,
         spec.mcp.url if spec.mcp else None,
     ):

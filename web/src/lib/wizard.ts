@@ -232,7 +232,8 @@ function parseTemplate(text: string): Record<string, unknown> | "invalid" | null
 
 /** Where a target runs decides what adversarial testing needs: an address on this machine is "local". */
 export function isRemote(state: WizardState): boolean {
-  const urls = [state.webUrl, state.apiUrl, state.mcpUrl].filter(Boolean);
+  // an API given only as an OpenAPI document is tested at the host that document came from
+  const urls = [state.webUrl, state.apiUrl.trim() || state.openapiUrl, state.mcpUrl].filter(Boolean);
   if (urls.length === 0) return false;
   return urls.some((text) => {
     try {
@@ -276,9 +277,10 @@ export function validateStep(step: StepId, s: WizardState): Problems {
         if (s.loginUrl.trim() && !isHttpUrl(s.loginUrl)) p.loginUrl = "Use a full http:// or https:// address.";
       }
       if (s.source === "api") {
-        if (!s.apiUrl.trim()) p.apiUrl = "Enter the endpoint address.";
-        else if (!isHttpUrl(s.apiUrl)) p.apiUrl = "Use a full http:// or https:// address.";
+        if (!s.apiUrl.trim() && !s.openapiUrl.trim()) p.apiUrl = "Enter the endpoint address, or an OpenAPI document that describes it.";
+        else if (s.apiUrl.trim() && !isHttpUrl(s.apiUrl)) p.apiUrl = "Use a full http:// or https:// address.";
         if (s.openapiUrl.trim() && !isHttpUrl(s.openapiUrl)) p.openapiUrl = "Use a full http:// or https:// address.";
+        if (s.apiProtocol === "websocket") p.apiProtocol = "WebSocket endpoints are not supported in this build. Use REST, server-sent events or GraphQL.";
         if (parseTemplate(s.requestTemplate) === "invalid") p.requestTemplate = "This must be a JSON object, for example {\"input\": \"{{input}}\"}.";
       }
       if (s.source === "mcp") {
@@ -391,7 +393,7 @@ export function buildTarget(s: WizardState): TargetSpec | null {
     case "api": {
       const template = parseTemplate(s.requestTemplate);
       spec.api = {
-        url: s.apiUrl.trim(),
+        ...(s.apiUrl.trim() ? { url: s.apiUrl.trim() } : {}),
         method: s.apiMethod,
         protocol: s.apiProtocol,
         openapi_url: s.openapiUrl.trim() || null,

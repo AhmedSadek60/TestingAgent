@@ -108,18 +108,21 @@ def build_target(
     if repo:
         is_remote = repo.startswith(("http://", "https://", "git@"))
         data["repository"] = RepositorySource(url=repo, ref=ref) if is_remote else RepositorySource(path=repo, ref=ref)
+    # A flag changes only what it names: the rest of an interface keeps what the target file says (headers, selectors,
+    # credentials, timeouts, ...), and a new interface is created when the file has none.
     if url:
-        data["web"] = WebConfig(url=url)
+        data["web"] = _with(spec.web, WebConfig, url=url)
     if api_url or openapi:
-        data["api"] = ApiConfig(url=api_url or openapi or "", openapi_url=openapi)
+        data["api"] = _with(spec.api, ApiConfig, **{k: v for k, v in (("url", api_url), ("openapi_url", openapi)) if v})
     if mcp_url:
-        data["mcp"] = McpConfig(transport="streamable_http", url=mcp_url)
+        keep_http = spec.mcp is not None and spec.mcp.transport in ("streamable_http", "sse")
+        data["mcp"] = _with(spec.mcp, McpConfig, url=mcp_url, **({} if keep_http else {"transport": "streamable_http"}))
     elif mcp_command:
-        data["mcp"] = McpConfig(transport="stdio", command=mcp_command.split())
+        data["mcp"] = _with(spec.mcp, McpConfig, transport="stdio", command=mcp_command.split())
     if command:
-        data["command"] = CommandConfig(command=command.split())
+        data["command"] = _with(spec.command, CommandConfig, command=command.split())
     if mock:
-        data["mock"] = MockAgentConfig(behaviors=mock)
+        data["mock"] = _with(spec.mock, MockAgentConfig, behaviors=mock)
     if llm:
         data["llm"] = _llm_target(llm, system_prompt, spec.llm)
     if docs:
@@ -139,6 +142,11 @@ def build_target(
                 iface.auth_credential = credentials[0]
     _apply_authorization(spec, authorize, authorization_note, disposable, production)
     return spec
+
+
+def _with(current: Any, cls: Any, **fields: Any) -> Any:
+    """``current`` with ``fields`` replaced, or a new ``cls(**fields)`` when there is no ``current``."""
+    return current.model_copy(update=fields) if current is not None else cls(**fields)
 
 
 def _llm_target(ref: str, system_prompt: str | None, current: LlmTargetConfig | None) -> LlmTargetConfig:

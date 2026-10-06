@@ -184,6 +184,11 @@ class AgentApiAdapter(AgentAdapter):
         self._client: httpx.AsyncClient | None = None
 
     async def open(self) -> None:
+        if not self.cfg.url:
+            raise TargetError(
+                "the api has no address to send messages to (api.url is empty and none could be taken from the OpenAPI "
+                "document); set api.url or pass --api-url"
+            )
         self.ctx.egress.check(self.cfg.url)
         self._client = httpx.AsyncClient(timeout=self.cfg.timeout_seconds, follow_redirects=False)
 

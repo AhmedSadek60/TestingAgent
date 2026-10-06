@@ -1022,9 +1022,10 @@ export interface components {
         ApiConfig: {
             /**
              * Url
-             * @description Address of the agent's endpoint
+             * @description Address of the endpoint that answers a message. May be left empty when openapi_url is given: AgentLab then looks for the chat endpoint in that document, uses it when it is on the host the document came from, and says which one it chose.
+             * @default
              */
-            url: string;
+            url?: string;
             /**
              * Method
              * @description HTTP method to use
@@ -2842,6 +2843,12 @@ export interface components {
              * @description The instructions the judges were given
              */
             rubric: string;
+            /**
+             * Weight
+             * @description How much this criterion counts in the attempt's score next to its other checks
+             * @default 1
+             */
+            weight?: number;
             /**
              * Votes
              * @description What each judge decided
@@ -5156,18 +5163,18 @@ export interface components {
             repetitions?: number | null;
             /**
              * Cleanup Strategy
-             * @description What to undo afterwards
+             * @description What a person should undo after the test, if anything. A note: AgentLab itself tears down only what it created (sandboxes, test sites, sessions)
              * @default none
              */
             cleanup_strategy?: string;
             /**
              * Evidence Requirements
-             * @description Evidence the test must collect
+             * @description The evidence a reviewer should expect for this test. A note: every attempt's trace is kept whatever this says
              */
             evidence_requirements?: string[];
             /**
              * Applicable Agent Types
-             * @description Kinds of agent the test applies to
+             * @description The kinds of agent the test was written for. A note: the skill's applicability rules decide whether a test is planned
              */
             applicable_agent_types?: components["schemas"]["AgentType"][];
             /**
