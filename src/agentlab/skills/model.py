@@ -44,7 +44,8 @@ class Applicability(Model):
 
 
 class Prerequisites(Model):
-    """What must be available for the skill's tests to *run* (missing items make tests BLOCKED, not FAILED)."""
+    """What the skill's tests need, as `agentlab skills show` tells a reader. It describes; it does not decide. Whether a
+    test is BLOCKED (never FAILED) comes from that test's own ``interfaces``, ``credentials`` and ``preconditions``."""
 
     interfaces_any: list[str] = Field(default_factory=list)
     credentials: bool = False
