@@ -28,7 +28,7 @@ RUN python -m venv /opt/venv
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY --from=web /repo/src/agentlab/api/static ./src/agentlab/api/static
-RUN /opt/venv/bin/pip install ".[redis,postgres,mcp]"
+RUN /opt/venv/bin/pip install ".[anthropic,redis,postgres,mcp]"
 
 # ---- what runs ----------------------------------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS runtime
