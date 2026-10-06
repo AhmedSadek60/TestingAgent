@@ -272,7 +272,12 @@ def render_comparison(c: Comparison) -> None:
 ReviewRun = Annotated[str, typer.Argument(help="Run id (an id prefix is enough).")]
 Reviewer = Annotated[str, typer.Option("--reviewer", help="Who is reviewing (recorded with the review).")]
 Decision = Annotated[str, typer.Option("--decision", "-d", help=f"One of: {DECISIONS}.")]
-Reason = Annotated[str, typer.Option("--reason", help="Why (required for most decisions).")]
+Reason = Annotated[
+    str,
+    typer.Option(
+        "--reason", help="Why. Required for false_positive, false_negative, override_score and change_severity."
+    ),
+]
 Comment = Annotated[str, typer.Option("--comment", help="An optional note for the next reader.")]
 
 

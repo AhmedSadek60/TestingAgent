@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 from agentlab.core.config import AgentLabConfig, EvaluationConfig, JudgeConfig, ProviderConfig
-from agentlab.orchestrator.manifest import comparable, compare_manifests, config_fingerprint
+from agentlab.orchestrator.manifest import comparable, compare_manifests, config_fingerprint, replays
 
 BASE = {
     "agentlab_version": "0.1.0",
@@ -62,6 +62,35 @@ def test_major_version_change_blocks_but_patch_change_does_not() -> None:
     assert not comparable(compare_manifests(BASE, changed(agentlab_version="1.0.0")))
     patch = compare_manifests(BASE, changed(agentlab_version="0.1.3"))
     assert comparable(patch) and patch[0].impact == "info"
+
+
+def replay_of(base: dict, baseline_run_id: str) -> dict:  # type: ignore[type-arg]
+    """The manifest of a run started with ``--baseline``: a plan of its own (new hash, the regression suite)."""
+    m = copy.deepcopy(base)
+    m["run_id"] = "run-b"
+    m["plan"] = {"hash": "p2", "intensity": "standard", "suite": "regression"}
+    m["options"] = {**m["options"], "baseline_run_id": baseline_run_id}
+    return m
+
+
+def test_a_replay_has_a_plan_of_its_own_and_that_is_expected_not_a_caveat() -> None:
+    base = changed(run_id="run-a")
+    replay = replay_of(base, "run-a")
+    assert replays(base, replay) and not replays(replay, base) and not replays(base, base)
+    diffs = {d.field: d for d in compare_manifests(base, replay)}
+    assert set(diffs) == {"plan.hash", "plan.suite"}
+    assert {d.impact for d in diffs.values()} == {"info"} and comparable(list(diffs.values()))
+    assert "replays" in diffs["plan.hash"].note
+
+
+def test_a_run_that_replays_some_other_run_still_has_caveats_against_this_one() -> None:
+    base = changed(run_id="run-a")
+    elsewhere = replay_of(base, "run-z")
+    assert not replays(base, elsewhere)
+    assert {d.field: d.impact for d in compare_manifests(base, elsewhere)} == {
+        "plan.hash": "caveat",
+        "plan.suite": "caveat",
+    }
 
 
 def test_environment_difference_explains_blocked_tests() -> None:

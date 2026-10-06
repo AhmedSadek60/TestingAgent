@@ -746,6 +746,47 @@ def test_a_changed_skill_or_plan_is_a_caveat_and_a_changed_test_is_not_compared(
     assert "differ in content" in " ".join(comparison.compatibility.notes)
 
 
+def test_the_trend_of_a_report_is_what_led_up_to_its_run(lab: Lab) -> None:
+    """``good`` ran first and ``bad`` second, both against the target 'demo': the report of the older run is not changed by a
+    newer one, and each run is the last point of its own trend."""
+    first = lab.report_json("good")["trend"]
+    second = lab.report_json("bad")["trend"]
+    assert [p["run_id"] for p in first["points"]] == [lab.good]
+    assert "first recorded run" in first["note"]
+    assert [p["run_id"] for p in second["points"]] == [lab.good, lab.bad]
+    assert "Earlier runs" in second["note"]
+
+
+def test_a_replay_is_compared_one_to_one_and_is_not_told_to_replay_what_it_replays(lab: Lab) -> None:
+    """B was started with ``--baseline A``: its own plan (new hash, the regression suite) is expected, and the tests only A
+    has are the follow-ups A's own results called for. Telling the reader to replay A's tests would be wrong."""
+    a = load_material(lab.sv, lab.bad)
+    b = copy.deepcopy(a)
+    b.run["id"] = "run-b"
+    b.manifest["run_id"] = "run-b"
+    b.manifest["plan"] = {**b.manifest["plan"], "hash": "replay", "suite": "regression"}
+    b.manifest["options"] = {**(b.manifest.get("options") or {}), "baseline_run_id": a.run_id}
+    comparison = compare_material(a, b)
+    impacts = {d.field: d.impact for d in comparison.compatibility.differences}
+    assert impacts == {"plan.hash": "info", "plan.suite": "info"}
+    assert comparison.compatibility.verdict == "comparable" and not comparison.compatibility.notes
+
+    dropped = b.results.pop()  # a test A ran that the replay did not: a follow-up of A's second wave
+    again = compare_material(a, b)
+    notes = " ".join(again.compatibility.notes)
+    assert again.compatibility.only_a == 1 and "replays the tests A started with" in notes
+    assert "--baseline" not in notes and "designed separately" not in notes, dropped.test_id
+    assert again.compatibility.verdict == "comparable_with_caveats"
+
+    c = copy.deepcopy(b)  # the same difference without a replay is still told to replay
+    c.manifest["options"] = {**c.manifest["options"], "baseline_run_id": None}
+    c.manifest["plan"] = {**c.manifest["plan"], "suite": "functional"}
+    unrelated = compare_material(a, c)
+    text = " ".join(unrelated.compatibility.notes)
+    assert "designed separately" in text and f"agentlab test --baseline {a.run_id[:8]}" in text
+    assert {d.field: d.impact for d in unrelated.compatibility.differences}["plan.hash"] == "caveat"
+
+
 def test_a_report_made_with_a_baseline_carries_the_regression_section(lab: Lab, tmp_path: Path) -> None:
     bundle = generate_report(lab.sv, lab.bad, formats=["json", "md"], baseline=lab.good, output=tmp_path / "vs")
     data = json.loads(bundle.paths["json"].read_text(encoding="utf-8"))

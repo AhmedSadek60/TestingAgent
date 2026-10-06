@@ -3983,7 +3983,7 @@ export interface components {
             reviewer: string;
             /**
              * Reason
-             * @description Required for every decision except approve
+             * @description Why. Required for false_positive, false_negative, override_score and change_severity
              * @default
              */
             reason?: string;

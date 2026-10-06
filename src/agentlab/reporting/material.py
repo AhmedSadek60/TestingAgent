@@ -97,6 +97,7 @@ def load_material(
     previous = store.latest_report(run_id)
 
     history: list[dict[str, Any]] = []
+    started = str(run.get("started_at") or run.get("created_at") or "")
     if run.get("target_id"):
         for other in store.list_runs(run.get("project_id"), limit=200):
             if other["id"] == run_id or other.get("target_id") != run.get("target_id"):
@@ -117,7 +118,8 @@ def load_material(
                 }
             )
         history.sort(key=lambda h: str(h["started_at"]))
-        history = history[-history_limit:]
+        # the trend is what led up to this run: a report of an older run does not change when newer runs are added
+        history = [h for h in history if not started or str(h["started_at"]) < started][-history_limit:]
 
     return RunMaterial(
         run=run,

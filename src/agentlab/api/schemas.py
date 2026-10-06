@@ -326,7 +326,11 @@ class ReviewRequest(Model):
     subject_id: str = Field(description="The id of the test (or result) or of the finding")
     decision: ReviewDecision
     reviewer: str = Field(min_length=1, max_length=120, description="Who is deciding")
-    reason: str = Field(default="", max_length=2000, description="Required for every decision except approve")
+    reason: str = Field(
+        default="",
+        max_length=2000,
+        description="Why. Required for false_positive, false_negative, override_score and change_severity",
+    )
     comment: str = Field(default="", max_length=2000)
     score: float | None = Field(default=None, ge=0, le=1, description="override_score only")
     severity: Severity | None = Field(default=None, description="change_severity and false_negative")

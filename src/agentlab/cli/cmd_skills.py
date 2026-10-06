@@ -25,7 +25,7 @@ from agentlab.skills.loader import discover_skill_dirs, load_skill_dir
 from agentlab.skills.model import NAME, REQUIRED_DOC_SECTIONS
 
 skills_app = typer.Typer(
-    help="The test skills AgentLab uses: list, show, create, import and promote.", no_args_is_help=True
+    help="The test skills AgentLab uses: list, show, validate, new, import, forge and promote.", no_args_is_help=True
 )
 
 TRUST_STYLE = {

@@ -23,7 +23,7 @@ from agentlab.core.ids import utcnow
 from agentlab.core.models import TestResult
 from agentlab.core.models.base import Model
 from agentlab.design.models import PlannedTest
-from agentlab.orchestrator.manifest import ManifestDifference, compare_manifests
+from agentlab.orchestrator.manifest import ManifestDifference, compare_manifests, replays
 from agentlab.reporting.material import RunMaterial, load_material
 from agentlab.reporting.util import clean, label, mean, money, ms, percentile, plural
 from agentlab.services import Services
@@ -324,11 +324,18 @@ def _compat(mat_a: RunMaterial, mat_b: RunMaterial, deltas: list[TestDelta]) -> 
         notes.append(f"{plural(changed, 'test')} share an id but differ in content and were not compared.")
     only_a, only_b = len(ids_a - ids_b), len(ids_b - ids_a)
     if only_a or only_b:
-        notes.append(
-            f"{only_a} test(s) exist only in A and {only_b} only in B: the two plans were designed separately. "
-            f"To compare like with like, replay A's tests against B's target with `agentlab test --baseline "
-            f"{mat_a.run_id[:8]}`."
-        )
+        if replays(mat_a.manifest, mat_b.manifest):
+            notes.append(
+                f"B replays the tests A started with, so those are compared one to one. {only_a} test(s) exist only "
+                f"in A and {only_b} only in B: follow-up tests are chosen from the results of the run that adds them, "
+                "so a replay does not repeat the ones A added in its later waves."
+            )
+        else:
+            notes.append(
+                f"{only_a} test(s) exist only in A and {only_b} only in B: the two plans were designed separately. "
+                f"To compare like with like, replay A's tests against B's target with `agentlab test --baseline "
+                f"{mat_a.run_id[:8]}`."
+            )
     blocking = [d for d in diffs if d.impact == "blocks_comparison"]
     caveats = [d for d in diffs if d.impact == "caveat"]
     if mat_a.run_id == mat_b.run_id:
