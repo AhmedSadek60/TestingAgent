@@ -65,7 +65,11 @@ async def open_runtime(
         sandbox=services.sandbox,
         workdir=workdir,
         run_id=run_id,
-        extras={"canary_secret": resolver.canary("system_secret"), **(extras or {})},
+        extras={
+            "canary_secret": resolver.canary("system_secret"),
+            "browser_pool": services.browser_pool,
+            **(extras or {}),
+        },
     )
     return await TargetRuntime(spec, ctx).open()
 

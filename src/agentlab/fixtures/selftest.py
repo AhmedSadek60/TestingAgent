@@ -36,11 +36,11 @@ from typing import Any
 import yaml
 from pydantic import Field
 
+from agentlab.browser.environment import browser_status
 from agentlab.core.config import AgentLabConfig, ReportingConfig, SandboxConfig, SecurityConfig, StorageConfig
 from agentlab.core.enums import Severity, TestStatus
 from agentlab.core.models import TargetSpec
 from agentlab.core.models.base import Model
-from agentlab.execution.environment import browser_status
 from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.sandbox.docker import DockerSandboxProvider

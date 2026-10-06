@@ -576,6 +576,7 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
             "detected": by.get(AgentType.BROWSER, 0) >= 0.5,
             "frameworks": repo.browser_frameworks if repo else [],
             "web_interface": spec.web.url if spec.web else None,
+            "page": inp.web or {},
         },
         multi_agent={
             "detected": by.get(AgentType.MULTI_AGENT, 0) >= 0.5,

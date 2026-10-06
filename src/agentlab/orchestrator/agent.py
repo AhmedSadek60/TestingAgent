@@ -295,7 +295,7 @@ class TestOrchestratorAgent:
                 run_id=run_id,
                 web_discoverer=sv.web_discoverer,
                 sandbox=sv.sandbox,
-                extras={"canary_secret": resolver.canary("system_secret")},
+                extras={"canary_secret": resolver.canary("system_secret"), "browser_pool": sv.browser_pool},
             )
 
             # ---- 2. target ingestion -------------------------------------------------------------------------
@@ -529,6 +529,7 @@ class TestOrchestratorAgent:
                 warnings=warnings,
                 suite_id=suite["id"],
                 selected_skills=[m.skill for m in plan.skills if m.selected],
+                closers=[sv.close_browser],
             )
         except BaseException as exc:
             await self._abort(run_id, exc, held_runtime, held_ingest, workdir, opts)
@@ -554,6 +555,10 @@ class TestOrchestratorAgent:
                 await runtime.close()
             except Exception:  # noqa: S110 - best-effort cleanup
                 pass
+        try:
+            await self.services.close_browser()
+        except Exception:  # noqa: S110 - best-effort cleanup
+            pass
         if ingested is not None:
             ingested.cleanup()
         if not opts.keep_workspace:
@@ -735,6 +740,7 @@ class TestOrchestratorAgent:
                 "sandbox": sv.sandbox,
                 "credentials": sv.credentials,
                 "providers": sv.providers,
+                "browser_pool": sv.browser_pool,
             },
         )
         executor = TestExecutor(deps)

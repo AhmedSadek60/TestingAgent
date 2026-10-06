@@ -471,7 +471,14 @@ def playwright_tests(sk: SkillRun) -> None:
         "The agent's web UI is part of the product: it must load cleanly, round-trip a message and render hostile text safely (taxonomy J)."
     ]
     ev = [f"web url: {web.url}", f"selectors: input={web.input_selector or 'auto'}, send={web.send_selector or 'auto'}"]
-    base: dict[str, Any] = dict(interfaces=["web"], timeout=120, why=why, evidence=ev, tags=["ui", "browser"])
+    base: dict[str, Any] = dict(
+        interfaces=["web"],
+        timeout=120,
+        why=why,
+        evidence=ev,
+        tags=["ui", "browser"],
+        credentials=[web.auth_credential] if web.auth_credential else None,
+    )
     sk.add(
         "LOADS",
         "The chat page loads without errors",
@@ -483,7 +490,8 @@ def playwright_tests(sk: SkillRun) -> None:
         ],
         assertions=[
             A("state_equals", path="browser.page_errors", equals=0, description="no uncaught page errors"),
-            A("state_equals", path="browser.load_failed", equals=False),
+            A("state_equals", path="browser.load_failed", equals=False, description="the page loaded"),
+            A("state_equals", path="browser.expectation_failures", equals=0, description="the message box is visible"),
         ],
         severity=Severity.HIGH,
         subcategory="page-load",
@@ -499,7 +507,10 @@ def playwright_tests(sk: SkillRun) -> None:
             {"action": "chat", "value": "What is the capital of France?"},
             {"action": "screenshot"},
         ],
-        assertions=[A("contains", values=["Paris"]), A("state_equals", path="browser.page_errors", equals=0)],
+        assertions=[
+            A("contains", values=["Paris"], description="the answer appears in the conversation"),
+            A("state_equals", path="browser.page_errors", equals=0),
+        ],
         severity=Severity.HIGH,
         subcategory="chat-roundtrip",
         metrics=["ui_task_success"],
@@ -511,10 +522,13 @@ def playwright_tests(sk: SkillRun) -> None:
         "Pressing send with an empty box does nothing harmful",
         browser_steps=[
             {"action": "goto", "value": web.url},
-            {"action": "click", "target": web.send_selector or "button[type=submit]"},
+            {
+                "action": "click",
+                "target": web.send_selector or "button[type=submit], button:has-text('Send'), input[type=submit]",
+            },
             {"action": "screenshot"},
         ],
-        assertions=[A("state_equals", path="browser.page_errors", equals=0)],
+        assertions=[A("state_equals", path="browser.page_errors", equals=0, description="no uncaught page errors")],
         severity=Severity.LOW,
         subcategory="empty-input",
         metrics=["ui_robustness"],
@@ -530,6 +544,12 @@ def playwright_tests(sk: SkillRun) -> None:
             {"action": "screenshot"},
         ],
         assertions=[
+            A(
+                "state_equals",
+                path="browser.step_failures",
+                equals=0,
+                description="the hostile message was actually submitted (otherwise this check proves nothing)",
+            ),
             A("state_equals", path="browser.dialog_count", equals=0, description="no alert() dialog was triggered"),
             A("state_equals", path="browser.page_errors", equals=0),
         ],
@@ -550,7 +570,13 @@ def playwright_tests(sk: SkillRun) -> None:
             {"action": "chat", "value": "What date did I mention?"},
             {"action": "screenshot"},
         ],
-        assertions=[A("contains", values=["October 20", "Oct 20", "20 October"])],
+        assertions=[
+            A(
+                "contains",
+                values=["October 20", "Oct 20", "20 October"],
+                description="the second answer uses what the first message said",
+            )
+        ],
         severity=Severity.MEDIUM,
         subcategory="multi-turn-ui",
         metrics=["ui_task_success"],

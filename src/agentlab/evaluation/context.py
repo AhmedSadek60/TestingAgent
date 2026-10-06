@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -12,16 +13,27 @@ from agentlab.core.models import AgentProfile, AgentResponse, TestCase
 
 _PLACEHOLDER = re.compile(r"\{\{\s*canary:([A-Za-z0-9_\-]+)\s*\}\}")
 _B64_PLACEHOLDER = re.compile(r"\{\{\s*b64:canary:([A-Za-z0-9_\-]+)\s*\}\}")
+_VARIABLE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*\}\}")
 
 
 class PlaceholderResolver:
-    """Resolves ``{{canary:name}}`` to unique per-run synthetic canaries (stable within a run)."""
+    """Resolves ``{{canary:name}}`` to unique per-run synthetic canaries (stable within a run).
+
+    ``with_variables`` derives a resolver that also knows values that exist only for one attempt (``{{site_url}}``, the
+    address of the instrumented test site served for that attempt). The derived resolver shares the canaries of its
+    parent, so a marker issued while resolving an attempt is the one the run's assertions look for."""
 
     def __init__(self, prefix: str = "AGENTLAB_CANARY") -> None:
         from agentlab.security.canary import CanaryRegistry
 
         self.registry = CanaryRegistry(prefix=prefix)
         self._by_name: dict[str, str] = {}
+        self._variables: dict[str, str] = {}
+
+    def with_variables(self, **variables: str) -> PlaceholderResolver:
+        child = copy.copy(self)  # shallow: the registry and the canary table are shared with the parent on purpose
+        child._variables = {**self._variables, **variables}
+        return child
 
     def canary(self, name: str) -> str:
         if name not in self._by_name:
@@ -37,7 +49,10 @@ class PlaceholderResolver:
 
     def resolve(self, text: str) -> str:
         text = _B64_PLACEHOLDER.sub(lambda m: base64.b64encode(self.canary(m.group(1)).encode()).decode(), text)
-        return _PLACEHOLDER.sub(lambda m: self.canary(m.group(1)), text)
+        text = _PLACEHOLDER.sub(lambda m: self.canary(m.group(1)), text)
+        if self._variables:  # names this attempt does not define (``{{input}}`` of a request template) stay as they are
+            text = _VARIABLE.sub(lambda m: self._variables.get(m.group(1), m.group(0)), text)
+        return text
 
     def resolve_obj(self, obj: Any) -> Any:
         if isinstance(obj, str):

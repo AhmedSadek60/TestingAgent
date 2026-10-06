@@ -133,6 +133,7 @@ async def _discover(services: Services, spec: TargetSpec, *, probe: bool) -> Dis
             browser_available=browser_ok,
             web_discoverer=services.web_discoverer,
             sandbox=services.sandbox,
+            extras={"browser_pool": services.browser_pool},
         )
         return await agent.discover(spec, probe=probe)
     finally:

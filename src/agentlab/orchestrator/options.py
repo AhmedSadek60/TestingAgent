@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import shutil
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -112,6 +113,8 @@ class PreparedRun:
     suite_id: str | None = None
     selected_skills: list[Any] = field(default_factory=list)
     started_at: datetime = field(default_factory=utcnow)
+    #: other things to release when the run is over (the shared browser), each awaited once, errors ignored
+    closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     _closed: bool = False
 
     async def aclose(self) -> None:
@@ -120,6 +123,9 @@ class PreparedRun:
         self._closed = True
         with contextlib.suppress(Exception):
             await self.runtime.close()
+        for closer in self.closers:
+            with contextlib.suppress(Exception):
+                await closer()
         self.ingested.cleanup()
         if not self.options.keep_workspace:
             shutil.rmtree(self.workdir, ignore_errors=True)

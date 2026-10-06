@@ -14,8 +14,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from agentlab.browser.discover import discover_web
+from agentlab.browser.environment import browser_status
+from agentlab.browser.pool import BrowserPool
 from agentlab.core.config import AgentLabConfig
-from agentlab.execution.environment import browser_status
+from agentlab.core.models import TargetSpec
 from agentlab.providers import ProviderManager
 from agentlab.sandbox import SandboxProvider, create_sandbox_provider
 from agentlab.security.credentials import CredentialManager, EncryptedSecretStore
@@ -52,6 +55,7 @@ class Services:
     web_discoverer: WebDiscoverer | None = None
     reporter: Reporter | None = None
     startup_warnings: list[str] = field(default_factory=list)
+    _browser_pool: BrowserPool | None = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -77,7 +81,7 @@ class Services:
             from agentlab.reporting.bundle import default_reporter  # local: the reporting package builds on Services
 
             reporter = default_reporter
-        return cls(
+        services = cls(
             config=cfg,
             store=store or _open_store(_db_url(base, cfg.storage.database_url), migrate),
             artifacts=artifacts or LocalArtifactStore(_under(base, cfg.storage.artifacts_dir)),
@@ -88,6 +92,8 @@ class Services:
             reporter=reporter,
             startup_warnings=warnings,
         )
+        services.web_discoverer = services.discover_web
+        return services
 
     # ------------------------------------------------------------------ environment questions
     async def docker_status(self) -> tuple[bool, str]:
@@ -96,12 +102,28 @@ class Services:
     def browser_status(self) -> tuple[bool, str]:
         return browser_status(self.config)
 
+    @property
+    def browser_pool(self) -> BrowserPool:
+        """The run's shared Chromium (started on first use, so a run that never opens a page never launches one)."""
+        if self._browser_pool is None:
+            self._browser_pool = BrowserPool(self.config)
+        return self._browser_pool
+
+    async def discover_web(self, spec: TargetSpec) -> dict[str, Any]:
+        return await discover_web(self.browser_pool, spec, self.credentials)
+
+    async def close_browser(self) -> None:
+        """Stop Chromium and Playwright. Call it on the event loop that used them, once a run is over."""
+        if self._browser_pool is not None:
+            await self._browser_pool.aclose()
+
     def workdir(self, run_id: str) -> Path:
         path = self.base_dir / ".agentlab" / "work" / run_id
         path.mkdir(parents=True, exist_ok=True)
         return path
 
     async def aclose(self) -> None:
+        await self.close_browser()
         await self.providers.aclose()
         self.store.db.dispose()
 

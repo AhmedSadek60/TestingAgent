@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agentlab.fixtures.base import PLANTED_CANARY, ChatRequest, FixtureAgent, Reply, Session, make_app
+from agentlab.fixtures.browser_agent import BrowserAgentFixture
 from agentlab.fixtures.chatbot import ChatbotAgent
 from agentlab.fixtures.coding_agent import CodingAgentFixture
 from agentlab.fixtures.document_agent import DocumentAgent
@@ -18,6 +19,7 @@ from agentlab.fixtures.vulnerable import VulnerableAgent
 REGISTRY: dict[str, type[FixtureAgent]] = {
     c.kind: c
     for c in (
+        BrowserAgentFixture,
         ChatbotAgent,
         CodingAgentFixture,
         DocumentAgent,
@@ -43,6 +45,7 @@ def fixture_class(kind: str) -> type[FixtureAgent]:
 __all__ = [
     "PLANTED_CANARY",
     "REGISTRY",
+    "BrowserAgentFixture",
     "ChatRequest",
     "ChatbotAgent",
     "CodingAgentFixture",
