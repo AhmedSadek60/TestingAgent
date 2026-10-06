@@ -113,7 +113,7 @@ class CommandAdapter(AgentAdapter):
     def workdir(self) -> str:
         """Where the command starts: what the owner set, otherwise next to the agent's own code in chat mode and in the
         workspace in task mode."""
-        if "workdir" in self.cfg.model_fields_set:
+        if self.cfg.workdir:
             return self.cfg.workdir
         return AGENT_DIR if self.cfg.mode == "chat" and self._repo_path() else WORKSPACE_DIR
 

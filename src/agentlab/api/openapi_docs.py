@@ -266,7 +266,7 @@ note: Why the score is missing or limited
 mode: chat (one command run per message) or task (a coding agent working on a disposable workspace)
 image: Container image to run the command in; default: the sandbox's image
 command: The command and its arguments, run inside the sandbox
-workdir: Working directory inside the sandbox
+workdir: Working directory inside the sandbox (default: next to the agent's code in chat mode when there is a repository, the workspace otherwise)
 env: Environment of the command. Never put a secret here
 network: none, internal or allowlist; a sandboxed target has no network by default
 allow_hosts: Hosts reachable when network is allowlist

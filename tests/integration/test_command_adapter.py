@@ -93,6 +93,18 @@ def test_chat_and_task_modes_declare_different_capabilities(tmp_path: Path) -> N
     assert adapter_for(tmp_path, sandbox=None, mode="task", workdir="/work").workdir() == "/work"
 
 
+def test_the_default_working_directory_survives_a_trip_through_a_job_queue_or_the_database(tmp_path: Path) -> None:
+    """A target submitted through the API is serialised and read back, which writes every field. The default used to be
+    decided by "was workdir written?", so a chat agent ran in /workspace, where its code is not."""
+    made = adapter_for(tmp_path, sandbox=DisabledSandboxProvider(), mode="chat")
+    stored = TargetSpec.model_validate_json(made.spec.model_dump_json())
+    assert stored.command is not None and "workdir" in stored.command.model_fields_set
+    again = CommandAdapter(stored, AdapterContext(config=AgentLabConfig(), extras=made.ctx.extras))
+    assert again.workdir() == "/agent"
+    explicit = CommandConfig(command=["x"], workdir="/somewhere")
+    assert CommandConfig.model_validate_json(explicit.model_dump_json()).workdir == "/somewhere"
+
+
 async def test_a_task_runner_is_not_asked_questions(tmp_path: Path) -> None:
     task = adapter_for(tmp_path, sandbox=DisabledSandboxProvider(), mode="task")
     with pytest.raises(UnsupportedCapability, match="coding agent"):

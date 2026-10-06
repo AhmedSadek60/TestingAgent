@@ -100,7 +100,11 @@ class CommandConfig(Model):
     mode: Literal["chat", "task"] = "chat"
     image: str | None = None
     command: list[str]
-    workdir: str = "/workspace"
+    workdir: str | None = Field(
+        default=None,
+        description="Working directory inside the sandbox. Default: next to the agent's own code (/agent) in chat mode "
+        "when the target has a repository, the workspace (/workspace) otherwise",
+    )
     env: dict[str, str] = Field(default_factory=dict)
     timeout_seconds: float = 300.0
     network: Literal["none", "internal", "allowlist"] = "none"

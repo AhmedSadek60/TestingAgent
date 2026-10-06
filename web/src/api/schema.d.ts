@@ -1696,10 +1696,9 @@ export interface components {
             command: string[];
             /**
              * Workdir
-             * @description Working directory inside the sandbox
-             * @default /workspace
+             * @description Working directory inside the sandbox. Default: next to the agent's own code (/agent) in chat mode when the target has a repository, the workspace (/workspace) otherwise
              */
-            workdir?: string;
+            workdir?: string | null;
             /**
              * Env
              * @description Environment of the command. Never put a secret here

@@ -5723,10 +5723,16 @@
             "description": "The command and its arguments, run inside the sandbox"
           },
           "workdir": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Workdir",
-            "default": "/workspace",
-            "description": "Working directory inside the sandbox"
+            "description": "Working directory inside the sandbox. Default: next to the agent's own code (/agent) in chat mode when the target has a repository, the workspace (/workspace) otherwise"
           },
           "env": {
             "additionalProperties": {
