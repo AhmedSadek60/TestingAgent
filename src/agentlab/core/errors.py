@@ -22,6 +22,11 @@ class UserError(AgentLabError):
     kind = ErrorKind.USER_ERROR
 
 
+class NotFoundError(UserError):
+    """The thing the person named does not exist (a run, a target, a report). A user error for the CLI (exit code 2) and
+    a 404 for the API."""
+
+
 class TargetError(AgentLabError):
     kind = ErrorKind.TARGET_ERROR
 

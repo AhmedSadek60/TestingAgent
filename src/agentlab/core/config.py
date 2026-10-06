@@ -147,8 +147,55 @@ class PlanningConfig(Model):
 
 
 class QueueConfig(Model):
-    backend: Literal["inline", "redis"] = "inline"
-    redis_url: str = "redis://localhost:6379/0"
+    """Where runs wait for a worker (spec section 47). ``inline`` runs them inside the API process; ``redis`` hands them to
+    ``agentlab worker`` processes, so the API stays responsive and runs survive an API restart."""
+
+    backend: Literal["inline", "redis"] = Field(
+        default="inline", description="inline (this process) or redis (workers)"
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis server of the redis backend (put a password in AGENTLAB_REDIS_URL, not in this file)",
+    )
+    key_prefix: str = Field(
+        default="agentlab",
+        pattern=r"^[A-Za-z0-9_.:-]{1,64}$",
+        description="Prefix of the Redis keys, so several installations can share one Redis server",
+    )
+    max_concurrent_runs: int = Field(default=2, ge=1, le=64, description="Runs one process works on at the same time")
+    worker_timeout_seconds: int = Field(
+        default=45,
+        ge=5,
+        le=3600,
+        description="How long a worker may say nothing before the runs it held are considered abandoned and closed as failed",
+    )
+    job_ttl_seconds: int = Field(
+        default=86_400, ge=60, description="How long a queued job may wait for a worker before it is given up"
+    )
+
+
+class ServerConfig(Model):
+    """``agentlab serve``: the REST API and the web interface (spec sections 27 and 41)."""
+
+    host: str = Field(default="127.0.0.1", description="Address to listen on; anything but loopback needs a token")
+    port: int = Field(default=8080, ge=1, le=65535)
+    token_ref: str | None = Field(
+        default=None,
+        description="env:NAME or secret:NAME holding the API token every request must present. Required unless the "
+        "server listens on loopback only",
+    )
+    cors_origins: list[str] = Field(
+        default_factory=list,
+        description="Origins that may call the API from a browser page of their own. The bundled interface is served "
+        "from the API itself and needs none",
+    )
+    max_upload_mb: int = Field(default=25, ge=1, le=512, description="Largest document or archive an upload may carry")
+    allowed_paths: list[str] = Field(
+        default_factory=list,
+        description="Folders on the server a request may point a target at (a repository path, a document). "
+        "Uploads are always allowed. Empty means API clients cannot name server paths at all",
+    )
+    serve_ui: bool = Field(default=True, description="Serve the web interface at / when it has been built")
 
 
 class AgentLabConfig(Model):
@@ -162,6 +209,7 @@ class AgentLabConfig(Model):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     queue: QueueConfig = Field(default_factory=QueueConfig)
+    server: ServerConfig = Field(default_factory=ServerConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4
     skill_dirs: list[str] = Field(default_factory=list)

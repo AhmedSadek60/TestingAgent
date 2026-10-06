@@ -155,6 +155,7 @@ class RunOutcome:
     report: Any = None  # the ReportBundle, when report generation ran
     started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
+    cancel_reason: str | None = None  # why the run was cancelled, when it was
 
     @property
     def counts(self) -> dict[str, int]:
@@ -215,4 +216,5 @@ class RunOutcome:
             "cost_usd": self.limits.get("cost_usd"),
             "elapsed_s": self.limits.get("elapsed_s"),
             "waves": len(self.plans),
+            **({"cancel_reason": self.cancel_reason} if self.cancel_reason else {}),
         }

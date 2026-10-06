@@ -34,7 +34,7 @@ from agentlab.core.ids import new_id
 from agentlab.core.models import TargetSpec
 from agentlab.design import SUITES
 from agentlab.design.render import plan_markdown
-from agentlab.discovery.agent import DiscoveryResult, TargetDiscoveryAgent
+from agentlab.discovery.agent import DiscoveryResult
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.orchestrator.options import PreparedRun, RunOutcome
 from agentlab.services import Services
@@ -122,20 +122,8 @@ def discover(
 
 async def _discover(services: Services, spec: TargetSpec, *, probe: bool) -> DiscoveryResult:
     try:
-        docker_ok, _ = await services.docker_status()
-        browser_ok, _ = services.browser_status()
-        agent = TargetDiscoveryAgent(
-            services.config,
-            providers=services.providers,
-            credentials=services.credentials,
-            artifacts=services.artifacts,
-            docker_available=docker_ok,
-            browser_available=browser_ok,
-            web_discoverer=services.web_discoverer,
-            sandbox=services.sandbox,
-            extras={"browser_pool": services.browser_pool},
-        )
-        return await agent.discover(spec, probe=probe)
+        result: DiscoveryResult = await services.discover(spec, probe=probe)
+        return result
     finally:
         await services.aclose()
 

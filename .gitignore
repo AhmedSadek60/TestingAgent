@@ -83,3 +83,6 @@ playwright-report/
 htmlcov/
 node_modules/
 apps/web/dist/
+
+# The built web interface (npm run build in web/ writes it here); it is built in CI and in the Docker image
+src/agentlab/api/static/

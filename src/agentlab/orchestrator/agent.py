@@ -543,11 +543,11 @@ class TestOrchestratorAgent:
         status = RunStatus.CANCELLED if cancelled else RunStatus.FAILED
         info = {"kind": getattr(getattr(exc, "kind", None), "value", "USER_ERROR"), "message": str(exc)[:500]}
         try:
-            self.services.store.update_run(
-                run_id, status=status.value, finished_at=utcnow(), error=None if cancelled else info
-            )
             self.bus.emit(
                 run_id, EventType.RUN_CANCELLED if cancelled else EventType.RUN_FAILED, {"phase": "prepare", **info}
+            )
+            self.services.store.update_run(
+                run_id, status=status.value, finished_at=utcnow(), error=None if cancelled else info
             )
         except Exception:
             log.exception("could not record the failed run")
@@ -875,14 +875,24 @@ class TestOrchestratorAgent:
             status = RunStatus(run_stop.status.value)
 
         outcome = await self._analyse_and_finish(
-            p, waves, list(tests.values()), all_results, findings, limits, status, error, started, reporter
+            p,
+            waves,
+            list(tests.values()),
+            all_results,
+            findings,
+            limits,
+            status,
+            error,
+            started,
+            reporter,
+            cancel_reason=(token.reason or "cancelled")[:300] if token.cancelled else None,
         )
         return outcome
 
     def _finalize_early(self, run_id: str, status: RunStatus) -> None:
         try:
-            self.services.store.update_run(run_id, status=status.value, finished_at=utcnow())
             self.bus.emit(run_id, EventType.RUN_CANCELLED, {"phase": "execute"})
+            self.services.store.update_run(run_id, status=status.value, finished_at=utcnow())
         except Exception:
             log.exception("could not record the cancelled run")
 
@@ -898,6 +908,8 @@ class TestOrchestratorAgent:
         error: str | None,
         started: Any,
         reporter: Callable[..., Any] | None,
+        *,
+        cancel_reason: str | None = None,
     ) -> RunOutcome:
         sv = self.services
         run_id = p.run_id
@@ -1011,6 +1023,7 @@ class TestOrchestratorAgent:
             phases=records,
             error=error,
             started_at=started,
+            cancel_reason=cancel_reason if status == RunStatus.CANCELLED else None,
         )
         outcome.manifest["outcome"] = {
             "status": status.value,
@@ -1032,41 +1045,48 @@ class TestOrchestratorAgent:
             self._artifact(run_id, "analysis", "analysis.json", self._analysis_json(outcome)),
             self._artifact(run_id, "manifest", "manifest.json", outcome.manifest),
         ]
-        self._persist_run(outcome, records)
-        rep = reporter or getattr(sv, "reporter", None)
-        with self._phase(run_id, Phase.REPORT_GENERATION, records) as ph:
-            if rep is None:
-                ph.skip("no report generator is configured")
-            else:
-                try:
-                    outcome.report = await _maybe_await(rep(outcome, sv))
-                    ph.set(formats=sorted(getattr(outcome.report, "formats", {}) or {}))
-                except Exception as exc:
-                    log.exception("report generation failed")
-                    outcome.warnings.append(f"report generation failed: {type(exc).__name__}: {exc}")
-                    ph.set(error=f"{type(exc).__name__}: {exc}")
-                    ph.status = "failed"
-        with self._phase(run_id, Phase.ARTIFACT_PACKAGING, records) as ph:
-            ph.set(artifacts=len(sv.store.list_artifacts(run_id)), analysis_artifacts=[i for i in analysis_ids if i])
-            if getattr(outcome.report, "bundle_id", None):
-                ph.set(bundle=outcome.report.bundle_id)
-        self._persist_run(outcome, records)
-        end_type = {
-            RunStatus.COMPLETED: EventType.RUN_COMPLETED,
-            RunStatus.CANCELLED: EventType.RUN_CANCELLED,
-            RunStatus.FAILED: EventType.RUN_FAILED,
-        }.get(status, EventType.RUN_COMPLETED)
-        self.bus.emit(run_id, end_type, outcome.summary())
+        self._persist_run(outcome, records, final=False)
+        try:
+            rep = reporter or getattr(sv, "reporter", None)
+            with self._phase(run_id, Phase.REPORT_GENERATION, records) as ph:
+                if rep is None:
+                    ph.skip("no report generator is configured")
+                else:
+                    try:
+                        outcome.report = await _maybe_await(rep(outcome, sv))
+                        ph.set(formats=sorted(getattr(outcome.report, "formats", {}) or {}))
+                    except Exception as exc:
+                        log.exception("report generation failed")
+                        outcome.warnings.append(f"report generation failed: {type(exc).__name__}: {exc}")
+                        ph.set(error=f"{type(exc).__name__}: {exc}")
+                        ph.status = "failed"
+            with self._phase(run_id, Phase.ARTIFACT_PACKAGING, records) as ph:
+                ph.set(
+                    artifacts=len(sv.store.list_artifacts(run_id)), analysis_artifacts=[i for i in analysis_ids if i]
+                )
+                if getattr(outcome.report, "bundle_id", None):
+                    ph.set(bundle=outcome.report.bundle_id)
+        finally:
+            end_type = {
+                RunStatus.COMPLETED: EventType.RUN_COMPLETED,
+                RunStatus.CANCELLED: EventType.RUN_CANCELLED,
+                RunStatus.FAILED: EventType.RUN_FAILED,
+            }.get(status, EventType.RUN_COMPLETED)
+            self.bus.emit(
+                run_id, end_type, outcome.summary()
+            )  # recorded before the status flips: whoever sees the run end has it
+            self._persist_run(outcome, records)
         self._active.discard(run_id)
         self._tokens.pop(run_id, None)
         return outcome
 
-    def _persist_run(self, o: RunOutcome, records: list[PhaseRecord]) -> None:
-        """Write the run row's final state (called before the report is built and again once packaging is done)."""
+    def _persist_run(self, o: RunOutcome, records: list[PhaseRecord], *, final: bool = True) -> None:
+        """Write the run row's state. The first call (before the report is built) leaves the run ``running``: a run is over
+        only once its report and artifacts exist, so nothing that reads the row can see "completed" and then find no report.
+        The report itself is told how the run ended (``generate_report(final=...)``). The last call stores the end."""
         self.services.store.update_run(
             o.run_id,
-            status=o.status.value,
-            finished_at=o.finished_at,
+            **({"status": o.status.value, "finished_at": o.finished_at} if final else {}),
             manifest=o.manifest,
             totals={
                 **o.summary(),
@@ -1136,13 +1156,17 @@ class TestOrchestratorAgent:
             started_at=p.started_at,
             finished_at=now,
         )
+        self.bus.emit(p.run_id, EventType.RUN_COMPLETED, {"plan_only": True, **p.plan.counts()})
         sv.store.update_run(
             p.run_id,
             status=RunStatus.COMPLETED.value,
             finished_at=now,
-            totals={"plan_only": True, **p.plan.counts()},
+            totals={
+                "plan_only": True,
+                **p.plan.counts(),
+                "warnings": [redact(w)[:500] for w in outcome.warnings[:50]],
+            },
         )
-        self.bus.emit(p.run_id, EventType.RUN_COMPLETED, {"plan_only": True, **p.plan.counts()})
         self._active.discard(p.run_id)
         self._tokens.pop(p.run_id, None)
         return outcome

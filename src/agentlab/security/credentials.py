@@ -130,6 +130,23 @@ class CredentialManager:
                     self.redactor.register_secret(v)
 
     # ---- persistence -------------------------------------------------------
+    def reload(self) -> None:
+        """Read the store again. Another process (``agentlab credentials add``, the API) may have changed it since this
+        manager was created; a long-lived server calls this before it lists or uses credentials."""
+        if self.store is None:
+            return
+        data = self.store.load()
+        self._profiles = {n: CredentialProfile.model_validate(p) for n, p in data.get("profiles", {}).items()}
+        self._secrets = data.get("secrets", {})
+        for fields in self._secrets.values():
+            for v in fields.values():
+                self.redactor.register_secret(v)
+
+    def field_names(self, name: str) -> list[str]:
+        """The names of the fields a profile holds (stored or referenced): never their values."""
+        profile = self.get_profile(name)
+        return sorted(set(self._secrets.get(name, {})) | set(profile.references))
+
     def _persist(self) -> None:
         if self.store is None:
             return

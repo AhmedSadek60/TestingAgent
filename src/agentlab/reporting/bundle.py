@@ -17,7 +17,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -215,6 +215,7 @@ def generate_report(
     baseline: str | None = None,
     include_sensitive: bool = False,
     write_files: bool = True,
+    final: Mapping[str, Any] | None = None,
 ) -> ReportBundle:
     """Build, render and store the report of a stored run.
 
@@ -223,9 +224,10 @@ def generate_report(
       hold a bundle: a bundle is never overwritten.
     * ``baseline`` - run id to compare with (default: the baseline the run was started with, if any).
     * ``include_sensitive`` - embed restricted artifacts (screenshots taken while signed in). Off by default.
+    * ``final`` - how the run ended, when that is not stored yet (the orchestrator's own report phase passes it).
     """
     wanted = normalise_formats(formats)
-    material = load_material(sv, run_id)
+    material = load_material(sv, run_id, final=final)
     run_id = material.run_id
     warnings: list[str] = list(material.notes)
     if baseline is None:
@@ -303,6 +305,7 @@ def generate_report(
             "generated_at": report.generated_at.isoformat(),
             "agentlab_version": __version__,
             "baseline_run_id": baseline if regression else None,
+            "include_sensitive": include_sensitive,
             "redactions": redactions,
             "warnings": warnings,
         },
@@ -333,6 +336,7 @@ async def default_reporter(outcome: Any, sv: Services) -> ReportBundle:
             formats=cfg.formats,
             include_sensitive=cfg.include_sensitive_artifacts,
             write_files=True,
+            final={"status": outcome.status.value, "finished_at": outcome.finished_at},
         )
 
     url = sv.store.db.url

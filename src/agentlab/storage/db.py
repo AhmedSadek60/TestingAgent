@@ -7,16 +7,16 @@ import json
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, inspect, select
+from sqlalchemy import create_engine, event, func, inspect, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from agentlab.core.errors import UserError
+from agentlab.core.errors import NotFoundError, UserError
 from agentlab.core.ids import new_id, utcnow
 from agentlab.core.models import AgentProfile, Finding, Scorecard, TargetSpec, TestCase, TestResult
 from agentlab.security.credentials import CredentialProfile
@@ -114,7 +114,7 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.Project, ident) or s.scalar(select(orm.Project).where(orm.Project.name == ident))
             if row is None:
-                raise UserError(f"project '{ident}' not found")
+                raise NotFoundError(f"project '{ident}' not found")
             return row_to_dict(row)
 
     def ensure_project(self, name: str, **kw: Any) -> dict[str, Any]:
@@ -148,7 +148,7 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.Target, target_id)
             if row is None:
-                raise UserError(f"target '{target_id}' not found")
+                raise NotFoundError(f"target '{target_id}' not found")
             return row_to_dict(row), TargetSpec.model_validate(row.spec)
 
     def list_targets(self, project_id: str | None = None) -> list[dict[str, Any]]:
@@ -349,7 +349,7 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.TestSuiteRow, suite_id)
             if row is None:
-                raise UserError(f"test suite '{suite_id}' not found")
+                raise NotFoundError(f"test suite '{suite_id}' not found")
             cases = [TestCase.model_validate(c.definition) for c in sorted(row.cases, key=lambda c: c.test_key)]
             return row_to_dict(row), cases
 
@@ -371,7 +371,24 @@ class Store:
         limits: dict[str, Any],
         run_id: str | None = None,
     ) -> dict[str, Any]:
+        """Create a run. A run id that already exists as a row that has not started executing (the API queues a run before
+        a worker takes it, and a worker marks it running while it discovers and plans) is taken over: its target, mode,
+        manifest and limits are filled in and nothing is duplicated."""
         with self.db.session() as s:
+            queued = s.get(orm.TestRunRow, run_id) if run_id else None
+            if queued is not None:
+                if queued.status not in {"pending", "running"} or queued.started_at is not None:
+                    raise UserError(f"run '{run_id}' already exists")
+                queued.project_id, queued.target_id, queued.suite_id, queued.mode = (
+                    project_id,
+                    target_id,
+                    suite_id,
+                    mode,
+                )
+                queued.manifest, queued.limits = {**(queued.manifest or {}), **manifest}, limits
+                queued.version += 1
+                s.flush()
+                return row_to_dict(queued)
             row = orm.TestRunRow(
                 id=run_id or new_id(),
                 project_id=project_id,
@@ -390,7 +407,7 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.TestRunRow, run_id)
             if row is None:
-                raise UserError(f"run '{run_id}' not found")
+                raise NotFoundError(f"run '{run_id}' not found")
             for k, v in fields.items():
                 setattr(row, k, v)
             row.version += 1
@@ -401,8 +418,24 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.TestRunRow, run_id)
             if row is None:
-                raise UserError(f"run '{run_id}' not found")
+                raise NotFoundError(f"run '{run_id}' not found")
             return row_to_dict(row)
+
+    def resolve_run_id(self, ident: str) -> str:
+        """An exact run id, or the one stored run whose id starts with ``ident`` (what a person copies from a listing)."""
+        try:
+            return str(self.get_run(ident)["id"])
+        except UserError:
+            pass
+        if len(ident) < 4:
+            raise NotFoundError(f"run '{ident}' not found")
+        with self.db.session() as s:
+            hits = list(s.scalars(select(orm.TestRunRow.id).where(orm.TestRunRow.id.startswith(ident)).limit(3)))
+        if len(hits) == 1:
+            return str(hits[0])
+        if not hits:
+            raise NotFoundError(f"run '{ident}' not found (see `agentlab runs list`)")
+        raise UserError(f"'{ident}' matches several runs; give more of the id")
 
     def list_runs(self, project_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         with self.db.session() as s:
@@ -482,15 +515,46 @@ class Store:
                 )
 
     def list_events(
-        self, run_id: str, *, after_ts: datetime | None = None, limit: int = 1000, types: list[str] | None = None
+        self,
+        run_id: str,
+        *,
+        after_ts: datetime | None = None,
+        limit: int = 1000,
+        types: list[str] | None = None,
+        inclusive: bool = False,
     ) -> list[dict[str, Any]]:
+        """Events of a run in time order. ``after_ts`` with ``inclusive=True`` also returns the events stamped exactly
+        then, so a reader that follows a run can resume at its last timestamp and drop the ids it has already seen
+        instead of missing events that were written in the same instant."""
         with self.db.session() as s:
-            q = select(orm.EventRow).where(orm.EventRow.run_id == run_id).order_by(orm.EventRow.timestamp).limit(limit)
+            ident: Any = orm.EventRow.event_id
+            if self.db.engine.dialect.name == "postgresql":
+                ident = ident.collate("C")  # byte order, the same as the order a reader compares ids in
+            q = (
+                select(orm.EventRow)
+                .where(orm.EventRow.run_id == run_id)
+                .order_by(orm.EventRow.timestamp, ident)
+                .limit(limit)
+            )
             if after_ts:
-                q = q.where(orm.EventRow.timestamp > after_ts)
+                after_ts = self._db_time(after_ts)
+                q = q.where(orm.EventRow.timestamp >= after_ts if inclusive else orm.EventRow.timestamp > after_ts)
             if types:
                 q = q.where(orm.EventRow.type.in_(types))
             return [row_to_dict(r) for r in s.scalars(q)]
+
+    def _db_time(self, value: datetime) -> datetime:
+        """A moment as the database holds them: SQLite keeps UTC wall-clock time without an offset, the others keep it."""
+        utc = value.astimezone(UTC) if value.tzinfo else value.replace(tzinfo=UTC)
+        return utc.replace(tzinfo=None) if self.db.engine.dialect.name == "sqlite" else utc
+
+    def event_counts(self, run_id: str) -> dict[str, int]:
+        """How many events of each type a run has recorded (what a progress display needs, without reading them all)."""
+        with self.db.session() as s:
+            rows = s.execute(
+                select(orm.EventRow.type, func.count()).where(orm.EventRow.run_id == run_id).group_by(orm.EventRow.type)
+            ).all()
+            return {str(t): int(n) for t, n in rows}
 
     # ----------------------------------------------------------------- findings / scorecards / reports
     def save_findings(self, run_id: str, findings: list[Finding]) -> None:
@@ -550,8 +614,18 @@ class Store:
         with self.db.session() as s:
             row = s.get(orm.ReportRow, report_id)
             if row is None:
-                raise UserError(f"report '{report_id}' not found")
+                raise NotFoundError(f"report '{report_id}' not found")
             return row_to_dict(row)
+
+    def list_reports(self, run_id: str) -> list[dict[str, Any]]:
+        """Every report version of a run, newest first."""
+        with self.db.session() as s:
+            rows = s.scalars(
+                select(orm.ReportRow)
+                .where(orm.ReportRow.run_id == run_id)
+                .order_by(orm.ReportRow.report_version.desc())
+            )
+            return [row_to_dict(r) for r in rows]
 
     def latest_report(self, run_id: str) -> dict[str, Any] | None:
         with self.db.session() as s:

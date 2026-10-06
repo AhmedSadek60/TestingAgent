@@ -21,16 +21,7 @@ RunId = Annotated[str, typer.Argument(help="Run id (an unambiguous prefix is eno
 
 def resolve_run_id(services: Services, ident: str) -> str:
     """An exact id, or the one stored run whose id starts with ``ident``."""
-    try:
-        return str(services.store.get_run(ident)["id"])
-    except UserError:
-        pass
-    hits = [r["id"] for r in services.store.list_runs(limit=1000) if str(r["id"]).startswith(ident)]
-    if len(hits) == 1:
-        return str(hits[0])
-    if not hits:
-        raise UserError(f"run '{ident}' not found (see `agentlab runs list`)")
-    raise UserError(f"'{ident}' matches {len(hits)} runs; give more of the id")
+    return services.store.resolve_run_id(ident)
 
 
 @runs_app.command("list")

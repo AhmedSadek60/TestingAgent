@@ -19,6 +19,7 @@ dependencies = [
   "alembic>=1.13",
   "fastapi>=0.111",
   "uvicorn>=0.30",
+  "python-multipart>=0.0.9",
   "typer>=0.12",
   "rich>=13",
   "jinja2>=3.1",
@@ -53,7 +54,7 @@ agentlab = "agentlab.cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentlab = ["py.typed", "reporting/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*", "fixtures/data/coding_agent/*"]
+agentlab = ["py.typed", "reporting/templates/*", "storage/migrations/*", "storage/migrations/versions/*", "config/*.yaml", "evaluation/profiles/*.yaml", "skills/library/*/*", "fixtures/data/*", "fixtures/data/rag/*", "fixtures/data/coding_agent/*", "api/static/*", "api/static/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

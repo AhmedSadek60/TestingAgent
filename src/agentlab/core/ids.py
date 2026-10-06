@@ -19,6 +19,13 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(value: str | datetime) -> datetime:
+    """A timestamp as an aware UTC datetime. Stored rows hand timestamps back as ISO text, with an offset or without one
+    depending on the database; a moment with no offset is UTC wall-clock time."""
+    stamp = datetime.fromisoformat(value) if isinstance(value, str) else value
+    return stamp.astimezone(UTC) if stamp.tzinfo else stamp.replace(tzinfo=UTC)
+
+
 def sha256_hex(data: bytes | str) -> str:
     if isinstance(data, str):
         data = data.encode("utf-8")

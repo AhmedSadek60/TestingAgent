@@ -112,6 +112,26 @@ class Services:
     async def discover_web(self, spec: TargetSpec) -> dict[str, Any]:
         return await discover_web(self.browser_pool, spec, self.credentials)
 
+    async def discover(self, spec: TargetSpec, *, probe: bool = True) -> Any:
+        """Fingerprint a target (what ``agentlab discover`` does): returns a ``DiscoveryResult``. Sends harmless probes
+        only, and none at all with ``probe=False``."""
+        from agentlab.discovery.agent import TargetDiscoveryAgent
+
+        docker_ok, _ = await self.docker_status()
+        browser_ok, _ = self.browser_status()
+        agent = TargetDiscoveryAgent(
+            self.config,
+            providers=self.providers,
+            credentials=self.credentials,
+            artifacts=self.artifacts,
+            docker_available=docker_ok,
+            browser_available=browser_ok,
+            web_discoverer=self.web_discoverer,
+            sandbox=self.sandbox,
+            extras={"browser_pool": self.browser_pool},
+        )
+        return await agent.discover(spec, probe=probe)
+
     async def close_browser(self) -> None:
         """Stop Chromium and Playwright. Call it on the event loop that used them, once a run is over."""
         if self._browser_pool is not None:

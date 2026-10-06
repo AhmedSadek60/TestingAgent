@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,10 +60,16 @@ def _artifact_json(sv: Services, rows: list[dict[str, Any]], kind: str, name: st
     return None
 
 
-def load_material(sv: Services, run_id: str, *, history_limit: int = 12) -> RunMaterial:
-    """Load a finished (or stopped, or failed) run. Raises :class:`UserError` when the run does not exist."""
+def load_material(
+    sv: Services, run_id: str, *, history_limit: int = 12, final: Mapping[str, Any] | None = None
+) -> RunMaterial:
+    """Load a finished (or stopped, or failed) run. Raises :class:`UserError` when the run does not exist.
+
+    ``final`` is for the orchestrator's own report phase: the run row only becomes terminal once its report exists (so that
+    nothing reading the row ever sees "completed" without the report), and the report must still say how the run ended.
+    ``final`` gives that state (``status``, ``finished_at``); it is laid over the stored row."""
     store = sv.store
-    run = store.get_run(run_id)
+    run = {**store.get_run(run_id), **(final or {})}
     if run.get("status") in {"pending", "running"} and not store.list_results(run_id):
         raise UserError(f"run '{run_id}' has not produced any result yet (status: {run.get('status')})")
     artifacts = store.list_artifacts(run_id)

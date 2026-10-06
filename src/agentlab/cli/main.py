@@ -10,7 +10,7 @@ from typing import Annotated
 import typer
 
 from agentlab import __version__
-from agentlab.cli import cmd_doctor, cmd_init, cmd_report, cmd_test
+from agentlab.cli import cmd_doctor, cmd_init, cmd_report, cmd_serve, cmd_test
 from agentlab.cli.cmd_credentials import credentials_app
 from agentlab.cli.cmd_fixtures import fixtures_app
 from agentlab.cli.cmd_providers import models_app, providers_app
@@ -73,6 +73,8 @@ app.command("test")(cmd_test.test)
 app.command("report")(cmd_report.report)
 app.command("compare")(cmd_report.compare)
 app.command("doctor")(cmd_doctor.doctor)
+app.command("serve")(cmd_serve.serve)
+app.command("worker")(cmd_serve.work)
 app.add_typer(cmd_report.review_app, name="review")
 app.add_typer(runs_app, name="runs")
 app.add_typer(skills_app, name="skills")

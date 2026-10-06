@@ -6,8 +6,6 @@ the value. Commands that contact a provider say so and only run when asked.
 
 from __future__ import annotations
 
-import os
-import time
 from typing import Annotated, Any
 
 import typer
@@ -16,23 +14,11 @@ from rich.table import Table
 
 from agentlab.cli.common import EXIT_INCOMPLETE, console, emit_json, make_services, run_async, state
 from agentlab.core.errors import UserError
-from agentlab.providers import CompletionRequest, Message
+from agentlab.diagnostics import check_provider, key_status, provider_works
 from agentlab.security.redactor import redact
-from agentlab.services import Services
 
 providers_app = typer.Typer(help="Configured LLM providers.", no_args_is_help=True)
 models_app = typer.Typer(help="Models the configured providers offer.", no_args_is_help=True)
-
-
-def key_status(services: Services, ref: str | None) -> str:
-    """Whether an API-key reference resolves. The value is never read into the output."""
-    if not ref:
-        return "not needed"
-    if ref.startswith("env:"):
-        return "set" if os.environ.get(ref[4:]) else f"MISSING ({ref[4:]} is not set)"
-    if ref.startswith("secret:"):
-        return "set" if services.credentials.has(ref[7:]) else f"MISSING (no credential '{ref[7:]}')"
-    return "invalid reference (use env:NAME or secret:NAME)"
 
 
 @providers_app.command("list")
@@ -90,46 +76,13 @@ def providers_check(
     services.config.provider(name)  # unknown name -> exit 2
 
     async def go() -> dict[str, Any]:
-        out: dict[str, Any] = {
-            "provider": name,
-            "key": key_status(services, services.config.provider(name).api_key_ref),
-        }
         try:
-            prov = services.providers.get(name)
-            started = time.perf_counter()
-            try:
-                models = await prov.discover()
-                out["models"] = len(models)
-                out["discovery_ms"] = round((time.perf_counter() - started) * 1000)
-            except Exception as exc:  # discovery is optional: say why it did not work
-                out["models"] = None
-                out["discovery_error"] = redact(f"{type(exc).__name__}: {exc}")
-            if not no_complete:
-                started = time.perf_counter()
-                try:
-                    resp = await prov.complete(
-                        CompletionRequest(
-                            messages=[Message(role="user", content="Reply with the single word: ok")],
-                            model=model,
-                            max_tokens=8,
-                            temperature=0.0,
-                        )
-                    )
-                    out["completion"] = "ok"
-                    out["model"] = resp.model
-                    out["latency_ms"] = round((time.perf_counter() - started) * 1000)
-                    out["tokens"] = resp.usage.input_tokens + resp.usage.output_tokens
-                except Exception as exc:
-                    out["completion"] = "failed"
-                    out["completion_error"] = redact(f"{type(exc).__name__}: {exc}")
-        except Exception as exc:
-            out["error"] = redact(f"{type(exc).__name__}: {exc}")
+            return await check_provider(services, name, model=model, complete=not no_complete)
         finally:
             await services.aclose()
-        return out
 
     res = run_async(go())
-    ok = "error" not in res and res.get("completion", "ok") == "ok"
+    ok = provider_works(res)
     for k, v in res.items():
         if v is not None:
             console.print(f"[bold]{k}[/bold] {v}")
