@@ -35,8 +35,10 @@ TRUST_STYLE = {
 }
 
 
-def drafts_dir(base: Path) -> Path:
-    return base / ".agentlab" / "skills" / "drafts"
+def drafts_dir(cfg: AgentLabConfig, base: Path) -> Path:
+    """Where imported and generated skills wait, untrusted, for a human to promote them (storage.skill_drafts_dir)."""
+    path = Path(cfg.storage.skill_drafts_dir)
+    return path if path.is_absolute() else base / path
 
 
 def local_dir(cfg: AgentLabConfig, base: Path) -> Path:
@@ -51,8 +53,8 @@ def _registry(ctx: typer.Context, *, with_drafts: bool = False) -> tuple[SkillRe
     cfg, base = load_config(state(ctx))
     dirs = [d if Path(d).is_absolute() else str(base / d) for d in cfg.skill_dirs]
     reg = SkillRegistry.default(dirs)
-    if with_drafts and drafts_dir(base).is_dir():
-        for d in discover_skill_dirs(drafts_dir(base)):
+    if with_drafts and drafts_dir(cfg, base).is_dir():
+        for d in discover_skill_dirs(drafts_dir(cfg, base)):
             reg.add(load_skill_dir(d, trust=_draft_trust(d)))
     return reg, cfg, base
 
@@ -272,8 +274,8 @@ def skills_import(
     to: Annotated[Path | None, typer.Option("--to", help="Drafts folder.")] = None,
 ) -> None:
     """Import a third-party skill as an UNTRUSTED DRAFT: scanned, secrets redacted, nothing in it is ever executed."""
-    _, base = load_config(state(ctx))
-    report = import_skill(source, to or drafts_dir(base), name=name)
+    cfg, base = load_config(state(ctx))
+    report = import_skill(source, to or drafts_dir(cfg, base), name=name)
     if report.blocked:
         raise fail(f"nothing imported: {report.block_reason}")
     console.print(f"imported [bold]{report.name}[/bold] -> {report.destination} (license: {report.license})")
@@ -347,7 +349,7 @@ def skills_forge(
                         else None
                     )
                     suggestion, label = await suggest_methodology(services.providers, cap, profile, judge)
-                made.append(forge_skill(cap, to or drafts_dir(base), suggestion=suggestion, provider_label=label))
+                made.append(forge_skill(cap, to or drafts_dir(cfg, base), suggestion=suggestion, provider_label=label))
             return made
         finally:
             await services.aclose()

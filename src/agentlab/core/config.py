@@ -128,10 +128,17 @@ class LimitsConfig(Model):
 
 
 class StorageConfig(Model):
+    """Where AgentLab keeps what it writes. A relative path is relative to the folder of the configuration file (to the
+    working folder when there is no file), so a configuration that lives somewhere read-only, such as ``/etc``, has to
+    point every one of these somewhere writable."""
+
     database_url: str = "sqlite:///.agentlab/agentlab.db"
     artifacts_dir: str = ".agentlab/artifacts"
     secrets_file: str = ".agentlab/secrets.enc"
     reports_dir: str = ".agentlab/reports"
+    work_dir: str = ".agentlab/work"
+    uploads_dir: str = ".agentlab/uploads"
+    skill_drafts_dir: str = ".agentlab/skills/drafts"
 
 
 ReportFormat = Literal["json", "md", "html", "pdf"]

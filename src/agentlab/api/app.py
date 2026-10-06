@@ -141,7 +141,7 @@ def create_app(
             await q.ping()
         run_worker = (q.name == "inline") if start_worker is None else start_worker
         worker = Worker(svc, q) if run_worker else None
-        uploads = svc.base_dir / ".agentlab" / "uploads"
+        uploads = svc.uploads_dir
         uploads.mkdir(parents=True, exist_ok=True)
         resolved_ui = (ui_dir or default_ui_dir()) if (serve_ui if serve_ui is not None else scfg.serve_ui) else None
         app.state.agentlab = ApiState(

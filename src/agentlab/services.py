@@ -138,9 +138,14 @@ class Services:
             await self._browser_pool.aclose()
 
     def workdir(self, run_id: str) -> Path:
-        path = self.base_dir / ".agentlab" / "work" / run_id
+        path = _under(self.base_dir, self.config.storage.work_dir) / run_id
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @property
+    def uploads_dir(self) -> Path:
+        """Where documents and archives sent to the API are kept (created when the API starts)."""
+        return _under(self.base_dir, self.config.storage.uploads_dir)
 
     async def aclose(self) -> None:
         await self.close_browser()
