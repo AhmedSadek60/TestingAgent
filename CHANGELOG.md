@@ -89,8 +89,8 @@ pull request adds to the governance template the repository started as.
   client certificates, and the S3 and Qdrant backends are **not supported**, and AgentLab says so where one is asked for.
 - The hosted model providers (Gemini, OpenRouter, OpenAI, Anthropic) were run only against local stand-ins of their
   APIs; Ollama was also run against a real server.
-- The Railway files and the `CI` workflow have not been run on Railway and GitHub. The image cannot run Docker
-  containers or a browser, so those tests are blocked there.
+- The Railway files have not been run on Railway. The image cannot run Docker containers or a browser, so those tests
+  are blocked there.
 - Linux is the only platform it was run on, and nobody outside the project has audited it for security.
 
 What was verified, how, and what was not is in [docs/development.md](docs/development.md#verification-status).
