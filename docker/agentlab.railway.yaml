@@ -1,0 +1,40 @@
+# AgentLab's configuration on Railway: one service that serves the API and the web interface and runs the jobs itself
+# (docs/deployment-railway.md). docker/railway-start.sh passes it to AgentLab as /etc/agentlab/railway.yaml.
+#
+# Nothing secret is written here. Passwords and tokens come from the service's variables:
+#   AGENTLAB_API_TOKEN     the token every request must present (16 or more characters). Required: without it the
+#                          server refuses to start, because it listens on every interface
+#   AGENTLAB_DATABASE_URL  replaces storage.database_url. Set it to the Railway PostgreSQL service's DATABASE_URL
+#                          (a postgres:// or postgresql:// URL is understood)
+#   AGENTLAB_MASTER_KEY    optional: the key that encrypts stored credentials, kept out of the volume
+# To add a model provider, list it below and keep its key in a variable of the service (api_key_ref: env:NAME).
+providers:
+  - name: mock
+    type: mock
+    model: mock-judge
+
+security:
+  # A server on the public internet should test public agents. A token holder can otherwise point a target at an address
+  # that only this Railway project can reach (another service, a database). Set to true to test a service over Railway's
+  # private network.
+  allow_private_networks: false
+
+# The Railway volume is mounted at /data; nothing else is written to.
+storage:
+  database_url: sqlite:////data/agentlab.db
+  artifacts_dir: /data/artifacts
+  secrets_file: /data/secrets.enc
+  reports_dir: /data/reports
+  work_dir: /data/work
+  uploads_dir: /data/uploads
+  skill_drafts_dir: /data/skills/drafts
+
+server:
+  host: 0.0.0.0
+  port: 8080 # docker/railway-start.sh passes the port Railway injects as --port
+  token_ref: env:AGENTLAB_API_TOKEN
+
+# A Railway volume can be attached to one service only, so the API and a worker could not share the reports and evidence
+# a run writes. Jobs therefore run in the API process.
+queue:
+  backend: inline

@@ -8,6 +8,9 @@
 # The image has no Docker client and no browser. Without a Docker client the sandbox is unavailable, so tests that would
 # run untrusted code are BLOCKED with that reason (they are never run in the container itself); without a browser,
 # browser tests are BLOCKED. See docs/installation.md#docker.
+#
+# Railway builds this file too (railway.json, docs/deployment-railway.md). Its builder refuses the VOLUME instruction, so
+# there is none: Compose and Railway both mount their own volume at /data.
 ARG NODE_IMAGE=node:22-slim
 ARG PYTHON_IMAGE=python:3.12-slim
 
@@ -40,11 +43,13 @@ RUN useradd --system --uid 10001 --create-home --home-dir /home/agentlab agentla
     && chown agentlab /data
 COPY --from=build /opt/venv /opt/venv
 COPY docker/agentlab.yaml /etc/agentlab/agentlab.yaml
+COPY docker/agentlab.railway.yaml /etc/agentlab/railway.yaml
+COPY --chmod=0755 docker/railway-start.sh /usr/local/bin/agentlab-railway-start
 USER agentlab
 WORKDIR /data
-VOLUME /data
 EXPOSE 8080
+# The port is 8080 unless a platform injects PORT, which docker/railway-start.sh then listens on.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/health', timeout=4)"]
+    CMD ["python", "-c", "import os, urllib.request as u; u.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8080'), timeout=4)"]
 ENTRYPOINT ["agentlab"]
 CMD ["serve"]

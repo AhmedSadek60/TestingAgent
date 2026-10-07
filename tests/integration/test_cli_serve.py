@@ -205,6 +205,36 @@ SLOW = {
 }
 
 
+def test_a_server_that_is_stopped_in_the_middle_of_a_run_winds_it_down_and_reports_it(tmp_path: Path) -> None:
+    """What a platform does on every deployment: it sends SIGTERM. The run is not lost and not left running."""
+    port = free_port()
+    write_config(tmp_path, api_config(tmp_path))
+    args = ["--config", "agentlab.yaml", "serve", "--port", str(port)]
+    base = f"http://127.0.0.1:{port}"
+    server = start_agentlab(args, cwd=tmp_path, name="serve")
+    try:
+        wait_until_up(f"{base}/health", server)
+        with httpx.Client(base_url=base, timeout=60) as c:
+            run_id = c.post("/test-runs", json=SLOW).json()["run_id"]
+            poll(
+                lambda: sum(e["type"] == "TestCompleted" for e in c.get(f"/test-runs/{run_id}/events").json()) >= 3,
+                what="three tests",
+            )
+            assert server.stop(signal.SIGTERM, timeout=60) == 0, server.output
+    finally:
+        server.stop()
+    assert "Traceback" not in server.output, server.output
+    again = start_agentlab(args, cwd=tmp_path, name="serve-again")  # the same database and reports folder
+    try:
+        wait_until_up(f"{base}/health", again)
+        with httpx.Client(base_url=base, timeout=60) as c:
+            run = c.get(f"/test-runs/{run_id}").json()
+            assert run["status"] == "cancelled" and "worker is stopping" in run["totals"]["cancel_reason"], run
+            assert c.get(f"/test-runs/{run_id}/reports").json(), "stopping the server does not lose what ran"
+    finally:
+        again.stop()
+
+
 @needs_redis
 def test_the_api_and_worker_processes_share_a_redis_queue(tmp_path: Path) -> None:
     api, base, env, prefix = redis_deployment(tmp_path)
