@@ -179,11 +179,19 @@ async def test_cancelling_skips_the_remaining_tests_but_still_scores_what_ran(se
 async def test_a_run_level_budget_stops_the_run_instead_of_failing_tests(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, limits=LimitsConfig(max_tokens=40))
     sv = Services.create(cfg, base_dir=tmp_path)
-    out = await TestOrchestratorAgent(sv).run(mock_spec(), RunOptions(intensity="quick"))
+    orch = TestOrchestratorAgent(sv)
+    announced: list[dict[str, object]] = []
+    orch.bus.subscribe(lambda e: announced.append(e.payload) if e.type == EventType.LIMIT_REACHED else None)
+    out = await orch.run(mock_spec(), RunOptions(intensity="quick"))
     stopped = [r for r in out.results if r.status.is_stopped]
     assert stopped and out.status.value.startswith("stopped_due_to")
+    assert announced and all(a["reason"] for a in announced), "a limit that is announced says which one"
     assert not any(r.status == TestStatus.FAILED and "budget" in (r.blocked_reason or "") for r in out.results)
     assert any("stopped early" in q for q in out.scorecard.qualifiers)
+    # the run says which limit stopped it: in the score's qualifier, the summary of limits and the manifest
+    assert any("max_tokens is 40" in q for q in out.scorecard.qualifiers), out.scorecard.qualifiers
+    assert "max_tokens is 40" in str(out.limits["stop_reason"]) and out.limits["stopped"] == out.status.value
+    assert "max_tokens is 40" in str(out.manifest["outcome"]["stop_reason"])
     sv.store.db.dispose()
 
 
@@ -243,6 +251,25 @@ async def test_a_different_judge_is_accepted_and_recorded(tmp_path: Path) -> Non
     finally:
         await prepared.aclose()
     sv.store.db.dispose()
+
+
+async def test_an_unavailable_interface_is_reported_once_and_an_unchecked_rule_is_in_the_summary(
+    services: Services,
+) -> None:
+    from agentlab.core.models import ApiConfig
+
+    spec = TargetSpec(name="ws", api=ApiConfig(url="ws://127.0.0.1:9/chat", protocol="websocket"))
+    orch = TestOrchestratorAgent(services)
+    prepared = await orch.prepare(
+        spec, RunOptions(intensity="quick", plan_only=True, probe=False, requirements=["Never promise a refund"])
+    )
+    try:
+        said = [w for w in prepared.warnings if "WebSocket agent endpoints are not supported" in w]
+        assert len(said) == 1, prepared.warnings  # discovery and environment preparation both report it
+        assert len(prepared.warnings) == len(set(prepared.warnings))
+        assert any("business rule(s) have no test" in w and "Never promise a refund" in w for w in prepared.warnings)
+    finally:
+        await prepared.aclose()
 
 
 async def test_validation_rejects_unusable_requests_before_any_work(services: Services) -> None:

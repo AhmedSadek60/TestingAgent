@@ -152,6 +152,13 @@ def _major_minor(v: str | None) -> tuple[str, str]:
     return parts[0], parts[1] if len(parts) > 1 else "0"
 
 
+def replays(base: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    """True when ``current`` was started as a replay of the run ``base`` (``agentlab test --baseline``): it re-runs the
+    tests ``base`` started with, under a plan of its own."""
+    base_id = _get(base, "run_id")
+    return bool(base_id) and _get(current, "options.baseline_run_id") == base_id
+
+
 def compare_manifests(base: Mapping[str, Any], current: Mapping[str, Any]) -> list[ManifestDifference]:
     """Why two runs may not be comparable. ``blocks_comparison``: scores are not comparable; ``caveat``: comparable
     with a stated reservation; ``info``: expected (for a regression run the target itself is meant to differ)."""
@@ -195,17 +202,28 @@ def compare_manifests(base: Mapping[str, Any], current: Mapping[str, Any]) -> li
         "info",
         "the target definition (interfaces, endpoints, tools) changed",
     )
+    # a replay is a plan of its own (a new id, the "regression" suite) that holds the same tests, so those differences
+    # are expected and say nothing about whether the runs can be compared
+    replay = replays(base, current)
     add(
         "plan.hash",
         _get(base, "plan.hash"),
         _get(current, "plan.hash"),
-        "caveat",
-        "the test plans differ: only tests present in both runs can be compared one to one",
+        "info" if replay else "caveat",
+        "the second run replays the first one's tests under a plan of its own"
+        if replay
+        else "the test plans differ: only tests present in both runs can be compared one to one",
     )
     add(
         "plan.intensity", _get(base, "plan.intensity"), _get(current, "plan.intensity"), "caveat", "different intensity"
     )
-    add("plan.suite", _get(base, "plan.suite"), _get(current, "plan.suite"), "caveat", "different suites")
+    add(
+        "plan.suite",
+        _get(base, "plan.suite"),
+        _get(current, "plan.suite"),
+        "info" if replay else "caveat",
+        "a replay runs as the regression suite" if replay else "different suites",
+    )
     add(
         "scoring_profile",
         _get(base, "scoring_profile"),
@@ -260,7 +278,6 @@ def compare_manifests(base: Mapping[str, Any], current: Mapping[str, Any]) -> li
         "caveat",
         "budgets differ, which can stop tests earlier in one run",
     )
-    add("options.seed", _get(base, "options.seed"), _get(current, "options.seed"), "caveat", "generation seeds differ")
     for key in ("docker", "browser"):
         add(
             f"environment.{key}",

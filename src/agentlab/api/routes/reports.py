@@ -10,16 +10,26 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from agentlab.api.routes.common import RESPONSES, require_auth, run_row
-from agentlab.api.schemas import ArtifactOut, ExportRequest, ExportResponse, ReportCreate, ReportFileOut, ReportOut
-from agentlab.api.security import SANDBOX_CSP, safe_filename
+from agentlab.api.schemas import (
+    ArtifactOut,
+    ExportRequest,
+    ExportResponse,
+    ReportCreate,
+    ReportFileOut,
+    ReportOut,
+    ViewLink,
+)
+from agentlab.api.security import FRAMED_CSP, SANDBOX_CSP, safe_filename
 from agentlab.api.state import ApiState, state_of
 from agentlab.core.errors import InfrastructureError, NotFoundError, PolicyBlocked, UserError
-from agentlab.reporting.bundle import MEDIA_TYPES, generate_report
+from agentlab.reporting.bundle import generate_report
 from agentlab.reporting.compare import Comparison, compare_runs
+from agentlab.reporting.renderers import media_type_of
 from agentlab.storage.artifacts import ArtifactRef
 
 log = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_auth)], responses=RESPONSES)
+public = APIRouter()  # reached with a signed link, not a token
 
 INLINE_TYPES = (
     "application/json",
@@ -39,9 +49,9 @@ def _file(st: ApiState, report_id: str, fmt: str, artifact_id: str) -> ReportFil
         ref = st.services.artifacts.ref(artifact_id)
         size, media = ref.size, ref.media_type
     except InfrastructureError:
-        size, media = 0, MEDIA_TYPES.get(fmt, "application/octet-stream")
+        size, media = 0, media_type_of(fmt)
     return ReportFileOut(
-        format=fmt,  # type: ignore[arg-type]
+        format=fmt,
         artifact_id=artifact_id,
         media_type=media,
         size=size,
@@ -173,6 +183,49 @@ def download_report(report_id: str, format: str, request: Request) -> Response:
     return _send(
         st, artifact_id, name=f"agentlab-report-{row['run_id'][:8]}-v{row['report_version']}.{format}", inline=True
     )
+
+
+@router.post(
+    "/reports/{report_id}/view-link",
+    response_model=ViewLink,
+    tags=["Reports"],
+    summary="Get a link that shows the HTML report",
+    description=(
+        "A short-lived link (it works for five minutes, and until this server restarts) that opens the HTML report on its own, "
+        "with no token, so it can be shown in a frame. The report is served inside a sandbox: it has no origin of its own and "
+        "cannot read the page that frames it or call this API. The link opens that one file and nothing else."
+    ),
+)
+def report_view_link(report_id: str, request: Request) -> ViewLink:
+    st = state_of(request)
+    row = st.store.get_report(report_id)
+    if (row.get("formats") or {}).get("html") is None:
+        raise NotFoundError(f"report '{report_id}' has no html file (POST /reports/{report_id}/export creates it)")
+    token = st.links.sign(row["id"], "html")
+    return ViewLink(url=f"/view/{token}", expires_in=st.links.ttl_seconds)
+
+
+@public.get("/view/{token}", include_in_schema=False, response_class=Response)
+def view_report(token: str, request: Request) -> Response:
+    """What a link from ``POST /reports/{id}/view-link`` opens. Anything wrong with the link is the same plain 404."""
+    st = state_of(request)
+    claim = st.links.verify(token)
+    gone = NotFoundError("this link does not work (it has expired, or this server was restarted); ask for a new one")
+    if claim is None:
+        raise gone
+    report_id, fmt = claim
+    try:
+        row = st.store.get_report(report_id)
+    except NotFoundError:
+        raise gone from None
+    artifact_id = (row.get("formats") or {}).get(fmt)
+    if artifact_id is None:
+        raise gone
+    response = _send(st, artifact_id, name=f"report.{fmt}", inline=True)
+    response.headers["Content-Security-Policy"] = FRAMED_CSP
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 # =============================================================================================== comparison

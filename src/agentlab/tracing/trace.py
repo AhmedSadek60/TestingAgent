@@ -82,6 +82,7 @@ class TraceRecorder:
                 "tokens": {"input": response.usage.input_tokens, "output": response.usage.output_tokens},
                 "cost_usd": response.usage.cost_usd,
                 "error": response.error,
+                **({"retries": response.retries} if response.retries else {}),
             },
         )
 

@@ -12,10 +12,13 @@ call its API can make the server do those things. The protections here are layer
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
 import ipaddress
 import json
 import re
+import secrets
 import time
 from collections import defaultdict, deque
 from collections.abc import Sequence
@@ -25,7 +28,7 @@ from urllib.parse import urlsplit
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from agentlab.core.errors import PolicyBlocked
+from agentlab.core.errors import CredentialError, PolicyBlocked
 from agentlab.security.credentials import CredentialManager, resolve_reference
 
 LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
@@ -55,6 +58,16 @@ def resolve_token(ref: str | None, credentials: CredentialManager | None) -> str
             raise PolicyBlocked("server.token_ref names a stored credential but no credential store is available")
         fields = credentials.fields(ref.split(":", 1)[1])
         token = fields.get("token") or fields.get("key")
+    elif ref.startswith("env:"):
+        try:
+            token = resolve_reference(ref)
+        except CredentialError as exc:
+            # the usual first mistake on a new deployment, and the line a platform's deploy log shows for it
+            raise CredentialError(
+                f"server.token_ref is {ref}, but the variable {ref[4:]} is not set or is empty. Set it to a secret of "
+                "16 or more characters (`openssl rand -hex 24` makes one): the server does not start without the "
+                "token it is configured to require"
+            ) from exc
     else:
         token = resolve_reference(ref)
     if not token or len(token) < 16:
@@ -157,7 +170,7 @@ class RequestGuard:
                 raw = list(message.get("headers", []))
                 present = {k.lower() for k, _ in raw}
                 for key, value in SECURITY_HEADERS:
-                    if key.encode() not in present:
+                    if key.lower().encode() not in present:  # header names go over the wire in lower case
                         raw.append((key.encode(), value.encode()))
                 message["headers"] = raw
             await send(message)
@@ -184,11 +197,11 @@ SECURITY_HEADERS = (
     ("Cross-Origin-Resource-Policy", "same-origin"),
 )
 
-# The web interface is served by the API and needs nothing from anywhere else. ``frame-src blob:`` is for the report viewer,
-# which shows a report in a sandboxed frame.
+# The web interface is served by the API and needs nothing from anywhere else. ``frame-src 'self'`` is for the report
+# viewer, which shows a report in a sandboxed frame from a short-lived link of this server (see ``LinkSigner``).
 UI_CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-    "font-src 'self' data:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'self'"
+    "font-src 'self' data:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'"
 )
 # A document that came out of a run (a report, a page snapshot) can contain anything a target said. It is shown in a frame
 # with no origin of its own: it cannot read the interface's storage or call the API as the person using it.
@@ -196,6 +209,58 @@ SANDBOX_CSP = (
     "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
     "img-src data: blob:; font-src data:"
 )
+# The same document inside the interface's frame: only this server's own pages may frame it.
+FRAMED_CSP = SANDBOX_CSP + "; frame-ancestors 'self'"
+
+
+# ================================================================================================= view links
+def _b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _unb64(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+class LinkSigner:
+    """Short-lived links to one file of one report.
+
+    A report is shown in a frame, and a frame cannot send the ``Authorization`` header, so the interface asks for a link that
+    carries its own proof: the report, the format and an expiry, signed with a key that exists only in this process's memory.
+    The link opens that one file and nothing else; it stops working after ``ttl_seconds`` and when the server restarts."""
+
+    def __init__(self, ttl_seconds: int = 300) -> None:
+        self.ttl_seconds = ttl_seconds
+        self._key = secrets.token_bytes(32)
+
+    def _mac(self, payload: bytes) -> bytes:
+        return hmac.new(self._key, payload, hashlib.sha256).digest()
+
+    def sign(self, report_id: str, fmt: str, *, now: float | None = None) -> str:
+        expires = int((time.time() if now is None else now) + self.ttl_seconds)
+        payload = json.dumps({"r": report_id, "f": fmt, "e": expires}, separators=(",", ":")).encode()
+        return f"{_b64(payload)}.{_b64(self._mac(payload))}"
+
+    def verify(self, token: str, *, now: float | None = None) -> tuple[str, str] | None:
+        """``(report id, format)`` when the link is genuine and has not expired, else ``None``."""
+        if not token or len(token) > 1024 or token.count(".") != 1:
+            return None
+        try:
+            body, mac = token.split(".")
+            payload, presented = _unb64(body), _unb64(mac)
+            # Base64 ignores the spare bits of its last character, so two different strings can decode to the same
+            # bytes. Only the exact string this signer wrote is a link; anything else is refused.
+            if _b64(payload) != body or _b64(presented) != mac:
+                return None
+            if not hmac.compare_digest(presented, self._mac(payload)):
+                return None
+            claims = json.loads(payload)
+            report, fmt, expires = str(claims["r"]), str(claims["f"]), int(claims["e"])
+        except (ValueError, KeyError, TypeError):
+            return None
+        if (time.time() if now is None else now) >= expires:
+            return None
+        return report, fmt
 
 
 # ===================================================================================================== paths

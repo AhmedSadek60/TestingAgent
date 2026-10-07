@@ -214,4 +214,7 @@ def trajectory_summary(outcome: AttemptOutcome) -> dict[str, Any]:
     ]
     if handoffs:
         summary["handoffs"] = handoffs[:30]
+    retries = sum(r.retries for r in outcome.responses)
+    if retries:
+        summary["retries"] = retries
     return summary

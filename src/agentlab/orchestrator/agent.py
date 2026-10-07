@@ -23,7 +23,7 @@ from agentlab.core.enums import EventType, Phase, RiskClass, RunStatus, Severity
 from agentlab.core.errors import AgentLabError, UserError
 from agentlab.core.ids import new_id, utcnow
 from agentlab.core.models import Finding, Scorecard, TargetSpec, TestCase, TestResult
-from agentlab.design import SUITES, TestDesignerAgent
+from agentlab.design import TestDesignerAgent, check_suite
 from agentlab.design.models import PlannedTest, PlanWarning, TestPlan
 from agentlab.design.render import plan_markdown
 from agentlab.design.user_tests import load_user_tests
@@ -67,7 +67,7 @@ from agentlab.security.egress import EgressPolicy
 from agentlab.security.gate import AuthorizationGate
 from agentlab.security.redactor import redact
 from agentlab.services import Services
-from agentlab.skills.context import INTENSITIES
+from agentlab.skills.context import check_intensity
 from agentlab.tracing import Event, EventBus
 
 log = logging.getLogger(__name__)
@@ -302,6 +302,9 @@ class TestOrchestratorAgent:
             with self._phase(run_id, Phase.TARGET_INGESTION, records) as ph:
                 ingested = await discoverer.ingest(spec)
                 held_ingest = ingested
+                # when the owner gave only an OpenAPI document, the endpoint it describes is what is tested from here
+                # on: the plan, the gate, the manifest and every request use this target
+                spec = ingested.spec or spec
                 ra = ingested.repo_analysis
                 ph.set(
                     repository=(
@@ -311,6 +314,7 @@ class TestOrchestratorAgent:
                     ),
                     documents=len(ingested.documents),
                     openapi_endpoints=len(ingested.openapi.endpoints) if ingested.openapi else 0,
+                    api_from_openapi=ingested.spec is not None,
                     warnings=len(ingested.warnings),
                 )
             token.raise_if_cancelled()
@@ -433,6 +437,8 @@ class TestOrchestratorAgent:
                             "nothing is verified through it",
                         )
                     )
+                # a rule nobody checks must be visible in the run's summary, not only in the plan
+                warnings += [w.message for w in plan.warnings if w.code == "requirement_not_tested"]
                 suite = sv.store.save_suite(
                     project["id"],
                     target["id"],
@@ -498,7 +504,6 @@ class TestOrchestratorAgent:
                 },
                 environment=redact(report.model_dump(mode="json")),
                 options={
-                    "seed": opts.seed,
                     "second_wave": opts.second_wave,
                     "intensity": opts.intensity,
                     "baseline_run_id": opts.baseline_run_id,
@@ -527,7 +532,7 @@ class TestOrchestratorAgent:
                 workdir=workdir,
                 manifest=manifest,
                 phases=records,
-                warnings=warnings,
+                warnings=list(dict.fromkeys(warnings)),  # discovery and environment preparation can say the same thing
                 suite_id=suite["id"],
                 selected_skills=[m.skill for m in plan.skills if m.selected],
                 closers=[sv.close_browser],
@@ -583,11 +588,8 @@ class TestOrchestratorAgent:
     async def _validate(self, spec: TargetSpec, opts: RunOptions) -> tuple[list[TestCase], list[str]]:
         cfg = self.config
         warns: list[str] = []
-        suite = "regression" if opts.baseline_run_id else opts.suite
-        if suite not in SUITES:
-            raise UserError(f"unknown suite '{suite}' (known: {', '.join(SUITES)})")
-        if opts.intensity not in INTENSITIES:
-            raise UserError(f"unknown intensity '{opts.intensity}' (known: {', '.join(INTENSITIES)})")
+        suite = check_suite("regression" if opts.baseline_run_id else opts.suite)
+        check_intensity(opts.intensity)
         if suite == "regression" and not opts.baseline_run_id and opts.plan is None:
             raise UserError("a regression run needs the id of the run to compare against (baseline_run_id)")
         if not (
@@ -623,8 +625,8 @@ class TestOrchestratorAgent:
                 warns.append(f"credential profile '{name}' is not stored; tests that need it will be BLOCKED")
         if spec.safety.production and not cfg.security.allow_production_targets:
             warns.append(
-                "the target is marked production: adversarial and HIGH_IMPACT tests are blocked unless "
-                "security.allow_production_targets is enabled and the owner authorizes them"
+                "the target is marked production: tests above SAFE are blocked unless "
+                "security.allow_production_targets is on, and HIGH_IMPACT tests never run against it"
             )
         profile_name = opts.scoring_profile or cfg.evaluation.scoring_profile
         if profile_name:
@@ -716,7 +718,7 @@ class TestOrchestratorAgent:
         token = cancel or self._tokens.setdefault(run_id, CancellationToken())
         self._tokens[run_id] = token
         self._active.add(run_id)
-        limits = LimitTracker(cfg.limits)
+        limits = LimitTracker(cfg.limits, test_timeout=cfg.evaluation.timeout_seconds)
         probe = p.discovery.probe
         if probe is not None and (probe.tokens or probe.cost_usd):
             # the discovery questions were answered by the target too: they count against the run's budget
@@ -991,7 +993,11 @@ class TestOrchestratorAgent:
                 if status == RunStatus.CANCELLED:
                     scorecard.qualifiers.append("The run was cancelled: the score covers only the tests that ran.")
                 elif status.value.startswith("stopped_due"):
-                    scorecard.qualifiers.append(f"The run stopped early ({status.value}); some tests did not run.")
+                    why = f": {limits.stop_reason}" if limits.stop_reason else ""
+                    scorecard.qualifiers.append(
+                        f"The run stopped early ({status.value}{why}); some tests did not run, or not all of their "
+                        "repetitions."
+                    )
                 sv.store.save_scorecard(run_id, scorecard)
                 ph.set(overall=scorecard.overall, grade=scorecard.grade, profile=scorecard.profile)
             sv.store.save_findings(run_id, findings)
@@ -1034,6 +1040,7 @@ class TestOrchestratorAgent:
             "cost_usd": wall["cost_usd"],
             "tokens": wall["tokens"],
             "elapsed_s": wall["elapsed_s"],
+            "stop_reason": wall["stop_reason"],
             "plan_prediction": pred,
             "scope": scope.model_dump(mode="json") if scope else None,
         }

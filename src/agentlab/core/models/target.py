@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from agentlab.core.enums import RiskClass
 from agentlab.core.models.base import Model
@@ -38,17 +39,24 @@ class ResponseMapping(Model):
     session_id: str | None = None
 
 
+#: What an API target sends when the owner did not say how the request is shaped.
+DEFAULT_REQUEST_TEMPLATE: dict[str, Any] = {"input": "{{input}}", "session_id": "{{session_id}}"}
+
+
 class ApiConfig(Model):
     """Black-box HTTP/REST/SSE agent endpoint (spec section 19)."""
 
-    url: str
+    url: str = Field(
+        default="",
+        description="Address of the endpoint that answers a message. May be left empty when openapi_url is given: "
+        "AgentLab then looks for the chat endpoint in that document, uses it when it is on the host the document came "
+        "from, and says which one it chose.",
+    )
     method: Literal["POST", "GET", "PUT"] = "POST"
     protocol: Literal["rest", "sse", "websocket", "graphql"] = "rest"
     headers: dict[str, str] = Field(default_factory=dict)
     # A JSON body template. ``{{input}}``, ``{{session_id}}`` and ``{{attachments}}`` are substituted.
-    request_template: dict[str, Any] = Field(
-        default_factory=lambda: {"input": "{{input}}", "session_id": "{{session_id}}"}
-    )
+    request_template: dict[str, Any] = Field(default_factory=lambda: dict(DEFAULT_REQUEST_TEMPLATE))
     response: ResponseMapping = Field(default_factory=ResponseMapping)
     session_header: str | None = None
     auth_credential: str | None = Field(
@@ -62,6 +70,14 @@ class ApiConfig(Model):
         description="Test hook of a disposable deployment: POST {session_id, name, text} adds a document to that "
         "session's knowledge base, so indirect-injection tests can plant a malicious document. Never use in production.",
     )
+
+    @model_validator(mode="after")
+    def _has_an_address(self) -> ApiConfig:
+        if not self.url and not self.openapi_url:
+            raise ValueError(
+                "an api needs an address: set url, or openapi_url so the endpoint can be found in the document"
+            )
+        return self
 
 
 class WebConfig(Model):
@@ -85,7 +101,11 @@ class CommandConfig(Model):
     mode: Literal["chat", "task"] = "chat"
     image: str | None = None
     command: list[str]
-    workdir: str = "/workspace"
+    workdir: str | None = Field(
+        default=None,
+        description="Working directory inside the sandbox. Default: next to the agent's own code (/agent) in chat mode "
+        "when the target has a repository, the workspace (/workspace) otherwise",
+    )
     env: dict[str, str] = Field(default_factory=dict)
     timeout_seconds: float = 300.0
     network: Literal["none", "internal", "allowlist"] = "none"
@@ -145,6 +165,11 @@ class SafetyPolicy(Model):
     disposable_environment: bool = False
 
 
+#: interfaces AgentLab ships an adapter for, in the order ``TargetSpec.interfaces()`` lists them
+BUILTIN_INTERFACES: tuple[str, ...] = ("api", "web", "command", "mcp", "llm", "mock")
+_INTERFACE_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+
+
 class TargetSpec(Model):
     """Everything known about a target before discovery. Loaded from ``target.yaml``."""
 
@@ -170,10 +195,24 @@ class TargetSpec(Model):
     declared_types: list[str] = Field(default_factory=list)
     safety: SafetyPolicy = Field(default_factory=SafetyPolicy)
     tags: list[str] = Field(default_factory=list)
+    custom: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Interfaces that a plug-in agent adapter provides, by the name the adapter is registered under; "
+        "the value is that adapter's own settings (never a secret: use credential profiles). Nothing is "
+        "tested through one when no adapter of that name is installed",
+    )
+
+    @field_validator("custom")
+    @classmethod
+    def _custom_names(cls, v: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        for name in v:
+            if name in BUILTIN_INTERFACES:
+                raise ValueError(f"'{name}' is a built-in interface: configure it as its own block, not under custom")
+            if not _INTERFACE_NAME.match(name):
+                raise ValueError(f"custom interface name '{name}' must be lower-case letters, digits, - and _")
+        return v
 
     def interfaces(self) -> list[str]:
-        out = []
-        for name in ("api", "web", "command", "mcp", "llm", "mock"):
-            if getattr(self, name) is not None:
-                out.append(name)
-        return out
+        """The interfaces this target has: the built-in blocks that are set, then the plug-in ones by name."""
+        out = [name for name in BUILTIN_INTERFACES if getattr(self, name) is not None]
+        return [*out, *sorted(self.custom)]

@@ -17,6 +17,7 @@ from rich import box
 from rich.table import Table
 
 from agentlab.cli.common import EXIT_FINDINGS, EXIT_INPUT, console, emit_json, err, fail
+from agentlab.cli.markup import esc
 from agentlab.fixtures import REGISTRY, fixture_class
 from agentlab.fixtures.selftest import verify
 from agentlab.fixtures.server import serve_forever
@@ -52,13 +53,15 @@ def fixtures_list(
     for column in ("Kind", "Agent", "Declared types", "Defects"):
         table.add_column(column)
     for row in rows:
-        table.add_row(str(row["kind"]), str(row["title"]), ", ".join(row["types"]) or "-", str(len(row["defects"])))
+        table.add_row(
+            esc(row["kind"]), esc(row["title"]), esc(", ".join(row["types"]) or "-"), str(len(row["defects"]))
+        )
     console.print(table)
     if defects:
         for row in rows:
-            console.print(f"\n[bold]{row['kind']}[/bold]")
+            console.print(f"\n[bold]{esc(row['kind'])}[/bold]")
             for name, what in row["defects"].items():
-                console.print(f"  [cyan]{name}[/cyan]  {what}")
+                console.print(f"  [cyan]{esc(name)}[/cyan]  {esc(what)}")
 
 
 @fixtures_app.command("serve")
@@ -86,9 +89,11 @@ def fixtures_serve(
         )
     if host not in {"127.0.0.1", "localhost", "::1"}:
         err.print(
-            f"[yellow]warning:[/yellow] {host} is not loopback; a fixture is deliberately flawed and must not be exposed"
+            f"[yellow]warning:[/yellow] {esc(host)} is not loopback; a fixture is deliberately flawed and must not be exposed"
         )
-    console.print(f"serving [bold]{agent.title}[/bold] ({variant}) at http://{host}:{port}  (Ctrl-C stops it)")
+    console.print(
+        f"serving [bold]{esc(agent.title)}[/bold] ({esc(variant)}) at http://{esc(host)}:{port}  (Ctrl-C stops it)"
+    )
     serve_forever(agent.asgi_app(token=token), host=host, port=port, lifespan="on" if agent.lifespan else "off")
 
 
@@ -149,7 +154,15 @@ def fixtures_verify(
     unknown = [k for k in chosen if k not in REGISTRY]
     if unknown:
         raise fail(f"unknown fixture(s) {', '.join(unknown)}; available: {', '.join(sorted(REGISTRY))}", EXIT_INPUT)
-    err.print(f"[dim]verifying {', '.join(chosen)} with {max(1, workers)} worker(s)...[/dim]")
+    for kind in chosen:
+        absent = [name for name in defect or [] if name not in fixture_class(kind).DEFECTS]
+        if absent:
+            raise fail(
+                f"fixture '{kind}' has no defect {', '.join(absent)}; its defects are {', '.join(fixture_class(kind).DEFECTS)}"
+                " (name the kind too when you name a defect)",
+                EXIT_INPUT,
+            )
+    err.print(f"[dim]verifying {esc(', '.join(chosen))} with {max(1, workers)} worker(s)...[/dim]")
     reports = verify(chosen, workers=workers, defects=defect or None, all_defects=not skip_all)
     skipped = [r for r in reports if r.skipped]
     if as_json:
@@ -163,18 +176,20 @@ def fixtures_verify(
     else:
         for report in reports:
             if report.skipped:
-                console.print(f"[yellow]{report.kind}: SKIPPED[/yellow] {report.skipped}")
+                console.print(f"[yellow]{esc(report.kind)}: SKIPPED[/yellow] {esc(report.skipped)}")
                 continue
-            table = Table(box=box.SIMPLE_HEAD, title=f"{report.kind}: {'OK' if report.ok else 'NOT OK'}")
+            table = Table(box=box.SIMPLE_HEAD, title=esc(f"{report.kind}: {'OK' if report.ok else 'NOT OK'}"))
             table.add_column("Check")
             table.add_column("Result")
             table.add_column("Detail", overflow="fold")
             for check in report.checks:
-                table.add_row(check.name, "[green]ok[/green]" if check.ok else "[red]FAILED[/red]", check.detail)
+                table.add_row(
+                    esc(check.name), "[green]ok[/green]" if check.ok else "[red]FAILED[/red]", esc(check.detail)
+                )
             console.print(table)
     if skipped and not as_json:
         err.print(
-            f"[yellow]warning:[/yellow] {len(skipped)} kind(s) were not verified on this machine ({', '.join(r.kind for r in skipped)}); "
+            f"[yellow]warning:[/yellow] {len(skipped)} kind(s) were not verified on this machine ({esc(', '.join(r.kind for r in skipped))}); "
             "that is not a pass"
         )
     if not all(r.ok for r in reports) or (require_all and skipped):

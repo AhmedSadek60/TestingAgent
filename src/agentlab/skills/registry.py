@@ -354,8 +354,11 @@ def render_templates(skill: Skill, run: SkillRun) -> None:
                     continue
                 if key in _ADD_KEYS:
                     kwargs[key] = value
-            _coerce(kwargs)
-            run.add(topic, str(spec.get("name", tpl.id)), str(spec.get("objective", "")), why=reasons, **kwargs)
+            try:
+                _coerce(kwargs)
+                run.add(topic, str(spec.get("name", tpl.id)), str(spec.get("objective", "")), why=reasons, **kwargs)
+            except ValueError as exc:  # pydantic's ValidationError is one
+                run.note(f"template '{tpl.id}' skipped: it renders to an invalid test ({str(exc).splitlines()[0]})")
 
 
 def _coerce(kwargs: dict[str, Any]) -> None:

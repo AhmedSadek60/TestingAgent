@@ -28,44 +28,48 @@ from agentlab.reporting import model as m
 from agentlab.reporting.build import build_report
 from agentlab.reporting.compare import Comparison, compare_runs
 from agentlab.reporting.material import load_material
-from agentlab.reporting.render_html import render_html
-from agentlab.reporting.render_md import render_markdown
-from agentlab.reporting.render_pdf import render_pdf
+from agentlab.reporting.renderers import (
+    BUILTIN_FORMATS,
+    REPORT_RENDERERS,
+    RenderContext,
+    available_formats,
+    canonical_json,
+    media_type_of,
+    renderer_for,
+)
 from agentlab.security.redactor import get_redactor
 from agentlab.services import Services
 
 log = logging.getLogger(__name__)
 
-FORMATS = ("json", "md", "html", "pdf")
+#: the formats AgentLab ships; ``available_formats()`` also lists the ones plug-ins add (``reporting/renderers.py``)
+FORMATS = BUILTIN_FORMATS
 ALIASES = {"markdown": "md", "htm": "html"}
-FILE_NAMES = {"json": "report.json", "md": "report.md", "html": "report.html", "pdf": "report.pdf"}
-MEDIA_TYPES = {
-    "json": "application/json",
-    "md": "text/markdown",
-    "html": "text/html",
-    "pdf": "application/pdf",
-}
+FILE_NAMES = {name: REPORT_RENDERERS.get(name).file_name for name in FORMATS}
+MEDIA_TYPES = {name: REPORT_RENDERERS.get(name).media_type for name in FORMATS}
 CHECKSUMS = "checksums.json"
 RUN_MANIFEST = "run-manifest.json"
 BUNDLE_SCHEMA = "agentlab.report-bundle"
 
 
 def normalise_formats(formats: Sequence[str] | str | None) -> list[str]:
-    """``None`` or ``all`` is every format; names are case-insensitive; an unknown name is an error, not ignored."""
+    """``None`` is the four formats AgentLab ships, ``all`` every format installed (plug-ins included). Names are
+    case-insensitive; an unknown name is an error, not ignored."""
     if formats is None:
         return list(FORMATS)
+    known = available_formats()
     raw = [formats] if isinstance(formats, str) else list(formats)
     wanted: list[str] = []
     for item in raw:
         for part in str(item).replace(",", " ").split():
             name = ALIASES.get(part.lower(), part.lower())
             if name == "all":
-                return list(FORMATS)
-            if name not in FORMATS:
-                raise UserError(f"unknown report format '{part}' (use {', '.join(FORMATS)} or all)")
+                return known
+            if name not in known:
+                raise UserError(f"unknown report format '{part}' (use {', '.join(known)} or all)")
             if name not in wanted:
                 wanted.append(name)
-    return [f for f in FORMATS if f in wanted] or list(FORMATS)
+    return [f for f in known if f in wanted] or list(FORMATS)
 
 
 @dataclass
@@ -148,8 +152,7 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _canonical(obj: Any) -> bytes:
-    return json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8") + b"\n"
+_canonical = canonical_json
 
 
 def verify_bundle(directory: str | Path) -> list[str]:
@@ -242,19 +245,25 @@ def generate_report(
     version = report.report_version
     load = blob_loader(sv, run_id, include_sensitive=include_sensitive)
 
+    context = RenderContext(load_blob=load, json_file_name=FILE_NAMES["json"])
     rendered: dict[str, bytes] = {}
     for fmt in wanted:
-        if fmt == "json":
-            rendered[fmt] = _canonical(report.to_json_dict())
-        elif fmt == "md":
-            rendered[fmt] = render_markdown(report).encode("utf-8")
-        elif fmt == "html":
-            rendered[fmt] = render_html(report, load_blob=load, json_name=FILE_NAMES["json"]).encode("utf-8")
-        else:
-            rendered[fmt] = render_pdf(report, load_blob=load)
+        if fmt in FORMATS:
+            rendered[fmt] = renderer_for(fmt).render(report, context)
+            continue
+        try:  # a format a plug-in adds: whatever goes wrong with it costs that file, never the rest of the report
+            data = renderer_for(fmt).render(report, context)
+            if not isinstance(data, bytes | bytearray):
+                raise TypeError(f"render() returned {type(data).__name__}, not bytes")
+            rendered[fmt] = bytes(data)
+        except Exception as exc:
+            warnings.append(f"the '{fmt}' file was not written: {type(exc).__name__}: {exc}")
+            log.warning("report format %s failed: %s", fmt, exc)
+    wanted = [f for f in wanted if f in rendered]
+    names = {f: renderer_for(f).file_name for f in wanted}
 
     manifest_bytes = _canonical(material.manifest)
-    files: dict[str, bytes] = {FILE_NAMES[f]: rendered[f] for f in wanted}
+    files: dict[str, bytes] = {names[f]: rendered[f] for f in wanted}
     files[RUN_MANIFEST] = manifest_bytes
     checksums = {name: _sha256(data) for name, data in files.items()}
     index = {
@@ -280,14 +289,14 @@ def generate_report(
         for name, data in files.items():
             _write(directory / name, data)
         _write(directory / CHECKSUMS, index_bytes)
-        paths = {f: directory / FILE_NAMES[f] for f in wanted}
+        paths = {f: directory / names[f] for f in wanted}
 
     artifact_ids: dict[str, str] = {}
     for fmt in wanted:
         ref = sv.artifacts.put(
             rendered[fmt],
             kind="report",
-            media_type=MEDIA_TYPES[fmt],
+            media_type=media_type_of(fmt),
             name=f"report-v{version}.{fmt}",
             run_id=run_id,
             redact=False,  # already scrubbed as data; redacting an HTML or PDF again could only damage it

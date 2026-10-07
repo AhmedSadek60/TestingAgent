@@ -36,7 +36,6 @@ log = logging.getLogger(__name__)
 
 MAX_OUTPUT_CHARS = 200_000
 AGENT_DIR = "/agent"
-DEFAULT_IMAGE = SandboxSpec().image
 INSTALL_HINT = "MCP targets need the optional 'mcp' package: pip install 'agentlab[mcp]'"
 
 
@@ -210,8 +209,9 @@ class McpAdapter(AgentAdapter):
             raise PolicyBlocked("an MCP server over stdio runs in the sandbox, and no sandbox provider is configured")
         assert self.cfg.command is not None
         sandbox = await provider.create(
-            SandboxSpec(
-                image=self.cfg.image or DEFAULT_IMAGE,
+            SandboxSpec.from_config(
+                self.ctx.config.security.sandbox,
+                image=self.cfg.image or self.ctx.config.security.sandbox.image,
                 workdir=AGENT_DIR,
                 env=dict(self.cfg.env),
                 timeout_seconds=3600,

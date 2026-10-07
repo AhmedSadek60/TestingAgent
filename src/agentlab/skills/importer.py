@@ -21,6 +21,7 @@ from pydantic import Field
 
 from agentlab.core.errors import UserError
 from agentlab.core.models.base import Model
+from agentlab.security import safeyaml
 from agentlab.security.redactor import get_redactor
 from agentlab.security.untrusted import injection_indicators
 from agentlab.skills.loader import load_skill_dir
@@ -141,7 +142,7 @@ def _frontmatter(text: str) -> tuple[dict[str, object], str]:
     if not m:
         return {}, text
     try:
-        data = yaml.safe_load(m.group(1))
+        data = safeyaml.load(m.group(1))
     except yaml.YAMLError:
         return {}, text
     return (data if isinstance(data, dict) else {}), m.group(2)
@@ -227,7 +228,7 @@ def promote_skill(draft_dir: str | Path, dest_root: str | Path, *, reviewer: str
     if dest.exists():
         raise UserError(f"{dest} already exists")
     shutil.copytree(src, dest)
-    data = yaml.safe_load((dest / "skill.yaml").read_text(encoding="utf-8")) or {}
+    data = safeyaml.load((dest / "skill.yaml").read_text(encoding="utf-8")) or {}
     data["status"] = "stable" if data.get("status") == "draft" else data.get("status", "stable")
     data.setdefault("provenance", {})["author"] = f"reviewed by {reviewer}"
     (dest / "skill.yaml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")

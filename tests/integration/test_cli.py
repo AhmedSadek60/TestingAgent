@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -95,6 +96,26 @@ def test_invalid_input_exits_2_with_a_one_line_message(project: Path) -> None:
     assert res.exit_code == 2
 
 
+def test_every_command_is_run_by_some_test() -> None:
+    """A command nobody runs breaks unseen. This looks for the words of each command, quoted in a call or written as
+    typed, in the tests: it cannot say the command is tested well, only that it is not forgotten."""
+    import typer
+
+    def leaves(command: object, path: tuple[str, ...]) -> list[tuple[str, ...]]:
+        children = getattr(command, "commands", None)
+        if not children:
+            return [path]
+        return [leaf for name, child in children.items() for leaf in leaves(child, (*path, name))]
+
+    source = "\n".join(p.read_text(encoding="utf-8") for p in Path(__file__).parents[1].rglob("*.py"))
+    forgotten = []
+    for path in leaves(typer.main.get_command(app), ()):
+        quoted = r"""["']\s*,\s*["']""".join(re.escape(word) for word in path)
+        if not (re.search(rf"""["']{quoted}["']""", source) or " ".join(path) in source):
+            forgotten.append(" ".join(path))
+    assert not forgotten, f"no test runs: {forgotten}"
+
+
 # ============================================================================================ skills
 def test_skills_list_show_new_validate(project: Path) -> None:
     data = run_json("skills", "list", "--json")
@@ -118,6 +139,25 @@ def test_skills_list_show_new_validate(project: Path) -> None:
     assert bad.exit_code == 2 and "invalid manifest" in bad.stdout
 
 
+def test_skills_validate_rejects_tests_that_could_never_run_and_accepts_the_ones_that_do(project: Path) -> None:
+    """A skill whose assertions are written ``{type: contains, value: x}`` used to validate as "ok" and then yield no tests."""
+    assert run("skills", "new", "refund-policy").exit_code == 0
+    manifest = project / "skills" / "refund-policy" / "skill.yaml"
+    text = manifest.read_text(encoding="utf-8")
+    assert "- {type: not_empty}" in text
+    manifest.write_text(text.replace("- {type: not_empty}", '- {type: contains, value: "30"}'), encoding="utf-8")
+    bad = run("skills", "validate", str(manifest.parent))
+    assert bad.exit_code == 2 and "params" in bad.stdout, bad.stdout
+    manifest.write_text(
+        text.replace("- {type: not_empty}", '- {type: contains, params: {value: "30"}}'), encoding="utf-8"
+    )
+    assert run("skills", "validate", str(manifest.parent)).exit_code == 0
+    plan = run(
+        "test", "--mock", "success", "--skills", "refund-policy", "--suite", "functional", "--plan-only", "--no-probe"
+    )
+    assert plan.exit_code == 0 and "1 tests from 1 skills" in plan.stdout, plan.stdout
+
+
 def test_imported_skill_is_an_untrusted_draft_that_cannot_be_promoted_unreviewed(project: Path) -> None:
     src = project / "third-party.md"
     src.write_text(
@@ -138,6 +178,24 @@ def test_imported_skill_is_an_untrusted_draft_that_cannot_be_promoted_unreviewed
     assert "shiny-tester" not in [s["name"] for s in run_json("skills", "list", "--json")["skills"]]  # type: ignore[index]
     refused = run("skills", "promote", str(draft), "--reviewer", "me")
     assert refused.exit_code == 2 and "IMPORTED-UNREVIEWED" in refused.stderr
+
+
+def test_forge_has_nothing_to_draft_when_an_installed_skill_covers_what_was_found(project: Path) -> None:
+    res = run("skills", "forge", "--mock", "success", "--to", str(project / "drafts"))
+    assert res.exit_code == 0 and "already covered" in " ".join(res.stdout.split())
+    assert not (project / "drafts").exists()
+
+
+def test_forge_drafts_a_skill_for_a_kind_of_agent_no_skill_covers_and_the_draft_is_not_used(project: Path) -> None:
+    description = "A voice assistant: it listens to speech, transcribes the audio and answers spoken questions."
+    drafts = project / "drafts"
+    res = run("skills", "forge", "--mock", "success", "--description", description, "--to", str(drafts))
+    assert res.exit_code == 0 and "voice-testing" in res.stdout, res.stdout
+    draft = drafts / "voice-testing"
+    assert (draft / "skill.yaml").is_file() and (draft / "SKILL.md").is_file()
+    assert "never selected until promoted" in " ".join(res.stderr.split())
+    assert run("skills", "validate", str(draft)).exit_code == 0
+    assert "voice-testing" not in [s["name"] for s in run_json("skills", "list", "--json")["skills"]]  # type: ignore[index]
 
 
 # ===================================================================================== credentials
@@ -202,6 +260,20 @@ def test_plan_only_designs_and_stores_a_plan_but_runs_nothing(project: Path) -> 
     assert len(runs) == 1 and runs[0]["status"] == "completed"  # type: ignore[arg-type]
     shown = run_json("runs", "show", str(data["run_id"])[:8], "--json")  # type: ignore[index]
     assert shown["summary"]["tests"] == 0, "plan-only never executes a test"  # type: ignore[index]
+
+
+def test_runs_show_lists_every_finding_while_the_run_summary_lists_the_top_ten(project: Path) -> None:
+    ran = run("test", "--mock", "success", "--mock", "unsafe_behavior", "--intensity", "quick", "--no-second-wave")
+    assert ran.exit_code == 1, ran.output
+    run_id = json.loads(run("runs", "list", "--json").stdout)[0]["id"]
+    findings = run_json("runs", "show", run_id[:8], "--json")["findings"]  # type: ignore[index]
+    assert len(findings) > 10, "the example needs more findings than the summary shows"
+    assert "and" in ran.output and "more: `agentlab runs show" in ran.output
+    shown = run("runs", "show", run_id[:8], "--tests")
+    assert shown.exit_code == 0
+    assert "more: `agentlab runs show" not in shown.output, "show is where they are listed, not a pointer to itself"
+    rows = re.findall(r"^\s+(?:CRITICAL|HIGH|MEDIUM|LOW|INFO)\s{2,}", shown.output, re.M)
+    assert len(rows) == len(findings), f"{len(rows)} rows for {len(findings)} findings"
 
 
 def test_a_run_reports_exit_codes_json_and_can_be_inspected_and_replayed(project: Path) -> None:

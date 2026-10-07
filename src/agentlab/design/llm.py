@@ -1,7 +1,8 @@
 """Optional model-suggested tests (``evaluation.llm_test_generation``; spec section 7).
 
-A model may propose extra *safe* functional scenarios for behaviour the deterministic skills do not cover. The rules
-that keep this from becoming a way into the evaluator:
+A model may propose extra *safe* functional scenarios for behaviour the deterministic skills do not cover, and it is
+the only thing that can turn a business rule the owner wrote in words ("refunds above 500 USD need manager approval")
+into a scenario: no template can know what to ask. The rules that keep this from becoming a way into the evaluator:
 
 * it is off by default and runs only with a configured evaluator provider - never the target itself;
 * everything it is told about the target (description, tools, documents) is wrapped as untrusted data;
@@ -42,6 +43,7 @@ SCHEMA: dict[str, Any] = {
                     "must_contain": {"type": "array", "items": {"type": "string"}},
                     "must_not_contain": {"type": "array", "items": {"type": "string"}},
                     "severity": {"type": "string", "enum": ["low", "medium"]},
+                    "requirement": {"type": "integer"},
                 },
                 "required": ["name", "objective", "input", "expected_behavior"],
                 "additionalProperties": False,
@@ -54,6 +56,8 @@ SCHEMA: dict[str, Any] = {
 URL = re.compile(r"https?://|www\.", re.I)
 CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f​-‏‪-‮⁠-⁤﻿]")
 MAX_INPUT = 500
+MAX_REQUIREMENTS = 12  # business rules the model is asked to design a scenario for
+MAX_REQUIREMENT_CHARS = 300
 
 
 @dataclass
@@ -74,6 +78,19 @@ def _clean(text: object, limit: int) -> str | None:
     return s
 
 
+def requirements_of(ctx: SkillContext) -> list[str]:
+    """The owner's business rules the model is asked about, in the order the owner gave them."""
+    return [r.strip()[:MAX_REQUIREMENT_CHARS] for r in ctx.user_requirements if r.strip()][:MAX_REQUIREMENTS]
+
+
+def _requirement(number: object, ctx: SkillContext) -> str | None:
+    """The rule a suggestion says it checks (1-based, as numbered in the prompt), or ``None`` when the number is not one."""
+    rules = requirements_of(ctx)
+    if isinstance(number, int) and not isinstance(number, bool) and 1 <= number <= len(rules):
+        return rules[number - 1]
+    return None
+
+
 def _build(raw: dict[str, Any], ids: IdAllocator, label: str, ctx: SkillContext) -> tuple[Draft | None, str | None]:
     name = _clean(raw.get("name"), 100)
     objective = _clean(raw.get("objective"), 240)
@@ -90,12 +107,14 @@ def _build(raw: dict[str, Any], ids: IdAllocator, label: str, ctx: SkillContext)
             clean = _clean(item, 80)
             if clean:
                 asserts.append(AssertionSpec(type=kind, params={"text": clean, "case_sensitive": False}))
+    rule = _requirement(raw.get("requirement"), ctx)
     test = TestCase(
         id=ids.alloc("LLM", _slug(name)),
         name=name,
         category="functional",
         objective=objective,
-        rationale=f"Model-suggested (unverified) by {label}: {objective}",
+        rationale=f"Model-suggested (unverified) by {label}: {objective}"
+        + (f" Designed to check the owner's rule: {rule}" if rule else ""),
         skill="llm-suggested",
         skill_version="1",
         risk_level=RiskClass.SAFE,
@@ -105,13 +124,17 @@ def _build(raw: dict[str, Any], ids: IdAllocator, label: str, ctx: SkillContext)
         assertions=asserts,
         judge=[JudgeCriterion(metric="task_completion", rubric=expected, threshold=0.6)],
         evaluation_metrics=["task_completion"],
-        tags=["llm-suggested", "unverified"],
+        tags=["llm-suggested", "unverified", *(["requirement"] if rule else [])],
+        context={"requirement": rule} if rule else {},
         score_category="functional_quality",
     )
     return Draft(
         test=test,
         reasons=[
-            f"Suggested by {label} as a scenario the built-in skills do not cover. Unverified: review before relying on it."
+            f"Suggested by {label} to check the owner's rule: {rule}. Unverified: review before relying on it."
+            if rule
+            else f"Suggested by {label} as a scenario the built-in skills do not cover. Unverified: review before "
+            "relying on it."
         ],
         evidence=[f"target: {ctx.profile.target_name}"],
         taxonomy=["A"],
@@ -140,18 +163,30 @@ async def suggest_tests(
     gaps = [f"{e.key} {e.name}" for e in plan.coverage if e.status in {"not_covered", "partial"}]
     profile = ctx.profile
     facts = "\n".join(f"- {f.subject}: {f.statement}" for f in ctx.facts[:8]) if ctx.documents else ""
+    rules = requirements_of(ctx)
+    max_tests = max(max_tests, len(rules))
     context = (
         f"Target name: {profile.target_name}\n"
         f"Detected types: {', '.join(t.type.value for t in profile.types[:5]) or 'unknown'}\n"
         f"Tools: {', '.join(t.name for t in ctx.tools[:12]) or 'none'}\n"
-        f"Areas with no or partial coverage: {', '.join(gaps) or 'none'}\n"
-        f"Owner requirements: {'; '.join(ctx.user_requirements[:5]) or 'none'}"
+        f"Areas with no or partial coverage: {', '.join(gaps) or 'none'}"
     )
-    user = (
-        wrap_untrusted("repository", f"{profile.summary}\n{context}\n{facts}", max_chars=4000)
-        + f"\nSuggest up to {max_tests} additional, harmless functional test scenarios (plain user messages) for behaviour "
+    if rules:
+        context += "\nBusiness rules the owner says the agent must follow:\n" + "\n".join(
+            f"{n}. {rule}" for n, rule in enumerate(rules, 1)
+        )
+    task = (
+        f"\nSuggest up to {max_tests} additional, harmless functional test scenarios (plain user messages) for behaviour "
         "the existing tests miss. Each needs a measurable expectation. Do not suggest attacks, secrets, links or code."
     )
+    if rules:
+        task = (
+            '\nFirst write one scenario for each numbered business rule, in order, and set "requirement" to its number: '
+            "a plain user message in which an agent that ignores the rule would show it, with a measurable expectation. "
+            f"Then, up to {max_tests} scenarios in all, add harmless scenarios for behaviour the existing tests miss. "
+            "Do not suggest attacks, secrets, links or code."
+        )
+    user = wrap_untrusted("repository", f"{profile.summary}\n{context}\n{facts}", max_chars=4000) + task
     try:
         resp = await providers.get(name).complete(
             CompletionRequest(

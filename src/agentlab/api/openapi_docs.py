@@ -266,7 +266,7 @@ note: Why the score is missing or limited
 mode: chat (one command run per message) or task (a coding agent working on a disposable workspace)
 image: Container image to run the command in; default: the sandbox's image
 command: The command and its arguments, run inside the sandbox
-workdir: Working directory inside the sandbox
+workdir: Working directory inside the sandbox (default: next to the agent's code in chat mode when there is a repository, the workspace otherwise)
 env: Environment of the command. Never put a secret here
 network: none, internal or allowlist; a sandboxed target has no network by default
 allow_hosts: Hosts reachable when network is allowlist
@@ -397,6 +397,10 @@ include_sensitive: Embed evidence taken while signed in (off by default)
 report: The report the file belongs to
 file: The file in the format asked for
 
+[ViewLink]
+url: The address, on this server, that shows the report
+expires_in: How many seconds the link works for
+
 [Finding]
 id: Unique identifier of the finding
 run_id: Id of the run
@@ -513,9 +517,9 @@ capabilities: What the model can do: chat, tool_calling, json_schema, multimodal
 
 [MockAgentConfig]
 tools: Names of the tools the mock agent offers
-behaviors: Behaviours to simulate (success, leak, slow, hallucinate, ...)
+behaviors: Behaviours to simulate: success, hallucination, wrong_citation, wrong_tool, wrong_argument, prompt_injection, memory_leakage, excessive_tool_calls, infinite_loop, unsafe_behavior, flaky, slow
 knowledge: Documents the mock agent answers from, by name
-seed: Seed for deterministic behaviour
+seed: A number that makes the mock agent's planted secret unique (MOCK_SECRET_NNNN)
 
 [PlanOut]
 run_id: Id of the plan (it is a run of kind `plan`)
@@ -633,7 +637,7 @@ contexts: JSONPath of the retrieved passages
 citations: JSONPath of the sources it cited
 events: JSONPath of its event list
 usage: JSONPath of its token usage
-session_id: JSONPath of the conversation id it returned
+session_id: JSONPath of the conversation id the agent assigned, in a JSON answer (not a stream). Later turns of the same conversation send it as {{session_id}} and in session_header
 
 [ReviewOut]
 id: Review id
@@ -859,9 +863,9 @@ browser_steps: Steps to perform in a browser
 timeout: Seconds before the test is stopped
 max_steps: Most agent steps allowed
 max_cost: Most money the test may spend, in US dollars
-cleanup_strategy: What to undo afterwards
-evidence_requirements: Evidence the test must collect
-applicable_agent_types: Kinds of agent the test applies to
+cleanup_strategy: What a person should undo afterwards (a note; AgentLab tears down only what it created itself)
+evidence_requirements: Evidence a reviewer should expect (a note; every attempt's trace is kept regardless)
+applicable_agent_types: Kinds of agent the test was written for (a note; the skill's applicability decides what is planned)
 score_category: Scorecard category the result counts toward
 
 [TestDelta]
@@ -892,7 +896,7 @@ limits: Limits the plan was made under
 plan_hash: Fingerprint of the selected tests; a run executes the plan with this hash
 parent_plan_id: The plan this one follows up
 suite: Which suite it was made for
-intensity: quick, standard or deep
+intensity: quick, standard or thorough
 profile_hash: Fingerprint of the profile it was made from
 coverage: Which taxonomy letters (A to Q) are covered
 security_coverage: Which security categories (N1 to N28) are covered
@@ -1074,6 +1078,7 @@ TraceOut: The ordered events of one attempt of one test
 TraceSummary: One trace in a list
 Turn: One thing the user says in a conversation
 TypeScore: How strongly the target looks like one kind of agent
+ViewLink: A short-lived link that shows a report in a sandboxed frame
 WebConfig: A web interface to drive with a browser
 """
 

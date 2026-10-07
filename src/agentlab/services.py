@@ -22,7 +22,7 @@ from agentlab.core.models import TargetSpec
 from agentlab.providers import ProviderManager
 from agentlab.sandbox import SandboxProvider, create_sandbox_provider
 from agentlab.security.credentials import CredentialManager, EncryptedSecretStore
-from agentlab.storage.artifacts import ArtifactStore, LocalArtifactStore
+from agentlab.storage.artifacts import ArtifactStore, create_artifact_store
 from agentlab.storage.db import Database, Store, open_store
 
 log = logging.getLogger(__name__)
@@ -41,6 +41,15 @@ def load_plugin_modules(modules: list[str]) -> list[str]:
         except Exception as exc:  # a broken plug-in must not stop AgentLab
             warnings.append(f"plug-in module '{name}' could not be imported ({type(exc).__name__}: {exc})")
     return warnings
+
+
+def _check_report_formats(cfg: AgentLabConfig) -> None:
+    """Refuse a report format nothing provides now, not when the report phase of a long run reaches it. This runs after
+    the plug-ins are loaded, because a plug-in may be what adds the format."""
+    if cfg.reporting.formats:
+        from agentlab.reporting.bundle import normalise_formats  # local: the reporting package builds on Services
+
+        normalise_formats(cfg.reporting.formats)
 
 
 @dataclass
@@ -76,6 +85,7 @@ class Services:
         cfg = config or AgentLabConfig.load()
         base = base_dir or Path.cwd()
         warnings = load_plugin_modules(cfg.plugins)
+        _check_report_formats(cfg)
         creds = credentials or CredentialManager(EncryptedSecretStore(_under(base, cfg.storage.secrets_file)))
         if reporter is None and cfg.reporting.formats:
             from agentlab.reporting.bundle import default_reporter  # local: the reporting package builds on Services
@@ -84,7 +94,10 @@ class Services:
         services = cls(
             config=cfg,
             store=store or _open_store(_db_url(base, cfg.storage.database_url), migrate),
-            artifacts=artifacts or LocalArtifactStore(_under(base, cfg.storage.artifacts_dir)),
+            artifacts=artifacts
+            or create_artifact_store(
+                cfg.storage.artifact_store, _under(base, cfg.storage.artifacts_dir), cfg.storage.artifact_store_options
+            ),
             credentials=creds,
             providers=providers or ProviderManager(cfg, creds),
             sandbox=sandbox or create_sandbox_provider(cfg.security.sandbox.provider),
@@ -138,9 +151,14 @@ class Services:
             await self._browser_pool.aclose()
 
     def workdir(self, run_id: str) -> Path:
-        path = self.base_dir / ".agentlab" / "work" / run_id
+        path = _under(self.base_dir, self.config.storage.work_dir) / run_id
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @property
+    def uploads_dir(self) -> Path:
+        """Where documents and archives sent to the API are kept (created when the API starts)."""
+        return _under(self.base_dir, self.config.storage.uploads_dir)
 
     async def aclose(self) -> None:
         await self.close_browser()

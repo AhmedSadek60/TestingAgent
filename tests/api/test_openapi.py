@@ -139,3 +139,30 @@ async def test_the_reference_pages_are_served(tmp_path: Path) -> None:
         docs = await api.client.get("/docs")
         assert docs.status_code == 200 and "swagger" in docs.text.lower()
         assert (await api.client.get("/redoc")).status_code == 200
+
+
+def test_the_schema_the_web_interface_is_built_from_is_the_current_one() -> None:
+    """The interface's TypeScript types are generated from ``web/openapi.json``. When the API changes, the committed copy has
+    to be regenerated, or the interface would be built against an API that no longer exists."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "scripts" / "export_openapi.py"
+    spec = importlib.util.spec_from_file_location("export_openapi", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    have = module.TARGET.read_text(encoding="utf-8")
+    assert have == module.current(), (
+        "web/openapi.json is out of date: run `python scripts/export_openapi.py && (cd web && npm run gen:api)`"
+    )
+
+
+def test_the_choices_a_request_can_name_are_listed_in_the_schema(schema: dict[str, Any]) -> None:
+    """The web client's types are generated from these lists, so a choice the server does not know cannot be offered."""
+    from agentlab.design import SUITES
+    from agentlab.skills.context import INTENSITIES
+
+    for name in ("JobOptions", "TestPlan"):
+        props = schema["components"]["schemas"][name]["properties"]
+        assert props["intensity"]["enum"] == list(INTENSITIES), name
+        assert set(props["suite"]["enum"]) == set(SUITES), name

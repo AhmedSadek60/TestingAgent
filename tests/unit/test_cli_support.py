@@ -37,6 +37,43 @@ def test_flags_override_the_target_file_and_paths_in_the_file_are_relative_to_it
     assert build_target(target_file=f, name="other").name == "other"
 
 
+def test_a_flag_changes_only_the_setting_it_names_and_the_rest_of_the_interface_stays(tmp_path: Path) -> None:
+    f = tmp_path / "t.yaml"
+    f.write_text(
+        yaml.safe_dump(
+            {
+                "name": "n",
+                "api": {"url": "http://a/x", "headers": {"X-Team": "t"}, "timeout_seconds": 7, "auth_credential": "c"},
+                "web": {"url": "http://w", "input_selector": "#q"},
+                "mcp": {"transport": "sse", "url": "http://m/sse", "headers": {"A": "b"}},
+                "command": {"command": ["agent"], "mode": "task", "timeout_seconds": 9},
+            }
+        ),
+        encoding="utf-8",
+    )
+    merged = build_target(
+        target_file=f, api_url="http://b/y", url="http://w2", mcp_url="http://m2/sse", command="agent2 -x"
+    )
+    assert merged.api is not None and merged.api.url == "http://b/y"
+    assert (merged.api.headers, merged.api.timeout_seconds, merged.api.auth_credential) == ({"X-Team": "t"}, 7, "c")
+    assert merged.web is not None and (merged.web.url, merged.web.input_selector) == ("http://w2", "#q")
+    assert merged.mcp is not None and (merged.mcp.url, merged.mcp.transport) == ("http://m2/sse", "sse")
+    assert merged.mcp.headers == {"A": "b"}
+    assert merged.command is not None and merged.command.command == ["agent2", "-x"]
+    assert (merged.command.mode, merged.command.timeout_seconds) == ("task", 9)
+
+
+def test_an_openapi_document_alone_leaves_the_address_to_be_found_in_it(tmp_path: Path) -> None:
+    only = build_target(openapi="http://h/openapi.json")
+    assert only.api is not None and only.api.url == "" and only.api.openapi_url == "http://h/openapi.json"
+    f = tmp_path / "t.yaml"
+    f.write_text(yaml.safe_dump({"name": "n", "api": {"url": "http://a/x"}}), encoding="utf-8")
+    both = build_target(target_file=f, openapi="http://h/openapi.json")
+    assert both.api is not None and (both.api.url, both.api.openapi_url) == ("http://a/x", "http://h/openapi.json")
+    both_flags = build_target(api_url="http://a/x", openapi="http://h/openapi.json")
+    assert both_flags.api is not None and both_flags.api.url == "http://a/x"
+
+
 def test_llm_flag_accepts_model_names_with_colons_and_system_prompt_files(tmp_path: Path) -> None:
     prompt = tmp_path / "p.txt"
     prompt.write_text("You are terse.", encoding="utf-8")

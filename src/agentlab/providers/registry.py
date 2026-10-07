@@ -75,7 +75,13 @@ class ProviderManager:
         if name in self._overrides:
             return self._overrides[name]
         if name not in self._instances:
-            self._instances[name] = create_provider(self.config.provider(name), self.credentials)
+            cfg = self.config.provider(name)
+            cap = self.config.limits.max_retries
+            if (
+                cfg.max_retries > cap
+            ):  # limits.max_retries is the most any call may be repeated, whatever a provider says
+                cfg = cfg.model_copy(update={"max_retries": cap})
+            self._instances[name] = create_provider(cfg, self.credentials)
         return self._instances[name]
 
     def describe(self) -> list[dict[str, object]]:

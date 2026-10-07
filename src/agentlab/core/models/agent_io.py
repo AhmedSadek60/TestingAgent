@@ -70,6 +70,10 @@ class AgentResponse(Model):
     first_token_ms: float | None = None
     status_code: int | None = None
     error: str | None = None
+    retries: int = Field(
+        default=0,
+        description="Times the call was repeated because the connection could not be made, so it never reached the agent",
+    )
     raw: Any = None
     artifacts: list[str] = Field(default_factory=list)
     observed: dict[str, Any] = Field(

@@ -6,7 +6,8 @@ Design rules:
 * Judges return structured JSON (score, verdict, confidence, uncertainty, brief justification
   citing observable evidence). Hidden chain-of-thought is neither requested nor stored.
 * Strategies: single, average, vote, min. Disagreement lowers confidence and flags review.
-* The rubric text and a hash of the full prompt are stored for reproducibility.
+* The rubric text and a hash of the full prompt (with the judges and the strategy) are stored on every result, so a
+  verdict can be tied to exactly the question that produced it.
 * A target must not judge itself: matching provider/model pairs are rejected.
 """
 
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import statistics
 from collections.abc import Callable
 from typing import Any
@@ -24,6 +26,8 @@ from agentlab.core.models import AgentResponse, JudgeCriterion, JudgeResult, Jud
 from agentlab.providers import Capability, CompletionRequest, Message, ProviderManager
 from agentlab.security.redactor import get_redactor
 from agentlab.security.untrusted import EVALUATOR_POLICY, wrap_untrusted
+
+_NONCE = re.compile(r'nonce="[0-9a-f]+"')
 
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -109,7 +113,7 @@ class JudgeEvidence:
             blocks.append(
                 wrap_untrusted(
                     "agent_output",
-                    "CITATIONS: " + ", ".join(c for r in self.responses for c in r.citations),
+                    red.redact_text("CITATIONS: " + ", ".join(c for r in self.responses for c in r.citations))[0],
                     max_chars=1000,
                 )
             )
@@ -200,9 +204,12 @@ class JudgeEngine:
     async def judge(self, test: TestCase, criterion: JudgeCriterion, evidence: JudgeEvidence) -> JudgeResult:
         system, user = self.prompt_for(test, criterion, evidence)
         rubric = criterion.rubric or RUBRICS.get(criterion.metric, criterion.metric)
+        # Each wrapper carries a fresh random nonce (so a target cannot forge a closing tag); the key must not, or no two
+        # questions would ever look alike.
+        question = _NONCE.sub('nonce="-"', user)
         key = hashlib.sha256(
             json.dumps(
-                [system, user, [(j.provider, j.model) for j in self.config.judges], self.config.judge_strategy]
+                [system, question, [(j.provider, j.model) for j in self.config.judges], self.config.judge_strategy]
             ).encode()
         ).hexdigest()
         if key in self._cache:
@@ -232,9 +239,11 @@ class JudgeEngine:
                 passed=False,
                 confidence=0.0,
                 rubric=rubric,
+                weight=criterion.weight,
                 strategy=strat,
                 error="; ".join(errors) or "no judge available",
                 agreement=0.0,
+                prompt_hash=prompt_hash,
             )
         usable = [v for v in votes if not v.uncertain] or []
         pool = usable or votes
@@ -265,11 +274,13 @@ class JudgeEngine:
             passed=score >= criterion.threshold and not uncertain,
             confidence=round(conf, 4),
             rubric=rubric,
+            weight=criterion.weight,
             votes=votes,
             strategy=strat,
             agreement=round(agreement, 4),
             uncertain=uncertain,
             error="; ".join(errors) if errors else ("judge uncertain" if uncertain else None),
+            prompt_hash=prompt_hash,
         )
 
     def supports_structured(self) -> bool:

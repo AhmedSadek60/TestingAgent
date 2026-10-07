@@ -537,6 +537,13 @@ def authentication_model(inp: FingerprintInputs) -> dict:
     return info
 
 
+def _models(spec: TargetSpec, repo: RepositoryAnalysis | None) -> list[str]:
+    """The models behind the agent: the one the owner named for an ``llm`` target (declared, so first), then the ones the
+    repository's code refers to (inferred). A target with neither says nothing, rather than a guess."""
+    declared = [f"{spec.llm.provider}:{spec.llm.model}" if spec.llm.model else spec.llm.provider] if spec.llm else []
+    return list(dict.fromkeys([*declared, *(repo.models if repo else [])]))
+
+
 def build_profile(inp: FingerprintInputs) -> AgentProfile:
     types = classify(inp)
     tools = build_tools(inp)
@@ -620,7 +627,7 @@ def build_profile(inp: FingerprintInputs) -> AgentProfile:
             "servers": [m.name for m in repo.mcp] if repo else [],
             "tools": [t.name for t in inp.mcp_tools],
         },
-        models=repo.models if repo else [],
+        models=_models(spec, repo),
         frameworks=repo.frameworks if repo else [],
         languages=repo.languages if repo else {},
         expected_workflows=[],

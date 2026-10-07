@@ -13,7 +13,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from agentlab.adapters.base import TargetRuntime
-from agentlab.core.enums import Phase, RunStatus, TestStatus
+from agentlab.core.enums import Intensity, Phase, RunStatus, Suite, TestStatus
 from agentlab.core.ids import utcnow
 from agentlab.core.models import AgentProfile, Finding, Scorecard, TargetSpec, TestCase, TestResult
 from agentlab.core.models.base import Model
@@ -32,8 +32,8 @@ from agentlab.tracing import EventBus
 class RunOptions:
     """What the user asked for. Everything has a safe default; nothing here can widen the target's authorization."""
 
-    suite: str = "full"
-    intensity: str = "standard"
+    suite: Suite = "full"
+    intensity: Intensity = "standard"
     include_skills: list[str] | None = None
     exclude_skills: list[str] | None = None
     user_test_files: list[Path] = field(default_factory=list)
@@ -45,7 +45,6 @@ class RunOptions:
     objective: str | None = None
     requirements: list[str] = field(default_factory=list)
     probe: bool = True
-    seed: int = 0
     project: str = "default"
     plan_only: bool = False
     run_id: str | None = None

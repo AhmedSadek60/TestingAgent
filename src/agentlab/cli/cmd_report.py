@@ -26,10 +26,11 @@ from agentlab.cli.common import (
     make_services,
     state,
 )
+from agentlab.cli.markup import esc, short, styled
 from agentlab.cli.render import STATUS_STYLE
 from agentlab.core.enums import ReviewDecision
 from agentlab.core.errors import UserError
-from agentlab.reporting.bundle import FORMATS, generate_report, normalise_formats, verify_bundle
+from agentlab.reporting.bundle import generate_report, normalise_formats, verify_bundle
 from agentlab.reporting.compare import KIND_TITLES, Comparison, compare_runs, comparison_markdown, format_metric
 from agentlab.reporting.render_html import render_comparison_html
 from agentlab.reporting.review import review_finding, review_result, subject_labels
@@ -66,7 +67,10 @@ def report(
     fmt: Annotated[
         list[str] | None,
         typer.Option(
-            "--format", "-f", help=f"{', '.join(FORMATS)} or all; repeat or separate with commas. Default: all."
+            "--format",
+            "-f",
+            help="json, md, html, pdf, all (every installed format) or a format a plug-in adds; repeat or separate "
+            "with commas. Default: json, md, html and pdf.",
         ),
     ] = None,
     output: Annotated[
@@ -107,9 +111,9 @@ def report(
             )
         raise typer.Exit(EXIT_OK if not problems else EXIT_FINDINGS)
 
-    formats = normalise_formats(fmt)
-    services = make_services(state(ctx))
+    services = make_services(state(ctx))  # loads the plug-ins, which may be what provides a format
     try:
+        formats = normalise_formats(fmt)
         if run:
             run_id = resolve_run_id(services, run)
         else:
@@ -117,7 +121,7 @@ def report(
             if not runs:
                 raise UserError("there is no finished run yet: run `agentlab test` first, or give --run")
             run_id = str(runs[0]["id"])
-            err.print(f"[dim]no --run given: using the latest run {run_id[:8]}[/dim]")  # stderr keeps --json clean
+            err.print(f"[dim]no --run given: using the latest run {esc(run_id[:8])}[/dim]")  # stderr keeps --json clean
         baseline_id = resolve_run_id(services, baseline) if baseline else None
         bundle = generate_report(
             services,
@@ -133,11 +137,11 @@ def report(
         emit_json(bundle.summary())
         return
     console.print(
-        f"[bold]Report[/bold] run {run_id[:8]} · version {bundle.report_version} · bundle {bundle.bundle_id[:12]}"
+        f"[bold]Report[/bold] run {esc(run_id[:8])} · version {bundle.report_version} · bundle {esc(bundle.bundle_id[:12])}"
     )
     # paths are printed unwrapped so they can be copied from a narrow terminal or a CI log
     for name, path in bundle.paths.items():
-        console.print(f"  {name:<5} {escape(str(path))}", soft_wrap=True, highlight=False)
+        console.print(f"  {esc(f'{name:<5}')} {esc(path)}", soft_wrap=True, highlight=False)
     if bundle.directory:
         console.print(
             f"  [dim]checksums: {escape(str(bundle.directory / 'checksums.json'))}[/dim]",
@@ -150,7 +154,7 @@ def report(
             highlight=False,
         )
     for w in bundle.warnings:
-        console.print(f"  [yellow]![/yellow] {w}")
+        console.print(f"  [yellow]![/yellow] {esc(w)}")
 
 
 # ========================================================================================================= compare
@@ -213,47 +217,55 @@ def compare(
 def _status(value: str | None) -> str:
     if not value:
         return "-"
-    style = STATUS_STYLE.get(value, "")
-    return f"[{style}]{value}[/]" if style else value
+    return styled(value, STATUS_STYLE.get(value))
 
 
 def render_comparison(c: Comparison) -> None:
     comp = c.compatibility
-    console.print(f"[bold]Regression comparison[/bold]  A {c.run_a.run_id[:8]}  ->  B {c.run_b.run_id[:8]}")
-    console.print(f"[{VERDICT_STYLE[c.verdict]}]{c.summary}[/]")
-    console.print(f"[{COMPAT_STYLE[comp.verdict]}]Compatibility: {comp.verdict.replace('_', ' ')}[/] - {comp.summary}")
+    console.print(f"[bold]Regression comparison[/bold]  A {esc(c.run_a.run_id[:8])}  ->  B {esc(c.run_b.run_id[:8])}")
+    console.print(styled(c.summary, VERDICT_STYLE[c.verdict]))
+    console.print(
+        f"{styled(f'Compatibility: {comp.verdict}'.replace('_', ' '), COMPAT_STYLE[comp.verdict])} - {esc(comp.summary)}"
+    )
     if comp.differences:
         t = Table("Impact", "What differs", "A", "B", box=box.SIMPLE_HEAD, title="Differences between the runs")
         for diff in comp.differences:
-            t.add_row(diff.impact.replace("_", " "), diff.field, str(diff.base)[:40], str(diff.current)[:40])
+            t.add_row(
+                esc(diff.impact.replace("_", " ")),
+                esc(diff.field),
+                esc(str(diff.base)[:40]),
+                esc(str(diff.current)[:40]),
+            )
         console.print(t)
     for note in comp.notes:
-        console.print(f"  [yellow]![/yellow] {note}")
+        console.print(f"  [yellow]![/yellow] {esc(note)}")
     sc: dict[str, Any] = c.score
     delta = "" if sc.get("overall_delta") is None else f" ({sc['overall_delta']:+.1f})"
     console.print(
-        f"Score {format_metric(sc.get('overall_a'), '')} -> {format_metric(sc.get('overall_b'), '')}{delta}"
-        f" · grade {sc.get('grade_a') or '-'} -> {sc.get('grade_b') or '-'}"
+        f"Score {esc(format_metric(sc.get('overall_a'), ''))} -> {esc(format_metric(sc.get('overall_b'), ''))}{delta}"
+        f" · grade {esc(sc.get('grade_a') or '-')} -> {esc(sc.get('grade_b') or '-')}"
     )
     if sc.get("note"):
-        console.print(f"  [yellow]![/yellow] {sc['note']}")
+        console.print(f"  [yellow]![/yellow] {esc(sc['note'])}")
     for kind, title in KIND_TITLES.items():
         items = [d for d in c.tests if d.kind == kind]
         if not items:
             continue
-        console.print(f"\n[bold]{title}: {len(items)}[/bold]")
+        console.print(f"\n[bold]{esc(title)}: {len(items)}[/bold]")
         for d in items[:12]:
-            console.print(f"  {d.test_id}  {_status(d.status_a)} -> {_status(d.status_b)}  {d.note or d.name}"[:160])
+            console.print(
+                f"  {esc(d.test_id)}  {_status(d.status_a)} -> {_status(d.status_b)}  {short(d.note or d.name, 100)}"
+            )
         if len(items) > 12:
             console.print(f"  [dim]... and {len(items) - 12} more (use --format md)[/dim]")
     sec = c.security
     if sec.get("new_attacks_succeeded"):
         console.print(
-            f"\n[bold red]New attacks that succeeded:[/bold red] {', '.join(sec['new_attacks_succeeded'][:10])}"
+            f"\n[bold red]New attacks that succeeded:[/bold red] {esc(', '.join(sec['new_attacks_succeeded'][:10]))}"
         )
     if sec.get("attacks_no_longer_succeeding"):
         console.print(
-            f"[green]Attacks that no longer succeed:[/green] {', '.join(sec['attacks_no_longer_succeeding'][:10])}"
+            f"[green]Attacks that no longer succeed:[/green] {esc(', '.join(sec['attacks_no_longer_succeeding'][:10]))}"
         )
     if not c.tests:
         console.print("\n[green]No test changed outcome.[/green]")
@@ -263,14 +275,19 @@ def render_comparison(c: Comparison) -> None:
 ReviewRun = Annotated[str, typer.Argument(help="Run id (an id prefix is enough).")]
 Reviewer = Annotated[str, typer.Option("--reviewer", help="Who is reviewing (recorded with the review).")]
 Decision = Annotated[str, typer.Option("--decision", "-d", help=f"One of: {DECISIONS}.")]
-Reason = Annotated[str, typer.Option("--reason", help="Why (required for most decisions).")]
+Reason = Annotated[
+    str,
+    typer.Option(
+        "--reason", help="Why. Required for false_positive, false_negative, override_score and change_severity."
+    ),
+]
 Comment = Annotated[str, typer.Option("--comment", help="An optional note for the next reader.")]
 
 
 def _print_review(row: dict[str, Any]) -> None:
     console.print(
-        f"[green]recorded[/green] {row['decision']} on {row['subject_type']} by {row['reviewer']} "
-        f"(review {str(row['id'])[:8]}); the original evaluation is unchanged."
+        f"[green]recorded[/green] {esc(row['decision'])} on {esc(row['subject_type'])} by {esc(row['reviewer'])} "
+        f"(review {esc(str(row['id'])[:8])}); the original evaluation is unchanged."
     )
     console.print("[dim]Run `agentlab report` to write a report that shows it next to the original.[/dim]")
 
@@ -363,12 +380,12 @@ def review_list(
         change = "; ".join(f"{k} {_value(original.get(k))} -> {_value(v)}" for k, v in reviewed.items()) or "-"
         about = labels.get(str(r["subject_id"]), str(r["subject_id"])[:8])
         t.add_row(
-            str(r.get("created_at"))[:16],
-            str(r["reviewer"]),
-            f"{r['subject_type']} {about}",
-            str(r["decision"]),
-            change,
-            str(r.get("reason") or r.get("comment") or ""),
+            esc(str(r.get("created_at"))[:16]),
+            esc(r["reviewer"]),
+            esc(f"{r['subject_type']} {about}"),
+            esc(r["decision"]),
+            esc(change),
+            esc(r.get("reason") or r.get("comment") or ""),
         )
     console.print(t)
 

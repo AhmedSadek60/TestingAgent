@@ -1,26 +1,26 @@
 {
-  "templateMode": true,
+  "templateMode": false,
   "project": {
-    "name": "TBD",
-    "description": "TBD",
-    "type": "TBD"
+    "name": "AgentLab",
+    "description": "AI agent testing, evaluation and security platform: ingests an agent, plans tests that fit it, runs them in isolation, evaluates in three layers and reports findings with severity, confidence and what was not tested.",
+    "type": "application"
   },
   "technology": {
-    "languages": [],
-    "frameworks": [],
-    "buildSystems": [],
-    "packageManagers": []
+    "languages": ["Python", "TypeScript"],
+    "frameworks": ["FastAPI", "Pydantic", "SQLAlchemy", "Alembic", "Typer", "React", "Vite"],
+    "buildSystems": ["setuptools", "vite", "docker"],
+    "packageManagers": ["pip", "npm"]
   },
   "commands": {
-    "install": null,
-    "build": null,
-    "test": null,
-    "lint": null,
-    "format": null,
-    "typecheck": null,
-    "verify": null
+    "install": "pip install -e \".[dev]\"",
+    "build": "cd web && npm ci && npm run build",
+    "test": "pytest tests -q -m \"not docker and not browser and not postgres and not redis and not ollama and not matrix\"",
+    "lint": "ruff check .",
+    "format": "ruff format --check .",
+    "typecheck": "mypy src",
+    "verify": "python3 scripts/ai/validate_governance.py && python scripts/export_openapi.py --check && cd web && npm test"
   },
   "architecture": {
-    "style": "TBD"
+    "style": "One Python package (src/agentlab) whose parts are plug-in registries, with a REST API, a command line and a React web interface served from the API's own origin. See docs/architecture.md."
   }
 }

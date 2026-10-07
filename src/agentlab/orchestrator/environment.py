@@ -170,6 +170,5 @@ def build_skill_context(
         intensity=options.intensity,
         fixtures_dir=fixtures_dir,
         doc_paths=document_paths(spec),
-        seed=options.seed,
         user_requirements=list(options.requirements),
     )

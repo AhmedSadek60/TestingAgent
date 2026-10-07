@@ -18,11 +18,13 @@ dependencies = [
   "sqlalchemy>=2.0",
   "alembic>=1.13",
   "fastapi>=0.111",
+  "starlette>=0.37",
   "uvicorn>=0.30",
   "python-multipart>=0.0.9",
   "typer>=0.12",
   "rich>=13",
   "jinja2>=3.1",
+  "markupsafe>=2.1",
   "cryptography>=42",
   "jsonschema>=4.22",
   "jsonpath-ng>=1.6",
@@ -33,11 +35,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+anthropic = ["anthropic>=1.0,<2"]
 browser = ["playwright>=1.45"]
 postgres = ["psycopg[binary]>=3.1"]
 redis = ["redis>=5.0"]
-mcp = ["mcp>=2.3,<3"]
-all = ["agentlab[browser,postgres,redis,mcp]"]
+mcp = ["mcp>=2.3,<3", "httpx2>=2.10"]
+all = ["agentlab[anthropic,browser,postgres,redis,mcp]"]
 dev = [
   "agentlab[all]",
   "pytest>=8",

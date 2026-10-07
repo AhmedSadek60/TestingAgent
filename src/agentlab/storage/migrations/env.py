@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from agentlab.storage.db import postgres_connect_args
 from agentlab.storage.orm import Base
 
 config = context.config
@@ -25,9 +28,11 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     url = (config.get_main_option("sqlalchemy.url") or "").replace("%%", "%")
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     if url.startswith("sqlite") and (":memory:" in url or url == "sqlite://"):
         kwargs["poolclass"] = pool.StaticPool
+    if connect_args := postgres_connect_args(url):
+        kwargs["connect_args"] = connect_args
     engine = create_engine(url, **kwargs)
     with engine.connect() as connection:
         context.configure(

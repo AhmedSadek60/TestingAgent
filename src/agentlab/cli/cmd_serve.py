@@ -18,6 +18,7 @@ import typer
 from agentlab import __version__
 from agentlab.api.security import is_loopback, resolve_token
 from agentlab.cli.common import EXIT_NOT_TESTED, console, err, fail, load_config, make_services, run_async, state
+from agentlab.cli.markup import esc
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import InfrastructureError
 from agentlab.jobs.queue import RedisQueue, create_queue
@@ -82,14 +83,14 @@ def serve(
         ui_dir = default_ui_dir() if serve_ui else None
         base = f"http://{'127.0.0.1' if scfg.host in {'0.0.0.0', '::'} else scfg.host}:{scfg.port}"  # noqa: S104 - compared, not bound
 
-        console.print(f"[bold]AgentLab {__version__}[/bold] listening on [cyan]{scfg.host}:{scfg.port}[/cyan]")
-        console.print(f"  API reference   {base}/docs")
+        console.print(f"[bold]AgentLab {__version__}[/bold] listening on [cyan]{esc(scfg.host)}:{scfg.port}[/cyan]")
+        console.print(f"  API reference   {esc(base)}/docs")
         if not serve_ui:
             console.print("  web interface   off")
         elif ui_dir is None:
-            console.print("  web interface   not built here (cd web && npm install && npm run build)")
+            console.print("  web interface   not built here (cd web && npm ci && npm run build)")
         else:
-            console.print(f"  web interface   {base}/")
+            console.print(f"  web interface   {esc(base)}/")
         console.print(
             "  authentication  "
             + (

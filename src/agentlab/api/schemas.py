@@ -7,7 +7,7 @@ silently ignored."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -37,7 +37,7 @@ class Health(Model):
     version: str = Field(description="AgentLab version")
     auth_required: bool = Field(description="Whether requests must carry the API token")
     queue: str = Field(description="Queue backend: inline or redis")
-    workers: int = Field(description="Runs this process is working on right now (inline queue)")
+    running: int = Field(description="Runs in progress, whichever process works on them (from the database)")
     queued: int = Field(description="Jobs waiting for a worker")
 
 
@@ -326,7 +326,11 @@ class ReviewRequest(Model):
     subject_id: str = Field(description="The id of the test (or result) or of the finding")
     decision: ReviewDecision
     reviewer: str = Field(min_length=1, max_length=120, description="Who is deciding")
-    reason: str = Field(default="", max_length=2000, description="Required for every decision except approve")
+    reason: str = Field(
+        default="",
+        max_length=2000,
+        description="Why. Required for false_positive, false_negative, override_score and change_severity",
+    )
     comment: str = Field(default="", max_length=2000)
     score: float | None = Field(default=None, ge=0, le=1, description="override_score only")
     severity: Severity | None = Field(default=None, description="change_severity and false_negative")
@@ -349,7 +353,7 @@ class ReviewOut(Model):
 
 # ============================================================================================== reports
 class ReportFileOut(Model):
-    format: Literal["json", "md", "html", "pdf"]
+    format: str = Field(description="json, md, html, pdf, or the name of a format a plug-in adds")
     artifact_id: str
     media_type: str
     size: int
@@ -369,12 +373,10 @@ class ReportOut(Model):
     warnings: list[str] = Field(default_factory=list)
 
 
-ReportFormatName = Literal["json", "md", "html", "pdf"]
-
-
 class ReportCreate(Model):
-    formats: list[Literal["json", "md", "html", "pdf"]] = Field(
-        default_factory=lambda: list(get_args(ReportFormatName))
+    formats: list[str] = Field(
+        default_factory=lambda: ["json", "md", "html", "pdf"],
+        description="json, md, html, pdf, all (every installed format), or the name of a format a plug-in adds",
     )
     include_sensitive: bool = Field(
         default=False, description="Embed restricted evidence (screenshots taken signed in)"
@@ -383,8 +385,13 @@ class ReportCreate(Model):
 
 
 class ExportRequest(Model):
-    format: Literal["json", "md", "html", "pdf"]
+    format: str = Field(description="json, md, html, pdf, or the name of a format a plug-in adds")
     include_sensitive: bool = False
+
+
+class ViewLink(Model):
+    url: str = Field(description="Path on this server that opens the report; it needs no token")
+    expires_in: int = Field(description="Seconds the link stays valid")
 
 
 class ExportResponse(Model):

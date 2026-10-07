@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from agentlab.core.enums import RiskClass
+from agentlab.core.enums import Intensity, RiskClass, Suite
 from agentlab.core.ids import short_id, utcnow
 from agentlab.core.models import TestCase
 from agentlab.core.models.base import Model
@@ -89,8 +89,8 @@ class TestPlan(Model):
     created_at: datetime = Field(default_factory=utcnow)
     wave: int = 1
     parent_plan_id: str | None = None
-    suite: str = "full"
-    intensity: str = "standard"
+    suite: Suite = "full"
+    intensity: Intensity = "standard"
     profile_hash: str = ""
     summary: str = ""
     inputs: dict[str, Any] = Field(default_factory=dict, description="what the plan was built from (no secrets)")

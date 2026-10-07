@@ -18,8 +18,6 @@ from collections import Counter
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import yaml
-
 from agentlab.core.models import ArchitectureGraph
 from agentlab.repository import signals as S
 from agentlab.repository.ingest import IngestedRepo
@@ -42,6 +40,7 @@ from agentlab.repository.models import (
     Signal,
     ToolDefinition,
 )
+from agentlab.security import safeyaml
 from agentlab.security.redactor import SecretRedactor
 from agentlab.security.untrusted import injection_indicators
 
@@ -549,7 +548,7 @@ class RepositoryAnalyzer:
 
     def _tools_from_structured(self, rel: str, text: str, a: RepositoryAnalysis, seen: set[tuple[str, str]]) -> None:
         try:
-            data = json.loads(text) if rel.endswith(".json") else yaml.safe_load(text)
+            data = json.loads(text) if rel.endswith(".json") else safeyaml.load(text)
         except Exception:
             return
         found = 0

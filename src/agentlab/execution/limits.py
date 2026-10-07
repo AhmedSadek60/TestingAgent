@@ -87,8 +87,9 @@ class TestBudget:
 class LimitTracker:
     """Thread-safe accounting for the whole run plus per-test budgets."""
 
-    def __init__(self, limits: LimitsConfig) -> None:
+    def __init__(self, limits: LimitsConfig, *, test_timeout: float | None = None) -> None:
         self.limits = limits
+        self.test_timeout = test_timeout  # evaluation.timeout_seconds: no single test may take longer than this
         self._lock = threading.Lock()
         self.started = time.monotonic()
         self.cost = 0.0
@@ -107,7 +108,7 @@ class LimitTracker:
             max_tokens=min(test.max_tokens, self.limits.max_tokens),
             max_steps=min(test.max_steps, self.limits.max_steps),
             max_browser_actions=self.limits.max_browser_actions,
-            timeout=test.timeout,
+            timeout=test.timeout if self.test_timeout is None else min(test.timeout, self.test_timeout),
         )
 
     def record(
@@ -138,7 +139,17 @@ class LimitTracker:
 
     # ------------------------------------------------------------------ checks
     def check_run(self) -> None:
-        """Run-level budgets: total cost, total tokens and wall-clock time."""
+        """Run-level budgets: total cost, total tokens and wall-clock time. The first one reached is remembered, so the
+        run can say which limit stopped it."""
+        try:
+            self._check_run()
+        except LimitReached as lr:
+            with self._lock:
+                if self.stopped is None:
+                    self.stopped, self.stop_reason = RunStatus(lr.status.value), str(lr)
+            raise
+
+    def _check_run(self) -> None:
         lim = self.limits
         elapsed = time.monotonic() - self.started
         if self.cost > lim.max_cost_usd:
@@ -186,6 +197,8 @@ class LimitTracker:
             "steps": self.steps,
             "browser_actions": self.browser_actions,
             "elapsed_s": round(time.monotonic() - self.started, 2),
+            "stopped": self.stopped.value if self.stopped else None,
+            "stop_reason": self.stop_reason,
             "cost_by_category": {k: round(v, 6) for k, v in self.by_category.items()},
             "cost_by_model": {k: round(v, 6) for k, v in self.by_model.items()},
             "limits": self.limits.model_dump(),

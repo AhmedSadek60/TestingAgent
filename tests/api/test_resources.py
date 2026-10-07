@@ -321,9 +321,21 @@ async def test_the_catalogue_endpoints_describe_what_this_server_offers(tmp_path
             "version": health["version"],
             "auth_required": False,
             "queue": "inline",
-            "workers": 0,
+            "running": 0,
             "queued": 0,
         }
+
+
+async def test_health_counts_the_runs_in_progress_whichever_process_works_on_them(tmp_path: Path) -> None:
+    # With the Redis queue the runs are worked by other processes, so the API's own worker cannot be the one counted.
+    async with running_api(tmp_path, start_worker=False) as api:
+        store = api.services.store
+        project = store.ensure_project("default")
+        for status in ("running", "running", "pending", "completed"):
+            row = store.create_run(project["id"], None, None, "full", {}, {})
+            store.update_run(row["id"], status=status)
+        health = (await api.client.get("/health")).json()
+        assert health["running"] == 2 and "workers" not in health
 
 
 async def test_the_settings_endpoint_masks_passwords_and_shows_references_not_keys(tmp_path: Path) -> None:
@@ -362,6 +374,7 @@ async def test_every_failure_has_one_shape_and_none_leaks_internals(tmp_path: Pa
         assert any(f.startswith("body.target") for f in fields) and any("intensity" in f for f in fields), fields
         bad_option = await c.post("/test-runs", json={"target": mock_target(), "options": {"intensity": "extreme"}})
         assert bad_option.status_code == 422 and "intensity" in bad_option.json()["error"]["message"]
+        assert "'thorough'" in bad_option.json()["error"]["message"]  # it says what would have been accepted
         bad_suite = await c.post("/test-runs", json={"target": mock_target(), "options": {"suite": "everything"}})
         assert bad_suite.status_code == 422 and "suite" in bad_suite.json()["error"]["message"]
         no_target = await c.post("/test-runs", json={})

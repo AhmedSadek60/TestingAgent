@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from agentlab.core.config import AgentLabConfig
+from agentlab.core.enums import Intensity, Suite
 from agentlab.core.ids import new_id, utcnow
 from agentlab.core.models import TargetSpec, TestCase
 from agentlab.core.models.base import Model
@@ -24,8 +25,12 @@ JobKind = Literal["plan", "run"]
 class JobOptions(Model):
     """The serialisable part of :class:`RunOptions`: what the person asked for."""
 
-    suite: str = Field(default="full", description="discovery, functional, security, browser, full or regression")
-    intensity: str = Field(default="standard", description="quick, standard or deep")
+    suite: Suite = Field(
+        default="full", description="discovery, functional, security, browser, reliability, full or regression"
+    )
+    intensity: Intensity = Field(
+        default="standard", description="How many variants each skill makes: quick, standard or thorough"
+    )
     include_skills: list[str] | None = Field(default=None, description="Use only these skills")
     exclude_skills: list[str] | None = Field(default=None, description="Never use these skills")
     scoring_profile: str | None = Field(default=None, description="Name of a scoring profile")
@@ -33,9 +38,12 @@ class JobOptions(Model):
     max_tests: int | None = Field(default=None, ge=1, description="Upper bound on the number of tests")
     judge: bool = Field(default=True, description="Use the LLM judge where deterministic checks cannot decide")
     objective: str | None = Field(default=None, description="What the owner wants to learn")
-    requirements: list[str] = Field(default_factory=list, description="Business rules the agent must follow")
+    requirements: list[str] = Field(
+        default_factory=list,
+        description="Business rules the agent must follow. A model designs a test for each when "
+        "evaluation.llm_test_generation is on; a rule that gets no test is named in the plan's warnings",
+    )
     probe: bool = Field(default=True, description="Send harmless discovery probes to the target")
-    seed: int = Field(default=0, description="Seed for test generation")
     baseline_run_id: str | None = Field(default=None, description="Regression: replay the tests of this earlier run")
     only_tests: list[str] = Field(default_factory=list, description="Run just these test ids (or MEM-* patterns)")
     user_tests: list[TestCase] = Field(default_factory=list, description="The person's own test cases")
@@ -100,7 +108,6 @@ class JobSpec(Model):
             objective=o.objective,
             requirements=list(o.requirements),
             probe=o.probe,
-            seed=o.seed,
             project=self.project,
             plan_only=self.kind == "plan",
             run_id=self.run_id,

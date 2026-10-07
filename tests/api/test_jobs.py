@@ -299,6 +299,52 @@ async def test_a_worker_that_cannot_wind_a_run_down_in_time_still_closes_it(serv
     assert worker.busy == 0 and worker.runner.active == []
 
 
+class RunThatLastsUntilAsked:
+    """Stands in for the runner: one run that goes on until it is asked to stop, as a long run does."""
+
+    def __init__(self) -> None:
+        self.active: list[str] = []
+        self.asked: list[tuple[str, str]] = []
+        self._ended = asyncio.Event()
+
+    async def run(self, job: JobSpec) -> None:
+        self.active.append(job.run_id)
+        try:
+            await self._ended.wait()
+        finally:
+            self.active.remove(job.run_id)
+
+    def cancel_local(self, run_id: str, reason: str) -> bool:
+        self.asked.append((run_id, reason))
+        self._ended.set()
+        return True
+
+
+async def test_a_worker_with_every_slot_busy_asks_its_runs_to_stop_without_waiting_for_them(
+    services: Services,
+) -> None:
+    """The loop that takes jobs is parked on the one busy slot. It holds no job, so stopping must not wait for the run
+    to end before asking it to stop: with ``drain_seconds=0`` the request is made at once, and what the run does with it
+    does not depend on how fast the machine is."""
+    q = InlineQueue()
+    worker = Worker(services, q, concurrency=1, poll_seconds=0.05)
+    runner = RunThatLastsUntilAsked()
+    worker.runner = runner  # type: ignore[assignment]
+    await queue_job(services, q)
+    worker.start()
+    for _ in range(100):
+        if runner.active:
+            break
+        await asyncio.sleep(0.02)
+    assert runner.active, "the run got going and holds the only slot"
+    began = asyncio.get_running_loop().time()
+    await worker.stop(drain_seconds=0, wind_down_seconds=5)
+    took = asyncio.get_running_loop().time() - began
+    assert [reason for _, reason in runner.asked] == ["the worker is stopping"]
+    assert took < 3.0, f"stopping waited {took:.1f} s before it asked the run to stop"
+    assert worker.busy == 0 and runner.active == []
+
+
 async def test_a_worker_keeps_working_when_the_queue_is_briefly_unreachable(services: Services) -> None:
     class Flaky(InlineQueue):
         def __init__(self) -> None:

@@ -26,6 +26,7 @@ import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
+from agentlab.cli.markup import esc
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import AgentLabError, PolicyBlocked, UserError
 from agentlab.services import Services
@@ -87,7 +88,7 @@ def emit_json(obj: Any) -> None:
 
 
 def fail(message: str, code: int = EXIT_INPUT) -> typer.Exit:
-    err.print(f"[bold red]error:[/bold red] {message}")
+    err.print(f"[bold red]error:[/bold red] {esc(message)}")
     return typer.Exit(code)
 
 

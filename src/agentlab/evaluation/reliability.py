@@ -116,7 +116,7 @@ def aggregate_status(attempts: list[AttemptResult], pass_threshold: float = 1.0)
 def attempt_score(attempt: AttemptResult) -> float:
     """Weighted mean of deterministic and judge scores for one attempt (0..1)."""
     parts: list[tuple[float, float]] = [(a.score, a.weight) for a in attempt.assertions]
-    parts += [(j.score, 1.0) for j in attempt.judge if not j.error or j.votes]
+    parts += [(j.score, j.weight) for j in attempt.judge if not j.error or j.votes]
     total = sum(w for _s, w in parts)
     if not total:
         return 1.0 if attempt.status == TestStatus.PASSED else 0.0
@@ -129,8 +129,8 @@ def evidence_factor(attempts: Iterable[AttemptResult]) -> float:
     for a in attempts:
         det_w += sum(x.weight for x in a.assertions)
         for j in a.judge:
-            judge_w += 1.0
-            judge_conf += j.confidence * (0.5 + 0.5 * j.agreement)
+            judge_w += j.weight
+            judge_conf += j.weight * j.confidence * (0.5 + 0.5 * j.agreement)
     if det_w + judge_w == 0:
         return 0.5
     judge_c = (judge_conf / judge_w) if judge_w else 1.0

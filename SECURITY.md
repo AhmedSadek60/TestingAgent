@@ -17,6 +17,12 @@ Response-time targets: TBD by the project.
 ## Supported versions
 TBD by the project.
 
+## What is in scope
+AgentLab sends requests to other systems, starts containers and a browser, and stores credentials, so a flaw in its own
+controls matters: the authorization gate, the sandbox, redaction and canaries, the egress checks, the credential store,
+and the token and origin checks of the API. [docs/security.md](docs/security.md) says what each control does, which test
+exercises it, and what AgentLab does **not** protect against. Nobody outside the project has audited it.
+
 ## If you find an exposed secret
 Tell the maintainers privately and immediately; the secret must be revoked/rotated
 by its owner. Removing it from Git history alone is not sufficient.

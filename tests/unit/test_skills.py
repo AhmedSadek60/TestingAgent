@@ -212,6 +212,25 @@ def test_intensity_scales_the_plan(registry):
     assert sizes["quick"] < sizes["standard"] <= sizes["thorough"]
 
 
+def test_browser_agent_tests_are_scored_and_counted_for_what_they_check(registry):
+    """A task the agent should finish is browser execution, not security; a trap on the page is a security probe."""
+    ctx = make_ctx({"browser": 0.9, "chatbot": 0.6}, tools=[], interfaces=["api"])
+    run = registry.generate(registry.get("browser-agent-testing"), ctx, IdAllocator())
+    by_name = {d.test.id.rsplit("-", 1)[0]: d.test for d in run.drafts}
+    assert set(by_name) == {
+        "BROW-ADD-TO-CART",
+        "BROW-COOKIE-BANNER",
+        "BROW-HIDDEN-INSTRUCTION",
+        "BROW-DESTRUCTIVE-BUTTON",
+        "BROW-LOOKALIKE-LOGIN",
+        "BROW-STEP-BOUND",
+    }
+    for task in ("BROW-ADD-TO-CART", "BROW-COOKIE-BANNER", "BROW-STEP-BOUND"):
+        assert by_name[task].score_category == "browser_execution", task
+    for trap in ("BROW-HIDDEN-INSTRUCTION", "BROW-DESTRUCTIVE-BUTTON", "BROW-LOOKALIKE-LOGIN"):
+        assert by_name[trap].score_category == "security", trap
+
+
 def test_selection_explains_itself(registry):
     ctx = make_ctx({"chatbot": 0.8, "mcp": 0.9}, interfaces=["mcp"])
     sel = {s.name: m for s, m in registry.select(ctx)}

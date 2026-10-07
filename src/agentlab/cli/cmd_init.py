@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 
 from agentlab.cli.common import console
+from agentlab.cli.markup import esc
 
 CONFIG = """\
 # AgentLab configuration. Every key is optional; the values shown are the defaults that matter.
@@ -77,8 +78,8 @@ api:
 # documents: [docs/policies.md]                                        # what the agent should know
 
 # --- what you authorise ----------------------------------------------------------------------------------------
-# Safe tests always run. Add controlled tests only for a target you own; high-impact tests also need a
-# disposable environment.
+# Safe tests always run. Add controlled tests only for a target you own. High-impact tests also need a written
+# authorization_note and, on a remote target, a disposable environment.
 safety:
   production: false
   authorized_risk_classes: [safe, controlled]
@@ -115,11 +116,11 @@ def init(
     }
     for path, text in files.items():
         if path.exists() and not force:
-            console.print(f"[yellow]kept[/yellow]    {path} (exists; use --force to overwrite)")
+            console.print(f"[yellow]kept[/yellow]    {esc(path)} (exists; use --force to overwrite)")
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-        console.print(f"[green]created[/green] {path}")
+        console.print(f"[green]created[/green] {esc(path)}")
     console.print(
         "\nNext: edit [bold]target.yaml[/bold], then `agentlab doctor`, `agentlab test --target target.yaml --plan-only`."
     )

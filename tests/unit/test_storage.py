@@ -11,8 +11,9 @@ from agentlab.security.credentials import CredentialProfile
 from agentlab.security.redactor import get_redactor
 from agentlab.storage import orm
 from agentlab.storage.artifacts import LocalArtifactStore, MemoryArtifactStore
-from agentlab.storage.db import Database, Store, open_store
+from agentlab.storage.db import Database, Store, normalise_database_url, open_store, postgres_connect_args
 from agentlab.storage.migrate import upgrade
+from agentlab.storage.vectors import HashingEmbedder, PgVectorStore
 
 PG = os.environ.get("AGENTLAB_TEST_POSTGRES_URL")
 
@@ -66,6 +67,31 @@ def test_migrations_create_schema_matching_models(tmp_path):
         assert expected in names
 
 
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("postgres://u:p@h:5432/db", "postgresql+psycopg://u:p@h:5432/db"),
+        ("postgresql://u:p@h:5432/db?sslmode=require", "postgresql+psycopg://u:p@h:5432/db?sslmode=require"),
+        ("postgresql+psycopg://u:p@h/db", "postgresql+psycopg://u:p@h/db"),
+        ("postgresql+psycopg2://u:p@h/db", "postgresql+psycopg2://u:p@h/db"),
+        ("sqlite:///relative.db", "sqlite:///relative.db"),
+        ("sqlite://", "sqlite://"),
+    ],
+)
+def test_a_hosts_postgres_url_gets_the_driver_agentlab_installs(given, expected):
+    """Railway, Heroku and Render hand out postgres:// or postgresql://, which SQLAlchemy opens with psycopg2."""
+    assert normalise_database_url(given) == expected
+
+
+def test_database_opens_a_platform_url_with_psycopg_3():
+    db = Database("postgres://user:p%40ss@127.0.0.1:1/db")  # nothing connects until the first query
+    try:
+        assert db.engine.dialect.driver == "psycopg"
+        assert db.url == "postgresql+psycopg://user:p%40ss@127.0.0.1:1/db"
+    finally:
+        db.dispose()
+
+
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG, reason="AGENTLAB_TEST_POSTGRES_URL not set")
 def test_migrations_and_store_on_postgres():
@@ -92,6 +118,86 @@ def test_migrations_and_store_on_postgres():
         )
     )
     assert store.list_results(run["id"])[0].status == TestStatus.PASSED
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG, reason="AGENTLAB_TEST_POSTGRES_URL not set")
+def test_the_pgvector_store_keeps_vectors_overwrites_by_id_and_ranks_by_cosine():
+    import psycopg
+
+    url = PG.replace("postgresql+psycopg://", "postgresql://", 1)  # the store takes a libpq URL, not SQLAlchemy's
+    table = "agentlab_vectors_test"
+    with psycopg.connect(url, autocommit=True) as conn:
+        if not conn.execute("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'").fetchone():
+            pytest.skip("this PostgreSQL has no 'vector' extension (pgvector)")
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
+    embedder = HashingEmbedder(dim=16)
+    store = PgVectorStore(url, table=table, dim=16)
+    try:
+        docs = {
+            "leave": "employees receive twenty five days of paid annual leave",
+            "expenses": "travel expenses are reimbursed within thirty days",
+            "security": "report a lost laptop to the security team at once",
+        }
+        for key, text in docs.items():
+            store.add(key, embedder.embed([text])[0], text, {"source": key + ".md"})
+        assert len(store) == 3
+        hits = store.search(embedder.embed(["how many days of annual leave do employees receive"])[0], k=2)
+        assert [h.id for h in hits][0] == "leave" and len(hits) == 2
+        assert hits[0].score >= hits[1].score and hits[0].metadata == {"source": "leave.md"}
+        store.add("leave", embedder.embed(["leave is now thirty days"])[0], "leave is now thirty days")
+        assert len(store) == 3, "adding an id again replaces it"
+        assert next(h for h in store.search(embedder.embed(["thirty days"])[0], k=3) if h.id == "leave").text == (
+            "leave is now thirty days"
+        )
+    finally:
+        store.conn.execute(f"DROP TABLE IF EXISTS {table}")
+        store.conn.close()
+
+
+def test_postgres_connections_ask_for_utf8_and_other_databases_are_left_alone():
+    assert postgres_connect_args("postgresql+psycopg://u:p@h/db") == {"client_encoding": "utf8"}
+    assert postgres_connect_args("postgres://u:p@h/db") == {}, "the URL is normalised before it gets here"
+    assert postgres_connect_args("sqlite:///x.db") == {}
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG, reason="AGENTLAB_TEST_POSTGRES_URL not set")
+def test_a_database_created_as_sql_ascii_still_stores_and_returns_text_in_any_script():
+    """``initdb`` makes SQL_ASCII databases when the machine's locale is ``C``. Without an encoding of its own the driver
+    returns bytes for text there, and the first query of the engine fails."""
+    import psycopg
+    from sqlalchemy.engine import make_url
+
+    name = "agentlab_ascii_test"
+    admin = make_url(PG)
+    libpq = admin.set(drivername="postgresql").render_as_string(hide_password=False)
+    with psycopg.connect(libpq, autocommit=True) as conn:
+        conn.execute(f"DROP DATABASE IF EXISTS {name}")
+        try:
+            conn.execute(f"CREATE DATABASE {name} ENCODING 'SQL_ASCII' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'")
+        except psycopg.errors.InsufficientPrivilege:
+            pytest.skip("this role may not create databases")
+    ascii_url = admin.set(database=name).render_as_string(hide_password=False)
+    try:
+        upgrade(ascii_url)
+        store = Store(Database(ascii_url))
+        project = store.create_project("Проект ✓ مشروع")
+        assert store.get_project(project["id"])["name"] == "Проект ✓ مشروع"
+        spec = TargetSpec(name="مساعد", description="مساعد يجيب عن الأسئلة ✓", mock={"behaviors": ["success"]})
+        added = store.add_target(project["id"], spec)
+        assert store.get_target(added["id"])[1].description == "مساعد يجيب عن الأسئلة ✓"
+        vectors = PgVectorStore(ascii_url.replace("postgresql+psycopg://", "postgresql://", 1), table="v", dim=16)
+        try:
+            embedder = HashingEmbedder(dim=16)
+            vectors.add("ключ", embedder.embed(["текст"])[0], "текст ✓", {"язык": "ru"})
+            (hit,) = vectors.search(embedder.embed(["текст"])[0], k=1)
+            assert (hit.id, hit.text, hit.metadata) == ("ключ", "текст ✓", {"язык": "ru"})
+        finally:
+            vectors.conn.close()
+    finally:
+        with psycopg.connect(libpq, autocommit=True) as conn:
+            conn.execute(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
 
 
 def test_store_roundtrip_and_versioning():

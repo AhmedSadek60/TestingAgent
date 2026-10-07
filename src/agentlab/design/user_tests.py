@@ -22,12 +22,26 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
 from agentlab.core.models import TestCase
 from agentlab.evaluation.assertions import ASSERTIONS
+from agentlab.security import safeyaml
 
 MAX_FILE_BYTES = 1_000_000
 MAX_TESTS = 500
+
+
+def _why_invalid(exc: Exception) -> str:
+    """What is wrong with a test, in the words of the file: which key, and what to do about the usual slip."""
+    if not isinstance(exc, ValidationError):
+        return str(exc).splitlines()[0][:200]
+    found = exc.errors()
+    parts = [f"{'.'.join(str(p) for p in e['loc']) or 'test'}: {e['msg']}" for e in found[:3]]
+    hint = ""
+    if any(e["type"] == "extra_forbidden" and "assertions" in e["loc"] for e in found):
+        hint = " (settings go under 'params': {type: contains, params: {value: x}})"
+    return "; ".join(parts)[:300] + hint
 
 
 def _slug(text: str) -> str:
@@ -70,7 +84,7 @@ def load_user_tests(paths: Iterable[str | Path]) -> tuple[list[TestCase], list[s
             continue
         try:
             text = p.read_text(encoding="utf-8")
-            data = json.loads(text) if p.suffix.lower() == ".json" else yaml.safe_load(text)
+            data = json.loads(text) if p.suffix.lower() == ".json" else safeyaml.load(text)
         except (OSError, ValueError, yaml.YAMLError) as exc:
             problems.append(f"{p}: cannot be read ({type(exc).__name__}: {exc})")
             continue
@@ -86,7 +100,7 @@ def load_user_tests(paths: Iterable[str | Path]) -> tuple[list[TestCase], list[s
             try:
                 test = TestCase(**_expand(raw, n))
             except Exception as exc:
-                problems.append(f"{label}: {str(exc).splitlines()[0][:200]}")
+                problems.append(f"{label}: {_why_invalid(exc)}")
                 continue
             unknown = {
                 a.type

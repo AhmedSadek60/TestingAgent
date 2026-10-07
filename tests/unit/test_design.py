@@ -346,6 +346,31 @@ def test_user_tests_load_with_shorthands_and_report_problems(tmp_path: Path):
     assert any("missing.yaml" in p for p in problems)
 
 
+def test_a_user_test_that_is_invalid_says_which_key_and_what_to_do(tmp_path: Path):
+    f = tmp_path / "tests.yaml"
+    f.write_text(
+        """
+- name: settings beside the type
+  input: hello
+  assertions:
+    - {type: contains, value: "30 days"}
+- name: a field that does not exist
+  input: hello
+  severity: high
+- name: a wrong kind of value
+  input: hello
+  timeout: soon
+""",
+        encoding="utf-8",
+    )
+    tests, problems = load_user_tests([f])
+    assert tests == [] and len(problems) == 3
+    assert "assertions.0.value" in problems[0] and "go under 'params'" in problems[0]
+    assert "severity" in problems[1] and "go under 'params'" not in problems[1]
+    assert "timeout" in problems[2]
+    assert all("validation error for TestCase" not in p for p in problems)
+
+
 def test_user_tests_join_the_plan_and_are_never_trimmed(tmp_path: Path):
     f = tmp_path / "t.yaml"
     f.write_text(USER_YAML, encoding="utf-8")
@@ -596,3 +621,91 @@ async def test_model_suggestions_degrade_quietly_without_a_usable_provider():
     plan = await DESIGNER.enhance(plan, ctx, None)
     assert len(plan.tests) == n
     assert any("no evaluator provider" in w.message for w in plan.warnings)
+
+
+# ------------------------------------------------------------------------------------------------ business rules
+RULES = ["Never promise a refund", "Always greet the customer by name", "Escalate refund requests above 500 USD"]
+
+
+def _rule_test(number: object, name: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "objective": "Shows whether the rule is followed",
+        "input": f"({name}) I want my money back for order 1234.",  # distinct, or the duplicate filter drops it
+        "expected_behavior": "Does not promise a refund and offers a human",
+        "must_not_contain": ["refund has been issued"],
+        "requirement": number,
+    }
+
+
+async def test_each_business_rule_is_put_to_the_model_numbered_and_its_test_records_the_rule():
+    mgr, prov, _ = _manager(
+        {"tests": [_rule_test(1, "Refund promise"), _rule_test(2, "Greeting"), _rule_test(7, "Unnumbered")]}
+    )
+    ctx = make_ctx(user_requirements=RULES)
+    plan = DESIGNER.design(ctx, suite="discovery")
+    plan = await DESIGNER.enhance(plan, ctx, mgr)
+    sent = prov.calls[0].messages[-1].text()
+    assert all(f"{n}. {rule}" in sent for n, rule in enumerate(RULES, 1)), "the rules are numbered in the request"
+    assert "First write one scenario for each numbered business rule" in sent
+    by_rule = {p.test.context.get("requirement"): p for p in plan.tests if p.origin == "llm"}
+    assert set(by_rule) == {RULES[0], RULES[1], None}, "a number that is not one of the rules checks no rule"
+    checked = by_rule[RULES[0]]
+    assert "requirement" in checked.test.tags and RULES[0] in checked.test.rationale
+    assert any(RULES[0] in r for r in checked.reasons)
+    warning = next(w for w in plan.warnings if w.code == "requirement_not_tested")
+    assert RULES[2] in warning.message and RULES[0] not in warning.message and "1 business rule(s)" in warning.message
+
+
+async def test_an_answer_whose_rule_number_is_not_a_number_is_refused_like_any_schema_violation():
+    mgr, _, _ = _manager({"tests": [_rule_test(True, "Boolean"), _rule_test("1", "Text")]})
+    ctx = make_ctx(user_requirements=RULES)
+    plan = await DESIGNER.enhance(DESIGNER.design(ctx, suite="discovery"), ctx, mgr)
+    assert not [p for p in plan.tests if p.origin == "llm"]
+    assert any(w.code == "llm_suggestion_rejected" for w in plan.warnings), "the structured answer did not validate"
+    assert any(w.code == "requirement_not_tested" for w in plan.warnings), "and the rules are still named as unchecked"
+
+
+async def test_every_rule_is_covered_when_the_model_designs_a_scenario_for_each():
+    mgr, _, _ = _manager({"tests": [_rule_test(n, f"Rule {n}") for n in (1, 2, 3)]})
+    ctx = make_ctx(user_requirements=RULES)
+    plan = await DESIGNER.enhance(DESIGNER.design(ctx, suite="discovery"), ctx, mgr)
+    assert not any(w.code == "requirement_not_tested" for w in plan.warnings)
+
+
+async def test_the_model_may_write_more_scenarios_than_the_usual_six_when_there_are_more_rules():
+    many = [f"Rule number {n} must hold" for n in range(1, 10)]
+    mgr, prov, _ = _manager({"tests": [_rule_test(n, f"Scenario {n}") for n in range(1, 10)]})
+    ctx = make_ctx(user_requirements=many)
+    plan = await DESIGNER.enhance(DESIGNER.design(ctx, suite="discovery"), ctx, mgr)
+    assert len([p for p in plan.tests if p.origin == "llm"]) == 9
+    assert "up to 9 scenarios" in prov.calls[0].messages[-1].text()
+
+
+def test_a_rule_without_a_test_is_named_in_the_plan_and_the_reason_is_the_real_one():
+    ctx = make_ctx(user_requirements=RULES)
+    off = DESIGNER.design(ctx, suite="discovery")
+    message = next(w.message for w in off.warnings if w.code == "requirement_not_tested")
+    assert "3 business rule(s) have no test" in message and RULES[0] in message
+    assert "evaluation.llm_test_generation is off" in message and "--tests" in message
+
+    ctx.config.evaluation.llm_test_generation = True
+    on = DESIGNER.design(ctx, suite="discovery")  # on, but no model has answered yet
+    assert "proposed no usable scenario" in next(w.message for w in on.warnings if w.code == "requirement_not_tested")
+
+    off.suite = "regression"
+    DESIGNER._unchecked_requirements(off, ctx)
+    assert any("replays an earlier plan unchanged" in w.message for w in off.warnings)
+
+
+def test_no_rules_no_warning():
+    plan = DESIGNER.design(make_ctx(), suite="discovery")
+    assert not any(w.code == "requirement_not_tested" for w in plan.warnings)
+
+
+def test_a_long_list_of_rules_is_summarised_not_dumped():
+    ctx = make_ctx(user_requirements=[f"Rule {n}: " + "x" * 200 for n in range(6)])
+    message = next(
+        w.message for w in DESIGNER.design(ctx, suite="discovery").warnings if w.code == "requirement_not_tested"
+    )
+    assert "6 business rule(s)" in message and "and 3 more" in message and len(message) < 700

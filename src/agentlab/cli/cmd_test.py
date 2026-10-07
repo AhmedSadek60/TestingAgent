@@ -25,6 +25,7 @@ from agentlab.cli.common import (
     run_async,
     state,
 )
+from agentlab.cli.markup import esc
 from agentlab.cli.progress import ProgressPrinter
 from agentlab.cli.render import render_outcome, render_plan, render_profile
 from agentlab.cli.targets import build_target
@@ -32,13 +33,13 @@ from agentlab.core.enums import RunStatus, Severity
 from agentlab.core.errors import UserError
 from agentlab.core.ids import new_id
 from agentlab.core.models import TargetSpec
-from agentlab.design import SUITES
+from agentlab.design import SUITES, check_suite
 from agentlab.design.render import plan_markdown
 from agentlab.discovery.agent import DiscoveryResult
 from agentlab.orchestrator import RunOptions, TestOrchestratorAgent
 from agentlab.orchestrator.options import PreparedRun, RunOutcome
 from agentlab.services import Services
-from agentlab.skills.context import INTENSITIES
+from agentlab.skills.context import INTENSITIES, check_intensity
 from agentlab.tracing import EventBus
 
 FAIL_ON = ("none", "low", "medium", "high", "critical")
@@ -79,7 +80,12 @@ def discover(
     objective: o.Objective = None,
     credentials: o.Credentials = None,
     no_probe: Annotated[
-        bool, typer.Option("--no-probe", help="Do not contact the target; analyse the files you gave only.")
+        bool,
+        typer.Option(
+            "--no-probe",
+            help="Send the target no probe questions. An MCP server's tool list and a web page are still read, "
+            "because that is how those are discovered.",
+        ),
     ] = False,
     save: Annotated[Path | None, typer.Option("--save", help="Also write the profile as JSON to this file.")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Print the profile as JSON.")] = False,
@@ -117,7 +123,7 @@ def discover(
         return
     render_profile(console, profile, result.warnings)
     if save:
-        console.print(f"[dim]profile written to {save}[/dim]")
+        console.print(f"[dim]profile written to {esc(save)}[/dim]")
 
 
 async def _discover(services: Services, spec: TargetSpec, *, probe: bool) -> DiscoveryResult:
@@ -137,17 +143,16 @@ def _require_something(spec: TargetSpec) -> None:
 
 
 def report_formats(values: list[str] | None) -> list[str] | None:
-    """``--report``: ``None`` keeps the configured formats, ``none`` writes no report, anything else is validated."""
+    """``--report``: ``None`` keeps the configured formats, ``none`` writes no report, anything else is a list of format
+    names. Whether each exists is checked when the services start, once the plug-ins that may add one are loaded."""
     if not values:
         return None
-    words = {w.lower() for v in values for w in v.replace(",", " ").split()}
+    words = [w.lower() for v in values for w in v.replace(",", " ").split()]
     if "none" in words:
-        if len(words) > 1:
+        if len(set(words)) > 1:
             raise UserError("--report none cannot be combined with other formats")
         return []
-    from agentlab.reporting.bundle import normalise_formats
-
-    return normalise_formats(values)
+    return list(dict.fromkeys(words))
 
 
 # ========================================================================================================== test
@@ -201,7 +206,12 @@ def test(
     ] = None,
     requirement: Annotated[
         list[str] | None,
-        typer.Option("--requirement", help="A business rule the agent must follow (repeatable).", rich_help_panel=RUN),
+        typer.Option(
+            "--requirement",
+            help="A business rule the agent must follow (repeatable). A model designs a test for it, which needs "
+            "evaluation.llm_test_generation; a rule that gets no test is named in the plan.",
+            rich_help_panel=RUN,
+        ),
     ] = None,
     no_second_wave: Annotated[
         bool,
@@ -211,7 +221,12 @@ def test(
         bool, typer.Option("--no-judge", help="Deterministic checks only; no LLM judge.", rich_help_panel=RUN)
     ] = False,
     no_probe: Annotated[
-        bool, typer.Option("--no-probe", help="Do not send discovery probes to the target.", rich_help_panel=RUN)
+        bool,
+        typer.Option(
+            "--no-probe",
+            help="Do not send discovery probes (questions) to the target. Its reachability is still checked.",
+            rich_help_panel=RUN,
+        ),
     ] = False,
     baseline: Annotated[
         str | None,
@@ -225,7 +240,6 @@ def test(
             rich_help_panel=RUN,
         ),
     ] = None,
-    seed: Annotated[int, typer.Option("--seed", help="Seed for test generation.", rich_help_panel=RUN)] = 0,
     project: Annotated[
         str, typer.Option("--project", help="Project the run belongs to.", rich_help_panel=RUN)
     ] = "default",
@@ -273,8 +287,8 @@ def test(
         list[str] | None,
         typer.Option(
             "--report",
-            help="Report formats written at the end of the run: json, md, html, pdf, all or none "
-            "(repeat or separate with commas). Default: reporting.formats of the configuration.",
+            help="Report formats written at the end of the run: json, md, html, pdf, a format a plug-in adds, all or "
+            "none (repeat or separate with commas). Default: reporting.formats of the configuration.",
             rich_help_panel=OUT,
         ),
     ] = None,
@@ -337,8 +351,8 @@ def test(
     if baseline:
         baseline = resolve_run_id(services, baseline)  # an id prefix is enough
     options = RunOptions(
-        suite=suite,
-        intensity=intensity,
+        suite=check_suite(suite),
+        intensity=check_intensity(intensity),
         include_skills=skills,
         exclude_skills=exclude_skills,
         user_test_files=list(tests or []),
@@ -349,7 +363,6 @@ def test(
         objective=objective,
         requirements=list(requirement or []),
         probe=not no_probe,
-        seed=seed,
         project=project,
         plan_only=plan_only,
         run_id=new_id(),
@@ -437,14 +450,14 @@ async def _after_prepare(orch: TestOrchestratorAgent, prepared: PreparedRun, opt
         if flags.as_json:
             emit_json({"run_id": prepared.run_id, "plan": plan.model_dump(mode="json"), "warnings": prepared.warnings})
         else:
-            console.print(f"[dim]plan stored with run {prepared.run_id}; nothing was run against the target[/dim]")
+            console.print(f"[dim]plan stored with run {esc(prepared.run_id)}; nothing was run against the target[/dim]")
         return EXIT_OK if plan.counts()["runnable"] else EXIT_NOT_TESTED
     if flags.confirm:
         if not sys.stdin.isatty():
             raise UserError("--confirm needs an interactive terminal; use --plan-only to review a plan, then run it")
         if not typer.confirm("Run this plan against the target?", default=False):
             orch.finish_plan_only(prepared)
-            console.print(f"[yellow]not run[/yellow] (the plan is stored with run {prepared.run_id})")
+            console.print(f"[yellow]not run[/yellow] (the plan is stored with run {esc(prepared.run_id)})")
             return EXIT_OK
     outcome = await orch.execute(prepared, cancel=orch.token_for(prepared.run_id))
     if flags.as_json:

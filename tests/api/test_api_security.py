@@ -116,8 +116,8 @@ async def test_the_server_refuses_to_listen_beyond_this_machine_without_a_token(
     [
         ("short", PolicyBlocked, "16 characters"),
         ("x" * 15, PolicyBlocked, "16 characters"),
-        ("", CredentialError, "not set"),  # an empty variable is as good as none: the server must not start open
-        (None, CredentialError, "not set"),
+        ("", CredentialError, "AGENTLAB_TEST_TOKEN is not set or is empty"),  # as good as none: never start open
+        (None, CredentialError, "server.token_ref is env:AGENTLAB_TEST_TOKEN, but the variable"),
     ],
 )
 async def test_a_weak_or_missing_token_in_the_configuration_stops_the_server_starting(
@@ -240,6 +240,13 @@ async def test_every_response_says_it_must_not_be_sniffed_framed_or_shared(tmp_p
             assert r.headers["x-content-type-options"] == "nosniff", url
             assert r.headers["x-frame-options"] == "DENY" and r.headers["referrer-policy"] == "no-referrer", url
             assert r.headers["cross-origin-resource-policy"] == "same-origin", url
+            for name in (
+                "x-content-type-options",
+                "x-frame-options",
+                "referrer-policy",
+                "cross-origin-resource-policy",
+            ):
+                assert len(r.headers.get_list(name)) == 1, f"{url}: {name} was sent more than once"
 
 
 # ======================================================================================= paths on the server

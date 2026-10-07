@@ -38,10 +38,40 @@ def canonical_hash(obj: Any) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str, separators=(",", ":")).encode()).hexdigest()
 
 
+def normalise_database_url(url: str) -> str:
+    """The URL a hosting platform hands out, in the form SQLAlchemy needs for the driver AgentLab installs.
+
+    Railway, Heroku, Render and others give a PostgreSQL URL as ``postgres://`` or ``postgresql://``. SQLAlchemy opens
+    those with psycopg2, which AgentLab does not install (it uses psycopg 3), so both mean ``postgresql+psycopg://``.
+    A URL that names its driver, and every other database, is returned as it is."""
+    for scheme in ("postgres://", "postgresql://"):
+        if url.startswith(scheme):
+            return "postgresql+psycopg://" + url[len(scheme) :]
+    return url
+
+
+def dump_json(value: Any) -> str:
+    """JSON with its characters as they are and not as ``\\uXXXX`` escapes, which a SQL_ASCII database cannot keep in a
+    JSONB column ("Unicode escape value could not be translated to the server's encoding")."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def postgres_connect_args(url: str) -> dict[str, Any]:
+    """Text goes to and from PostgreSQL as UTF-8 whatever encoding the database was created with.
+
+    A database created as SQL_ASCII (what ``initdb`` makes when the machine's locale is ``C``) otherwise hands text back
+    as bytes, which fails at the first query, and cannot store a name in another script at all."""
+    return {"client_encoding": "utf8"} if url.startswith("postgresql") else {}
+
+
 class Database:
     def __init__(self, url: str = "sqlite:///.agentlab/agentlab.db", *, echo: bool = False) -> None:
+        url = normalise_database_url(url)
         self.url = url
         kwargs: dict[str, Any] = {"echo": echo, "future": True}
+        if url.startswith("postgresql"):
+            kwargs["connect_args"] = postgres_connect_args(url)
+            kwargs["json_serializer"] = dump_json
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
             if ":memory:" in url or url == "sqlite://":
@@ -444,6 +474,13 @@ class Store:
                 q = q.where(orm.TestRunRow.project_id == project_id)
             return [row_to_dict(r) for r in s.scalars(q)]
 
+    def count_runs(self, status: str) -> int:
+        """How many runs have this status, in any project."""
+        with self.db.session() as s:
+            return int(
+                s.scalar(select(func.count()).select_from(orm.TestRunRow).where(orm.TestRunRow.status == status)) or 0
+            )
+
     # ----------------------------------------------------------------- results / traces / events
     def save_result(self, result: TestResult) -> None:
         data = result.model_dump(mode="json")
@@ -756,4 +793,4 @@ def open_store(url: str, *, migrate: bool = True) -> Store:
     return Store(db)
 
 
-__all__ = ["Database", "Store", "canonical_hash", "open_store", "row_to_dict", "utcnow"]
+__all__ = ["Database", "Store", "canonical_hash", "normalise_database_url", "open_store", "row_to_dict", "utcnow"]
