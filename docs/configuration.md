@@ -113,7 +113,7 @@ Where AgentLab keeps what it writes. A relative path is relative to the configur
 
 | Key | Default | Holds |
 |---|---|---|
-| `database_url` | `sqlite:///.agentlab/agentlab.db` | `sqlite:///relative`, `sqlite:////absolute`, or `postgresql+psycopg://user:password@host:5432/db`. Tables are created and migrated on first use. |
+| `database_url` | `sqlite:///.agentlab/agentlab.db` | `sqlite:///relative`, `sqlite:////absolute`, or `postgresql+psycopg://user:password@host:5432/db`; a `postgres://` or `postgresql://` URL, as a hosting platform hands it out, is opened with the same driver. Tables are created and migrated on first use. |
 | `artifact_store` | `local` | Where evidence is kept: `local` (files under `artifacts_dir`), `memory` (gone when the process ends, for tests), or a store a plug-in registers ([plugins.md](plugins.md#artifact-stores)). `s3` is refused: no object store ships. |
 | `artifact_store_options` | `{}` | Settings handed to a plug-in store (`local` takes none). Never put a secret here. |
 | `artifacts_dir` | `.agentlab/artifacts` | Content-addressed evidence: traces, screenshots, workspaces' outputs. Redacted before it is written. The `local` store's folder. |

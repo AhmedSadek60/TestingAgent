@@ -181,7 +181,8 @@ by name, and what cannot, is in [plugins.md](plugins.md); the skills are in [ski
 | Local server | `agentlab serve` | API and interface on `127.0.0.1:8080`; inline worker. |
 | Team server | `agentlab serve --host 0.0.0.0` with `server.token_ref` | A token is required beyond loopback. Put TLS in front. |
 | Scaled | `agentlab serve --no-worker` + `agentlab worker` × N + Redis | `queue.backend: redis`. |
-| Containers | `docker compose up` | API, worker and Redis; see [installation.md](installation.md#docker). |
+| Containers | `docker compose up` | API, worker, Redis and PostgreSQL; see [installation.md](installation.md#docker). |
+| Railway | `railway.json` | One service with the jobs inside it, PostgreSQL and a volume; see [deployment-railway.md](deployment-railway.md). |
 
 ## Decisions
 
