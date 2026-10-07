@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from agentlab.cli.main import app
 from agentlab.core.config import QueueConfig, ServerConfig
 from tests.support.api import SMALL_RUN, api_config, mock_target
+from tests.support.cli import said
 from tests.support.process import Proc, free_port, poll, start_agentlab, wait_until_up, write_config
 from tests.support.redis import needs_redis, redis_test_url
 
@@ -30,11 +31,6 @@ TOKEN = "serve-" + "token-" + "q" * 16
 
 def invoke(root: Path, *args: str, env: dict[str, str] | None = None) -> Any:
     return runner.invoke(app, ["--config", str(root / "agentlab.yaml"), *args], env=env or {})
-
-
-def said(result: Any) -> str:
-    """What a command printed, with the line breaks the terminal width added taken out again."""
-    return " ".join(result.output.split())
 
 
 # ================================================================================================== what it refuses

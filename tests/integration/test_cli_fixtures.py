@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import signal
 from pathlib import Path
-from typing import Any
 
 import httpx
 import pytest
@@ -16,14 +15,10 @@ from typer.testing import CliRunner
 from agentlab.cli.main import app
 from agentlab.core.models.target import TargetSpec
 from agentlab.fixtures import REGISTRY, fixture_class
+from tests.support.cli import said
 from tests.support.process import free_port, start_agentlab, wait_until_up
 
 runner = CliRunner()
-
-
-def said(result: Any) -> str:
-    """What a command printed, with the line breaks the terminal width added taken out again."""
-    return " ".join(result.output.split())
 
 
 def services() -> list[str]:

@@ -525,6 +525,8 @@ def test_every_environment_variable_a_document_names_is_used_somewhere() -> None
 
 
 # ======================================================================================================== the repository
+# Written by a build and ignored by git (.gitignore), so a clean checkout, such as the one CI makes, does not have them.
+BUILD_PRODUCTS = {"src/agentlab/api/static"}
 PATH_IN_CODE = re.compile(r"`((?:src|tests|docs|docker|scripts|web|\.ai|\.github)/[A-Za-z0-9_./\-]*[A-Za-z0-9_])`")
 
 
@@ -534,7 +536,9 @@ def test_every_repository_path_a_document_names_exists() -> None:
         for number, line in enumerate(prose_of(path).splitlines(), 1):
             for match in PATH_IN_CODE.finditer(line):
                 named = match.group(1)
-                if not any(ch in named for ch in "*<>{}") and not (ROOT / named).exists():
+                if named in BUILD_PRODUCTS or any(ch in named for ch in "*<>{}"):
+                    continue
+                if not (ROOT / named).exists():
                     bad.append(f"{rel(path)}:{number}: {named}")
     assert not bad, "\n".join(bad)
 

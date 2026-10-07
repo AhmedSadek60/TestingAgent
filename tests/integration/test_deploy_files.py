@@ -149,7 +149,11 @@ def start(work: Path, *args: str, env: dict[str, str] | None = None, as_user: st
         **({"AGENTLAB_RUN_USER": "nobody"} if IS_ROOT else {}),
         **(env or {}),
     }
-    command = ["sh", str(SCRIPT), *args]
+    # A copy in `work`, which anybody may enter: the checkout may be in a folder that only its owner can read.
+    script = work / "railway-start.sh"
+    shutil.copyfile(SCRIPT, script)
+    script.chmod(0o755)
+    command = ["sh", str(script), *args]
     if as_user:
         account = pwd.getpwnam(as_user)
         command = ["setpriv", f"--reuid={account.pw_uid}", f"--regid={account.pw_gid}", "--clear-groups", *command]
