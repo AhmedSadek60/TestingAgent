@@ -17,3 +17,4 @@ accepted by human review, not by an agent.
 [0004](0004-one-origin-interface-and-signed-report-links.md) — One origin for the API and the interface; reports shown from signed, short-lived links — Proposed
 [0005](0005-blocked-is-not-failed-independent-judge.md) — BLOCKED is not FAILED; the judge is independent of the target — Proposed
 [0006](0006-reviews-never-rewrite-the-evaluation.md) — Human reviews sit beside the evaluation and never rewrite it — Proposed
+[0007](0007-railway-one-service-one-volume.md) — On Railway, one service with one volume, the jobs inside it — Proposed

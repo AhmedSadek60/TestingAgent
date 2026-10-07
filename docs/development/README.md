@@ -1,6 +1,8 @@
 # Development Guide
 
-Local setup, build, test, and run instructions for this project. Status: TBD (template).
+Setting AgentLab up, building it, testing it and running it: [development.md](../development.md). The commands there are
+the ones recorded in [`.ai/project.json`](../../.ai/project.json), and each was run before it was written down.
 
-Fill in from real, verified commands and mirror them in `/.ai/project.json`.
-Do not document commands you have not run.
+* [Implementation plan](implementation-plan-agentlab.md): the plan the build followed, its risks and its approval point.
+* [Assumptions](../assumptions.md): what was decided where the requirements left room.
+* [Contributing](../../CONTRIBUTING.md) and [AGENTS.md](../../AGENTS.md): how changes are made and reviewed.

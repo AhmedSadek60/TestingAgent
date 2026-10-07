@@ -327,8 +327,8 @@ while signed in) must not be readable by other users; a store has to honour that
 A `VectorStore` (`add`, `search`, `__len__`) with a `memory` implementation and a `pgvector` adapter. **Nothing in a
 test run reads or writes a vector store in this build**: groundedness is checked against the parsed documents
 directly. It is an extension point, kept so retrieval-based evaluation can be added without touching the rest, and not
-a feature to rely on. The `pgvector` adapter is **written but not verified** (it needs PostgreSQL with the `vector`
-extension and `psycopg`); `qdrant` is registered as a placeholder that raises *"vector store 'qdrant' is not implemented
+a feature to rely on. The `pgvector` adapter needs PostgreSQL with the `vector` extension and `psycopg`; it was run
+against PostgreSQL 16 with pgvector 0.6.0 and no other version. `qdrant` is registered as a placeholder that raises *"vector store 'qdrant' is not implemented
 in this build"*.
 
 ```python
@@ -447,4 +447,4 @@ path that selects it.
 
 What has **not** been tested: a plug-in installed from a real package index (the tests build the package metadata an
 installer would write and put it on `sys.path`), a third-party sandbox provider against real isolation, a `pgvector`
-store against a live database, and any plug-in on Windows.
+store on any PostgreSQL or pgvector version other than 16 and 0.6.0, and any plug-in on Windows.

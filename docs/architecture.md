@@ -148,8 +148,8 @@ computed from reviewed values. Details: [evaluation.md](evaluation.md).
   Values are write-only through the API and the interface.
 * **Vectors:** one `VectorStore` interface with an in-process cosine store and a `pgvector` adapter. Nothing in the
   evaluation pipeline reads or writes a vector store in this build (groundedness is checked against the parsed
-  documents directly), so this is an extension point and not a feature. `pgvector` is wired but unverified; Qdrant
-  is a registered placeholder that says it is unsupported ([plugins.md](plugins.md#vector-stores)).
+  documents directly), so this is an extension point and not a feature. `pgvector` ran against PostgreSQL 16 with pgvector 0.6.0 and
+  nothing else; Qdrant is a registered placeholder that says it is unsupported ([plugins.md](plugins.md#vector-stores)).
 
 ## API, jobs and the web interface
 
