@@ -71,7 +71,7 @@ A list. `providers: [mock, ollama]` is shorthand for providers named and typed b
 | `allow_private_networks` | `true` | Allow targets on `localhost` and private networks. `false` refuses them (for a server that should only test public agents). |
 | `custom_secret_patterns` | `[]` | Extra regular expressions the redactor and the repository scanner treat as secrets. |
 | `canary_prefix` | `AGENTLAB_CANARY` | The prefix of the harmless markers planted to detect leaks. |
-| `sandbox.provider` | `docker` | `docker`, or `disabled` (every sandbox request is then refused). |
+| `sandbox.provider` | `docker` | `docker`, `disabled` (every sandbox request is then refused), or the name of a sandbox a plug-in registers ([plugins.md](plugins.md#sandbox-providers)). An unknown name stops AgentLab at start-up; it never falls back to running on this machine. |
 | `sandbox.image` | `mirror.gcr.io/library/python:3.12-slim` | The image sandboxes start from. |
 | `sandbox.cpus` / `memory_mb` / `pids_limit` / `disk_mb` | `1.0` / `1024` / `256` / `512` | The limits of one sandbox. |
 | `sandbox.timeout_seconds` | `300.0` | The longest one command may run. |
@@ -114,7 +114,9 @@ Where AgentLab keeps what it writes. A relative path is relative to the configur
 | Key | Default | Holds |
 |---|---|---|
 | `database_url` | `sqlite:///.agentlab/agentlab.db` | `sqlite:///relative`, `sqlite:////absolute`, or `postgresql+psycopg://user:password@host:5432/db`. Tables are created and migrated on first use. |
-| `artifacts_dir` | `.agentlab/artifacts` | Content-addressed evidence: traces, screenshots, workspaces' outputs. Redacted before it is written. |
+| `artifact_store` | `local` | Where evidence is kept: `local` (files under `artifacts_dir`), `memory` (gone when the process ends, for tests), or a store a plug-in registers ([plugins.md](plugins.md#artifact-stores)). `s3` is refused: no object store ships. |
+| `artifact_store_options` | `{}` | Settings handed to a plug-in store (`local` takes none). Never put a secret here. |
+| `artifacts_dir` | `.agentlab/artifacts` | Content-addressed evidence: traces, screenshots, workspaces' outputs. Redacted before it is written. The `local` store's folder. |
 | `secrets_file` | `.agentlab/secrets.enc` | Encrypted stored credentials. |
 | `reports_dir` | `.agentlab/reports` | `<run>/v<N>/report.{json,md,html,pdf}` and `checksums.json`. |
 | `work_dir` | `.agentlab/work` | A temporary folder per run, removed afterwards unless `--keep-workspace`. |
@@ -125,7 +127,7 @@ Where AgentLab keeps what it writes. A relative path is relative to the configur
 
 | Key | Default | Meaning |
 |---|---|---|
-| `formats` | `[json, md, html, pdf]` | Written after every run (`--report`). `[]` writes none; `agentlab report` can write any later. |
+| `formats` | `[json, md, html, pdf]` | Written after every run (`--report`). `[]` writes none; `agentlab report` can write any later. `all` is every format installed. A format a plug-in adds can be named here ([plugins.md](plugins.md#report-renderers)); a name nothing provides stops AgentLab at start-up, not at the end of the run. |
 | `include_sensitive_artifacts` | `false` | Embed restricted evidence (screenshots taken while signed in) in the files. |
 
 ## `queue`

@@ -64,6 +64,7 @@ safety:
 | `description`, `objective` | What the agent is for, and what a good result means | Read by discovery as evidence of the agent's type and by the plan for its wording. **Words only**: they never grant anything and never change what is allowed |
 | `version` | Free text | Recorded in the run manifest |
 | `api`, `web`, `command`, `mcp`, `llm`, `mock` | Interfaces | How tests reach the agent: [below](#interfaces) |
+| `custom` | `{name: {settings}}` | Interfaces that a plug-in adapter provides, by the name it registers under ([plugins.md](plugins.md#agent-adapters)). With no adapter of that name installed nothing is tested through it, and the run says so |
 | `repository` | Source code | Analysed, never executed on this machine: [below](#a-repository) |
 | `documents` | Files the agent should know (or is judged against) | Analysed for facts and requirements: [below](#documents) |
 | `credentials` | Names of stored credential profiles the target may use | `agentlab credentials add`; [security.md](security.md#credentials) |

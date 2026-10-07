@@ -19,10 +19,12 @@ verified; see the pull request and `docs/testing-agents.md` for verification sta
 
 - Default database is **SQLite** at `.agentlab/agentlab.db`; PostgreSQL is supported through
   `storage.database_url` and the same Alembic migrations.
-- Artifacts are stored on the **local filesystem**, content-addressed, with secrets redacted before writing.
-  S3-compatible storage is **not implemented** (a clearly-labelled placeholder exists).
-- Vector search is an in-process cosine store (and a SQLite-persisted variant). `pgvector` is wired but not
-  verified here (the extension is not installed in the build environment); **Qdrant is unsupported**.
+- Artifacts are stored on the **local filesystem** by default, content-addressed, with secrets redacted before
+  writing. S3-compatible storage is **not implemented** (selecting `s3` says so); a plug-in can provide any
+  other store through `storage.artifact_store` ([plugins.md](plugins.md#artifact-stores)).
+- Vector storage is an interface with an in-process cosine store and a `pgvector` adapter that nothing in the
+  evaluation pipeline uses yet. `pgvector` is wired but **not verified**; **Qdrant is unsupported** (a registered
+  placeholder says so).
 - Queue backend is **inline** by default; a Redis worker is optional.
 
 ## Security defaults

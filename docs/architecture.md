@@ -141,12 +141,15 @@ computed from reviewed values. Details: [evaluation.md](evaluation.md).
 
 * **Database:** SQLite by default (`.agentlab/agentlab.db`), PostgreSQL through `storage.database_url` with the
   same Alembic migrations. Runs, results, traces, findings, reviews, reports, targets, projects and job rows.
-* **Artifacts:** local filesystem, content-addressed, redacted before writing. Restricted artifacts
+* **Artifacts:** a local filesystem store by default, content-addressed and redacted before writing;
+  `storage.artifact_store` selects another one a plug-in provides (no object store ships). Restricted artifacts
   (screenshots taken while signed in) need an explicit request to read or embed.
 * **Secrets:** an encrypted file (Fernet) whose key comes from `AGENTLAB_MASTER_KEY` or a key file next to it.
   Values are write-only through the API and the interface.
-* **Vectors:** an in-process cosine store and a SQLite-persisted variant. `pgvector` is wired but unverified
-  here; Qdrant is not supported.
+* **Vectors:** one `VectorStore` interface with an in-process cosine store and a `pgvector` adapter. Nothing in the
+  evaluation pipeline reads or writes a vector store in this build (groundedness is checked against the parsed
+  documents directly), so this is an extension point and not a feature. `pgvector` is wired but unverified; Qdrant
+  is a registered placeholder that says it is unsupported ([plugins.md](plugins.md#vector-stores)).
 
 ## API, jobs and the web interface
 
@@ -163,10 +166,12 @@ so the interface needs no CORS and holds its API token only in the tab's session
 
 ## Extension points
 
-Registries (`agentlab.<kind>` entry-point groups): `providers`, `adapters`, `engines`, `sandbox`, `assertions`,
-`artifact_stores`, `vector_stores`, `document_parsers`. Skills are data folders (and trusted built-in
-generators); `skill_dirs` and `plugins` in the configuration add skills and import modules at start-up. See
-[plugins.md](plugins.md) and [skills.md](skills.md). Report formats are built in and not pluggable.
+Nine registries, each an `agentlab.<kind>` entry-point group (or a module listed in `plugins:`): `providers`,
+`adapters`, `engines`, `sandbox`, `assertions`, `artifact_stores`, `vector_stores`, `document_parsers` and
+`report_renderers`. Test skills come in through the `agentlab.skills` entry point (a folder of skills, trust
+`plugin`). The built-in providers, adapters, engines, assertions, parsers, sandboxes, stores and the four report
+formats are registered in these same registries, so a plug-in is not a second-class citizen. What can be selected
+by name, and what cannot, is in [plugins.md](plugins.md); the skills are in [skills.md](skills.md).
 
 ## Deployment shapes
 
