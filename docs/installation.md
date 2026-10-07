@@ -38,7 +38,7 @@ agentlab doctor
 | *(none)* | The CLI, the API, reports, SQLite, and the OpenAI, OpenRouter, Gemini, Ollama, LM Studio, vLLM, llama.cpp and OpenAI-compatible providers | Testing HTTP agents, models and documents |
 | `anthropic` | The official `anthropic` SDK | The Anthropic provider |
 | `browser` | `playwright` | Browser testing (you still need a Chromium, below) |
-| `postgres` | `psycopg[binary]` | A PostgreSQL database |
+| `postgres` | `psycopg[binary]` (LGPL-3.0: [development.md](development.md#dependencies-and-their-licenses)) | A PostgreSQL database |
 | `redis` | `redis` | The Redis queue and workers |
 | `mcp` | `mcp`, `httpx2` | Testing MCP servers |
 | `all` | `anthropic`, `browser`, `postgres`, `redis`, `mcp` | All of the above |

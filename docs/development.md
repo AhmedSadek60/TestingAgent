@@ -12,6 +12,7 @@ Everything in the repository's rules for people and agents applies: [AGENTS.md](
 * [Tests](#tests)
 * [The web interface](#the-web-interface)
 * [Adding to AgentLab](#adding-to-agentlab)
+* [Dependencies and their licenses](#dependencies-and-their-licenses)
 * [The documents are tested](#the-documents-are-tested)
 * [Verification status](#verification-status)
 
@@ -125,6 +126,22 @@ cd web && AGENTLAB_DEV_API=http://127.0.0.1:8080 npm run dev
 
 Behaviour changes come with the page that describes them. A page says only what a test or a recorded run supports, and
 anything unproven is marked as such.
+
+## Dependencies and their licenses
+
+AgentLab is Apache-2.0 ([LICENSE](../LICENSE)). Before a dependency is added, check that it is not already there, that the
+standard library or the code cannot do the job, that it is maintained and what its license is ([AGENTS.md](../AGENTS.md),
+section 10). The licenses below were read from the packages' own metadata on 2026-10-07 (`pip show NAME`, and the `license`
+fields of `web/package-lock.json`). Nobody has reviewed them beyond that, and a new release can change one.
+
+* **Python:** every direct dependency is MIT, BSD, Apache-2.0 or a similar permissive license, except **`psycopg`** (and
+  `psycopg-binary`, which it brings), the PostgreSQL driver of the `postgres` extra, which is **LGPL-3.0**. AgentLab
+  imports it as a separate library and does not change it; it is an extra, so a plain install does not have it. The Docker
+  image does install it, so whoever distributes an image should keep psycopg's license text with it. Whether that suits
+  how you distribute AgentLab is for the maintainers to decide.
+* **Web interface:** all 161 packages in `web/package-lock.json` are permissive (mostly MIT), except the twelve
+  `lightningcss` packages (MPL-2.0, a file-level copyleft license). They are development tools that Vite uses to build
+  the interface, and nothing of them is in what the build produces.
 
 ## The documents are tested
 
