@@ -257,9 +257,9 @@ sandbox at `/agent`.
   `AGENTLAB_TURN` are set, so an agent that keeps state in files can remember. It may report what it did by printing
   lines such as `AGENTLAB_EVENT {"type": "tool_call", "name": "search", "arguments": {"q": "x"}}`: tool calls become the
   response's tool calls and other types become events; everything else on standard output is the answer.
-* **`task`**: a coding agent. It is started on a disposable copy of a project (`/workspace`) with the task on standard
-  input and is **judged by what it leaves behind**: the files it changed and the project's own tests. It is not asked
-  questions. The example is `agentlab fixtures target coding --dir ./repair-bot`.
+* **`task`**: a coding agent. It is started on a disposable copy of a project (`/workspace`, which `AGENTLAB_WORKSPACE`
+  also holds) with the task on standard input and is **judged by what it leaves behind**: the files it changed and the
+  project's own tests. It is not asked questions. The example is `agentlab fixtures target coding --dir ./repair-bot`.
 * `workdir` is where the command starts. By default that is `/agent` for a chat command that has a repository and
   `/workspace` otherwise. `env` adds environment variables.
 
@@ -438,6 +438,8 @@ $ agentlab compare 067fb368 9a1c2e44 --fail-on-regression
 `--baseline RUN` re-runs the tests of an earlier run unchanged (suite `regression`); `--only TEST_ID` runs just those. A
 comparison says what is newly failing, what was resolved, and how score, latency, cost and reliability moved, and says
 when two runs are not comparable because their plans differ ([reports.md](reports.md#comparing-runs)).
+`agentlab runs list` lists the recent runs, newest first, with the ids these commands take (`--limit`, `--project`,
+`--json`).
 
 ## Exit codes
 

@@ -193,10 +193,10 @@ category is about, for example no tools). "Covered" counts what was tested; it d
 | N21 | Path traversal | tool-abuse-testing, mcp-testing | tools or MCP |
 | N22 | Command-execution safety | tool-abuse-testing, mcp-testing | tools, MCP or coding |
 | N23 | Unsafe generated-code execution | coding-agent-testing | coding |
-| N24 | Denial-of-wallet and runaway loops | cost-testing, autonomous-agent-testing, browser-agent-testing, multi-agent-testing | tools, autonomy, a browser or several agents |
+| N24 | Denial-of-wallet / runaway loops | cost-testing, autonomous-agent-testing, browser-agent-testing, multi-agent-testing | tools, autonomy, a browser or several agents |
 | N25 | Recursive agent delegation | multi-agent-testing | several agents |
 | N26 | Malicious external content | indirect-prompt-injection-testing, browser-agent-testing, multimodal-agent-testing | any conversational target |
-| N27 | Malicious skill or tool instructions | mcp-testing | MCP |
+| N27 | Malicious skill / tool instructions | mcp-testing | MCP |
 | N28 | Insecure fallback behaviour | authorization-testing | tools or MCP |
 
 A security test is deterministic wherever it can be (a canary appeared or it did not; a tool was called or it was not)

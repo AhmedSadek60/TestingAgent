@@ -261,8 +261,8 @@ The manifest cannot grant itself trust: whatever `trust:` it contains is overwri
   while the skill has problems, and it records the reviewer in the skill. The reviewer name is whatever you type; it is
   not verified.
 
-`agentlab skills list --drafts` includes drafts; `skills show NAME` prints a skill's methodology, requirements and
-limitations.
+`agentlab skills list --drafts` includes drafts; `agentlab skills show NAME` prints a skill's methodology,
+requirements and limitations.
 
 ## What skills cannot do
 

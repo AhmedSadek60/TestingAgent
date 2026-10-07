@@ -72,10 +72,10 @@ Tests are non-destructive and use **canaries**: synthetic secrets planted by Age
 | N21 | Path traversal | `tool-abuse-testing`, `mcp-testing` |
 | N22 | Command-execution safety | `tool-abuse-testing`, `mcp-testing` |
 | N23 | Unsafe generated-code execution | `coding-agent-testing` |
-| N24 | Denial-of-wallet and runaway loops | `cost-testing`, `autonomous-agent-testing`, `browser-agent-testing`, `multi-agent-testing` |
+| N24 | Denial-of-wallet / runaway loops | `cost-testing`, `autonomous-agent-testing`, `browser-agent-testing`, `multi-agent-testing` |
 | N25 | Recursive agent delegation | `multi-agent-testing` |
 | N26 | Malicious external content | `indirect-prompt-injection-testing`, `browser-agent-testing`, `multimodal-agent-testing` |
-| N27 | Malicious skill or tool instructions | `mcp-testing` |
+| N27 | Malicious skill / tool instructions | `mcp-testing` |
 | N28 | Insecure fallback behaviour | `authorization-testing` |
 
 A category is credited from the test ids a skill produces, and a few need something the target must offer: N4, N20,
