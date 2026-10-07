@@ -116,8 +116,8 @@ async def test_the_server_refuses_to_listen_beyond_this_machine_without_a_token(
     [
         ("short", PolicyBlocked, "16 characters"),
         ("x" * 15, PolicyBlocked, "16 characters"),
-        ("", CredentialError, "not set"),  # an empty variable is as good as none: the server must not start open
-        (None, CredentialError, "not set"),
+        ("", CredentialError, "AGENTLAB_TEST_TOKEN is not set or is empty"),  # as good as none: never start open
+        (None, CredentialError, "server.token_ref is env:AGENTLAB_TEST_TOKEN, but the variable"),
     ],
 )
 async def test_a_weak_or_missing_token_in_the_configuration_stops_the_server_starting(

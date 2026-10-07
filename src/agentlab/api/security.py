@@ -28,7 +28,7 @@ from urllib.parse import urlsplit
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from agentlab.core.errors import PolicyBlocked
+from agentlab.core.errors import CredentialError, PolicyBlocked
 from agentlab.security.credentials import CredentialManager, resolve_reference
 
 LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
@@ -58,6 +58,16 @@ def resolve_token(ref: str | None, credentials: CredentialManager | None) -> str
             raise PolicyBlocked("server.token_ref names a stored credential but no credential store is available")
         fields = credentials.fields(ref.split(":", 1)[1])
         token = fields.get("token") or fields.get("key")
+    elif ref.startswith("env:"):
+        try:
+            token = resolve_reference(ref)
+        except CredentialError as exc:
+            # the usual first mistake on a new deployment, and the line a platform's deploy log shows for it
+            raise CredentialError(
+                f"server.token_ref is {ref}, but the variable {ref[4:]} is not set or is empty. Set it to a secret of "
+                "16 or more characters (`openssl rand -hex 24` makes one): the server does not start without the "
+                "token it is configured to require"
+            ) from exc
     else:
         token = resolve_reference(ref)
     if not token or len(token) < 16:
