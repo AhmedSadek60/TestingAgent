@@ -154,6 +154,14 @@ def fixtures_verify(
     unknown = [k for k in chosen if k not in REGISTRY]
     if unknown:
         raise fail(f"unknown fixture(s) {', '.join(unknown)}; available: {', '.join(sorted(REGISTRY))}", EXIT_INPUT)
+    for kind in chosen:
+        absent = [name for name in defect or [] if name not in fixture_class(kind).DEFECTS]
+        if absent:
+            raise fail(
+                f"fixture '{kind}' has no defect {', '.join(absent)}; its defects are {', '.join(fixture_class(kind).DEFECTS)}"
+                " (name the kind too when you name a defect)",
+                EXIT_INPUT,
+            )
     err.print(f"[dim]verifying {esc(', '.join(chosen))} with {max(1, workers)} worker(s)...[/dim]")
     reports = verify(chosen, workers=workers, defects=defect or None, all_defects=not skip_all)
     skipped = [r for r in reports if r.skipped]

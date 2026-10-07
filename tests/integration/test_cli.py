@@ -96,6 +96,26 @@ def test_invalid_input_exits_2_with_a_one_line_message(project: Path) -> None:
     assert res.exit_code == 2
 
 
+def test_every_command_is_run_by_some_test() -> None:
+    """A command nobody runs breaks unseen. This looks for the words of each command, quoted in a call or written as
+    typed, in the tests: it cannot say the command is tested well, only that it is not forgotten."""
+    import typer
+
+    def leaves(command: object, path: tuple[str, ...]) -> list[tuple[str, ...]]:
+        children = getattr(command, "commands", None)
+        if not children:
+            return [path]
+        return [leaf for name, child in children.items() for leaf in leaves(child, (*path, name))]
+
+    source = "\n".join(p.read_text(encoding="utf-8") for p in Path(__file__).parents[1].rglob("*.py"))
+    forgotten = []
+    for path in leaves(typer.main.get_command(app), ()):
+        quoted = r"""["']\s*,\s*["']""".join(re.escape(word) for word in path)
+        if not (re.search(rf"""["']{quoted}["']""", source) or " ".join(path) in source):
+            forgotten.append(" ".join(path))
+    assert not forgotten, f"no test runs: {forgotten}"
+
+
 # ============================================================================================ skills
 def test_skills_list_show_new_validate(project: Path) -> None:
     data = run_json("skills", "list", "--json")
@@ -158,6 +178,24 @@ def test_imported_skill_is_an_untrusted_draft_that_cannot_be_promoted_unreviewed
     assert "shiny-tester" not in [s["name"] for s in run_json("skills", "list", "--json")["skills"]]  # type: ignore[index]
     refused = run("skills", "promote", str(draft), "--reviewer", "me")
     assert refused.exit_code == 2 and "IMPORTED-UNREVIEWED" in refused.stderr
+
+
+def test_forge_has_nothing_to_draft_when_an_installed_skill_covers_what_was_found(project: Path) -> None:
+    res = run("skills", "forge", "--mock", "success", "--to", str(project / "drafts"))
+    assert res.exit_code == 0 and "already covered" in " ".join(res.stdout.split())
+    assert not (project / "drafts").exists()
+
+
+def test_forge_drafts_a_skill_for_a_kind_of_agent_no_skill_covers_and_the_draft_is_not_used(project: Path) -> None:
+    description = "A voice assistant: it listens to speech, transcribes the audio and answers spoken questions."
+    drafts = project / "drafts"
+    res = run("skills", "forge", "--mock", "success", "--description", description, "--to", str(drafts))
+    assert res.exit_code == 0 and "voice-testing" in res.stdout, res.stdout
+    draft = drafts / "voice-testing"
+    assert (draft / "skill.yaml").is_file() and (draft / "SKILL.md").is_file()
+    assert "never selected until promoted" in " ".join(res.stderr.split())
+    assert run("skills", "validate", str(draft)).exit_code == 0
+    assert "voice-testing" not in [s["name"] for s in run_json("skills", "list", "--json")["skills"]]  # type: ignore[index]
 
 
 # ===================================================================================== credentials
