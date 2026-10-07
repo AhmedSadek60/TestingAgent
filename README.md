@@ -44,8 +44,9 @@ agentlab test --target chatbot.yaml --intensity quick
 ```
 
 That tests an example agent with defects planted on purpose. It is a stand-in that shows what a finding looks like; it
-says nothing about your agent. To test yours, describe it in `target.yaml` or pass flags such as
-`--api-url http://localhost:8000/chat`, and start with `--plan-only`: [testing-agents.md](docs/testing-agents.md).
+says nothing about your agent, and the command ends with exit code 1 because it found something (the codes are in
+[testing-agents.md](docs/testing-agents.md#exit-codes)). To test yours, describe it in `target.yaml` or pass flags such
+as `--api-url http://localhost:8000/chat`, and start with `--plan-only`: [testing-agents.md](docs/testing-agents.md).
 
 The web interface, served by the same process as the API:
 
