@@ -13,6 +13,7 @@ from agentlab.storage import orm
 from agentlab.storage.artifacts import LocalArtifactStore, MemoryArtifactStore
 from agentlab.storage.db import Database, Store, normalise_database_url, open_store
 from agentlab.storage.migrate import upgrade
+from agentlab.storage.vectors import HashingEmbedder, PgVectorStore
 
 PG = os.environ.get("AGENTLAB_TEST_POSTGRES_URL")
 
@@ -117,6 +118,41 @@ def test_migrations_and_store_on_postgres():
         )
     )
     assert store.list_results(run["id"])[0].status == TestStatus.PASSED
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG, reason="AGENTLAB_TEST_POSTGRES_URL not set")
+def test_the_pgvector_store_keeps_vectors_overwrites_by_id_and_ranks_by_cosine():
+    import psycopg
+
+    url = PG.replace("postgresql+psycopg://", "postgresql://", 1)  # the store takes a libpq URL, not SQLAlchemy's
+    table = "agentlab_vectors_test"
+    with psycopg.connect(url, autocommit=True) as conn:
+        if not conn.execute("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'").fetchone():
+            pytest.skip("this PostgreSQL has no 'vector' extension (pgvector)")
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
+    embedder = HashingEmbedder(dim=16)
+    store = PgVectorStore(url, table=table, dim=16)
+    try:
+        docs = {
+            "leave": "employees receive twenty five days of paid annual leave",
+            "expenses": "travel expenses are reimbursed within thirty days",
+            "security": "report a lost laptop to the security team at once",
+        }
+        for key, text in docs.items():
+            store.add(key, embedder.embed([text])[0], text, {"source": key + ".md"})
+        assert len(store) == 3
+        hits = store.search(embedder.embed(["how many days of annual leave do employees receive"])[0], k=2)
+        assert [h.id for h in hits][0] == "leave" and len(hits) == 2
+        assert hits[0].score >= hits[1].score and hits[0].metadata == {"source": "leave.md"}
+        store.add("leave", embedder.embed(["leave is now thirty days"])[0], "leave is now thirty days")
+        assert len(store) == 3, "adding an id again replaces it"
+        assert next(h for h in store.search(embedder.embed(["thirty days"])[0], k=3) if h.id == "leave").text == (
+            "leave is now thirty days"
+        )
+    finally:
+        store.conn.execute(f"DROP TABLE IF EXISTS {table}")
+        store.conn.close()
 
 
 def test_store_roundtrip_and_versioning():
