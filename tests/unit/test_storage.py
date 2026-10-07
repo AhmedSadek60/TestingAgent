@@ -11,7 +11,7 @@ from agentlab.security.credentials import CredentialProfile
 from agentlab.security.redactor import get_redactor
 from agentlab.storage import orm
 from agentlab.storage.artifacts import LocalArtifactStore, MemoryArtifactStore
-from agentlab.storage.db import Database, Store, open_store
+from agentlab.storage.db import Database, Store, normalise_database_url, open_store
 from agentlab.storage.migrate import upgrade
 
 PG = os.environ.get("AGENTLAB_TEST_POSTGRES_URL")
@@ -64,6 +64,31 @@ def test_migrations_create_schema_matching_models(tmp_path):
         "events",
     ):
         assert expected in names
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("postgres://u:p@h:5432/db", "postgresql+psycopg://u:p@h:5432/db"),
+        ("postgresql://u:p@h:5432/db?sslmode=require", "postgresql+psycopg://u:p@h:5432/db?sslmode=require"),
+        ("postgresql+psycopg://u:p@h/db", "postgresql+psycopg://u:p@h/db"),
+        ("postgresql+psycopg2://u:p@h/db", "postgresql+psycopg2://u:p@h/db"),
+        ("sqlite:///relative.db", "sqlite:///relative.db"),
+        ("sqlite://", "sqlite://"),
+    ],
+)
+def test_a_hosts_postgres_url_gets_the_driver_agentlab_installs(given, expected):
+    """Railway, Heroku and Render hand out postgres:// or postgresql://, which SQLAlchemy opens with psycopg2."""
+    assert normalise_database_url(given) == expected
+
+
+def test_database_opens_a_platform_url_with_psycopg_3():
+    db = Database("postgres://user:p%40ss@127.0.0.1:1/db")  # nothing connects until the first query
+    try:
+        assert db.engine.dialect.driver == "psycopg"
+        assert db.url == "postgresql+psycopg://user:p%40ss@127.0.0.1:1/db"
+    finally:
+        db.dispose()
 
 
 @pytest.mark.postgres
