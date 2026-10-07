@@ -33,6 +33,7 @@ class Worker:
         self._tasks: set[asyncio.Task[None]] = set()
         self._main: asyncio.Task[None] | None = None
         self._reaper: asyncio.Task[None] | None = None
+        self._claiming = False  # the loop is waiting on the queue, where a job can arrive in its hands any moment
 
     # ----------------------------------------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -50,6 +51,10 @@ class Worker:
         if self._reaper is not None:
             self._reaper.cancel()
         if self._main is not None:
+            if not self._claiming:
+                # Parked on a busy slot (or between two attempts to reach the queue), so it holds no job. Waiting for it
+                # would mean waiting for a run to end, which is what this call is about to ask the runs to do.
+                self._main.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await asyncio.wait_for(self._main, timeout=5.0 + self.queue_poll)
         pending = [t for t in self._tasks if not t.done()]
@@ -95,7 +100,11 @@ class Worker:
                 slots.release()
                 break
             try:
-                job = await self.queue.claim(timeout=self.queue_poll)
+                self._claiming = True
+                try:
+                    job = await self.queue.claim(timeout=self.queue_poll)
+                finally:
+                    self._claiming = False
                 failures = 0
             except Exception as exc:  # the queue is unreachable: keep trying, slowly, and say so once in a while
                 slots.release()
