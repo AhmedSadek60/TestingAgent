@@ -143,17 +143,16 @@ def _require_something(spec: TargetSpec) -> None:
 
 
 def report_formats(values: list[str] | None) -> list[str] | None:
-    """``--report``: ``None`` keeps the configured formats, ``none`` writes no report, anything else is validated."""
+    """``--report``: ``None`` keeps the configured formats, ``none`` writes no report, anything else is a list of format
+    names. Whether each exists is checked when the services start, once the plug-ins that may add one are loaded."""
     if not values:
         return None
-    words = {w.lower() for v in values for w in v.replace(",", " ").split()}
+    words = [w.lower() for v in values for w in v.replace(",", " ").split()]
     if "none" in words:
-        if len(words) > 1:
+        if len(set(words)) > 1:
             raise UserError("--report none cannot be combined with other formats")
         return []
-    from agentlab.reporting.bundle import normalise_formats
-
-    return normalise_formats(values)
+    return list(dict.fromkeys(words))
 
 
 # ========================================================================================================== test
@@ -288,8 +287,8 @@ def test(
         list[str] | None,
         typer.Option(
             "--report",
-            help="Report formats written at the end of the run: json, md, html, pdf, all or none "
-            "(repeat or separate with commas). Default: reporting.formats of the configuration.",
+            help="Report formats written at the end of the run: json, md, html, pdf, a format a plug-in adds, all or "
+            "none (repeat or separate with commas). Default: reporting.formats of the configuration.",
             rich_help_panel=OUT,
         ),
     ] = None,

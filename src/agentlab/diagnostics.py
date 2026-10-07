@@ -144,7 +144,21 @@ async def run_checks(services: Services, config_path: Path | None, *, live: bool
 
     # storage
     checks.append(_database_check(services))
-    for label, rel in (("artifacts", cfg.storage.artifacts_dir), ("reports", cfg.storage.reports_dir)):
+    folders = [("reports", cfg.storage.reports_dir)]
+    if cfg.storage.artifact_store == "local":
+        folders.insert(0, ("artifacts", cfg.storage.artifacts_dir))
+    elif cfg.storage.artifact_store == "memory":
+        checks.append(
+            Check(
+                "warn",
+                "artifact store",
+                "memory: evidence is kept in this process only and is gone when it ends",
+                "set storage.artifact_store: local (the default) to keep evidence",
+            )
+        )
+    else:
+        checks.append(Check("ok", "artifact store", f"{cfg.storage.artifact_store} (provided by a plug-in)"))
+    for label, rel in folders:
         path = Path(rel) if Path(rel).is_absolute() else services.base_dir / rel
         ok, detail = _writable(path)
         checks.append(

@@ -136,21 +136,19 @@ class TargetRuntime:
             except Exception:  # noqa: S110 - best-effort cleanup
                 pass
 
+    def _by_preference(self) -> list[AgentAdapter]:
+        """Open adapters, the built-in interfaces in ``PRIORITY`` order, then any a plug-in provides by name."""
+        ordered = [k for k in self.PRIORITY if k in self.adapters]
+        return [self.adapters[k] for k in [*ordered, *sorted(k for k in self.adapters if k not in self.PRIORITY)]]
+
     def adapter(self, kind: str | None = None) -> AgentAdapter | None:
         if kind:
             return self.adapters.get(kind)
-        for k in self.PRIORITY:
-            if k in self.adapters:
-                return self.adapters[k]
-        return None
+        return next(iter(self._by_preference()), None)
 
     def conversational_adapter(self) -> AgentAdapter | None:
         """The preferred interface that takes free-text messages (what probing and chat-style tests use)."""
-        for k in self.PRIORITY:
-            a = self.adapters.get(k)
-            if a is not None and a.capabilities.conversational:
-                return a
-        return None
+        return next((a for a in self._by_preference() if a.capabilities.conversational), None)
 
     def available(self) -> list[str]:
         return sorted(self.adapters)

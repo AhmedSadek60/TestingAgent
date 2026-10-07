@@ -27,7 +27,7 @@ import time
 import uuid
 from pathlib import Path
 
-from agentlab.core.errors import SandboxError, SandboxUnavailable
+from agentlab.core.errors import SandboxError, SandboxUnavailable, UserError
 from agentlab.sandbox.base import SANDBOX_PROVIDERS, ExecResult, Sandbox, SandboxProvider, SandboxSpec
 
 _LIVE: set[str] = set()
@@ -362,4 +362,11 @@ SANDBOX_PROVIDERS.register("disabled", DisabledSandboxProvider, replace=True)
 
 
 def create_sandbox_provider(name: str) -> SandboxProvider:
-    return SANDBOX_PROVIDERS.get(name)()
+    """The provider ``security.sandbox.provider`` names, looked up in ``SANDBOX_PROVIDERS`` (built-in or plug-in)."""
+    try:
+        cls = SANDBOX_PROVIDERS.get(name)
+    except KeyError:
+        raise UserError(
+            f"unknown sandbox provider '{name}' in security.sandbox.provider (known: {', '.join(SANDBOX_PROVIDERS.names())})"
+        ) from None
+    return cls()

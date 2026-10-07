@@ -16,12 +16,13 @@ import os
 import re
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from pydantic import Field
 
-from agentlab.core.errors import InfrastructureError
+from agentlab.core.errors import InfrastructureError, UserError
 from agentlab.core.ids import utcnow
 from agentlab.core.models.base import Model
 from agentlab.core.plugins import Registry
@@ -51,7 +52,13 @@ def is_text_media(media_type: str) -> bool:
 
 
 class ArtifactStore(ABC):
-    @abstractmethod
+    @classmethod
+    def from_options(cls, root: Path, options: Mapping[str, Any]) -> ArtifactStore:
+        """How ``storage.artifact_store`` builds this store. ``root`` is the folder ``storage.artifacts_dir`` names
+        (resolved against the configuration's folder) and ``options`` is ``storage.artifact_store_options``. The default
+        is ``cls(root)``; a store that needs more (a bucket, an endpoint) overrides this."""
+        return cls(root)  # type: ignore[call-arg]
+
     def put(
         self,
         data: bytes | str | Path,
@@ -64,7 +71,38 @@ class ArtifactStore(ABC):
         sensitivity: str = "normal",
         redact: bool = True,
         meta: dict[str, Any] | None = None,
-    ) -> ArtifactRef: ...
+    ) -> ArtifactRef:
+        """Keep ``data`` and return its reference. Text is passed through the secret redactor *here*, before any store
+        sees it, so a store (a plug-in's too) is never handed a secret to keep: it implements :meth:`write`."""
+        raw, redacted = _prepare(data, media_type, redact)
+        return self.write(
+            raw,
+            kind=kind,
+            media_type=media_type,
+            name=name,
+            run_id=run_id,
+            test_key=test_key,
+            sensitivity=sensitivity,
+            redacted=redacted,
+            meta=meta or {},
+        )
+
+    @abstractmethod
+    def write(
+        self,
+        raw: bytes,
+        *,
+        kind: str,
+        media_type: str,
+        name: str | None,
+        run_id: str | None,
+        test_key: str | None,
+        sensitivity: str,
+        redacted: bool,
+        meta: dict[str, Any],
+    ) -> ArtifactRef:
+        """Store ``raw`` (already redacted) and return its reference, whose id is ``sha256-<hex of raw>``. Storing the
+        same bytes again is not an error. ``sensitivity`` ``restricted`` evidence must not be readable by other users."""
 
     @abstractmethod
     def get(self, artifact_id: str) -> bytes: ...
@@ -119,20 +157,9 @@ class LocalArtifactStore(ArtifactStore):
         area = "restricted" if sensitivity == "restricted" else "objects"
         return self.root / area / digest[:2] / digest
 
-    def put(
-        self,
-        data,
-        *,
-        kind,
-        media_type="application/octet-stream",
-        name=None,
-        run_id=None,  # type: ignore[no-untyped-def]
-        test_key=None,
-        sensitivity="normal",
-        redact=True,
-        meta=None,
+    def write(  # type: ignore[no-untyped-def]
+        self, raw, *, kind, media_type, name, run_id, test_key, sensitivity, redacted, meta
     ) -> ArtifactRef:
-        raw, redacted = _prepare(data, media_type, redact)
         digest = hashlib.sha256(raw).hexdigest()
         path = self._path(digest, sensitivity)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +182,7 @@ class LocalArtifactStore(ArtifactStore):
             run_id=run_id,
             test_key=test_key,
             redacted=redacted,
-            meta=meta or {},
+            meta=meta,
         )
         # one metadata record per (content, run, test, name) so repeated evidence keeps its provenance
         key = hashlib.sha256(f"{digest}|{run_id}|{test_key}|{name}|{kind}".encode()).hexdigest()[:16]
@@ -195,24 +222,19 @@ class LocalArtifactStore(ArtifactStore):
 
 
 class MemoryArtifactStore(ArtifactStore):
+    """Keeps evidence in this process only: for tests and throw-away runs, nothing survives the process."""
+
     def __init__(self) -> None:
         self._data: dict[str, bytes] = {}
         self._refs: list[ArtifactRef] = []
 
-    def put(
-        self,
-        data,
-        *,
-        kind,
-        media_type="application/octet-stream",
-        name=None,
-        run_id=None,  # type: ignore[no-untyped-def]
-        test_key=None,
-        sensitivity="normal",
-        redact=True,
-        meta=None,
+    @classmethod
+    def from_options(cls, root: Path, options: Mapping[str, Any]) -> ArtifactStore:
+        return cls()
+
+    def write(  # type: ignore[no-untyped-def]
+        self, raw, *, kind, media_type, name, run_id, test_key, sensitivity, redacted, meta
     ) -> ArtifactRef:
-        raw, redacted = _prepare(data, media_type, redact)
         digest = hashlib.sha256(raw).hexdigest()
         self._data[digest] = raw
         ref = ArtifactRef(
@@ -226,7 +248,7 @@ class MemoryArtifactStore(ArtifactStore):
             run_id=run_id,
             test_key=test_key,
             redacted=redacted,
-            meta=meta or {},
+            meta=meta,
         )
         self._refs.append(ref)
         return ref
@@ -256,7 +278,14 @@ class UnsupportedObjectStore(ArtifactStore):
             "implement ArtifactStore and register it in ARTIFACT_STORES"
         )
 
-    def put(self, *a, **k):  # type: ignore[no-untyped-def]
+    @classmethod
+    def from_options(cls, root: Path, options: Mapping[str, Any]) -> ArtifactStore:
+        raise UserError(
+            "storage.artifact_store 's3' is not supported in this build: object stores are an extension point "
+            "(implement ArtifactStore and register it; see docs/plugins.md). Use 'local'."
+        )
+
+    def write(self, *a, **k):  # type: ignore[no-untyped-def]
         raise NotImplementedError
 
     def get(self, *a):  # type: ignore[no-untyped-def]
@@ -273,3 +302,14 @@ ARTIFACT_STORES: Registry[type[ArtifactStore]] = Registry("artifact_stores")
 ARTIFACT_STORES.register("local", LocalArtifactStore, replace=True)
 ARTIFACT_STORES.register("memory", MemoryArtifactStore, replace=True)
 ARTIFACT_STORES.register("s3", UnsupportedObjectStore, replace=True)
+
+
+def create_artifact_store(name: str, root: Path, options: Mapping[str, Any] | None = None) -> ArtifactStore:
+    """The store ``storage.artifact_store`` names, looked up in ``ARTIFACT_STORES`` (built-in or plug-in)."""
+    try:
+        cls = ARTIFACT_STORES.get(name)
+    except KeyError:
+        raise UserError(
+            f"unknown artifact store '{name}' in storage.artifact_store (known: {', '.join(ARTIFACT_STORES.names())})"
+        ) from None
+    return cls.from_options(root, options or {})

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -164,6 +165,11 @@ class SafetyPolicy(Model):
     disposable_environment: bool = False
 
 
+#: interfaces AgentLab ships an adapter for, in the order ``TargetSpec.interfaces()`` lists them
+BUILTIN_INTERFACES: tuple[str, ...] = ("api", "web", "command", "mcp", "llm", "mock")
+_INTERFACE_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+
+
 class TargetSpec(Model):
     """Everything known about a target before discovery. Loaded from ``target.yaml``."""
 
@@ -189,10 +195,24 @@ class TargetSpec(Model):
     declared_types: list[str] = Field(default_factory=list)
     safety: SafetyPolicy = Field(default_factory=SafetyPolicy)
     tags: list[str] = Field(default_factory=list)
+    custom: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Interfaces that a plug-in agent adapter provides, by the name the adapter is registered under; "
+        "the value is that adapter's own settings (never a secret: use credential profiles). Nothing is "
+        "tested through one when no adapter of that name is installed",
+    )
+
+    @field_validator("custom")
+    @classmethod
+    def _custom_names(cls, v: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        for name in v:
+            if name in BUILTIN_INTERFACES:
+                raise ValueError(f"'{name}' is a built-in interface: configure it as its own block, not under custom")
+            if not _INTERFACE_NAME.match(name):
+                raise ValueError(f"custom interface name '{name}' must be lower-case letters, digits, - and _")
+        return v
 
     def interfaces(self) -> list[str]:
-        out = []
-        for name in ("api", "web", "command", "mcp", "llm", "mock"):
-            if getattr(self, name) is not None:
-                out.append(name)
-        return out
+        """The interfaces this target has: the built-in blocks that are set, then the plug-in ones by name."""
+        out = [name for name in BUILTIN_INTERFACES if getattr(self, name) is not None]
+        return [*out, *sorted(self.custom)]

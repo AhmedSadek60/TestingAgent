@@ -72,7 +72,11 @@ class EvaluationConfig(Model):
 
 
 class SandboxConfig(Model):
-    provider: Literal["docker", "disabled"] = "docker"
+    provider: str = Field(
+        default="docker",
+        description="Sandbox plug-in that runs untrusted code: docker, disabled (nothing runs: every test that needs a "
+        "sandbox is blocked) or the name of one a plug-in registers (docs/plugins.md)",
+    )
     image: str = "mirror.gcr.io/library/python:3.12-slim"
     cpus: float = 1.0
     memory_mb: int = 1024
@@ -154,6 +158,15 @@ class StorageConfig(Model):
     point every one of these somewhere writable."""
 
     database_url: str = "sqlite:///.agentlab/agentlab.db"
+    artifact_store: str = Field(
+        default="local",
+        description="Artifact store plug-in: local (files under artifacts_dir), memory (lost when the process ends), or "
+        "the name of one a plug-in registers (docs/plugins.md)",
+    )
+    artifact_store_options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Settings handed to a plug-in artifact store (none for local); never put a secret here",
+    )
     artifacts_dir: str = ".agentlab/artifacts"
     secrets_file: str = ".agentlab/secrets.enc"
     reports_dir: str = ".agentlab/reports"
@@ -162,16 +175,16 @@ class StorageConfig(Model):
     skill_drafts_dir: str = ".agentlab/skills/drafts"
 
 
-ReportFormat = Literal["json", "md", "html", "pdf"]
-_ALL_FORMATS: tuple[ReportFormat, ...] = ("json", "md", "html", "pdf")
+_ALL_FORMATS: tuple[str, ...] = ("json", "md", "html", "pdf")
 
 
 class ReportingConfig(Model):
     """What ``agentlab test`` writes at the end of a run. ``agentlab report`` can render any format later."""
 
-    formats: list[ReportFormat] = Field(
+    formats: list[str] = Field(
         default_factory=lambda: list(_ALL_FORMATS),
-        description="Report formats written after every run (the folder is storage.reports_dir)",
+        description="Report formats written after every run (the folder is storage.reports_dir): json, md, html, pdf, "
+        "all, or the name of a format a plug-in adds. A name no installed plug-in provides is refused at start-up",
     )
     include_sensitive_artifacts: bool = Field(
         default=False,

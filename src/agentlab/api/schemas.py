@@ -7,7 +7,7 @@ silently ignored."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -353,7 +353,7 @@ class ReviewOut(Model):
 
 # ============================================================================================== reports
 class ReportFileOut(Model):
-    format: Literal["json", "md", "html", "pdf"]
+    format: str = Field(description="json, md, html, pdf, or the name of a format a plug-in adds")
     artifact_id: str
     media_type: str
     size: int
@@ -373,12 +373,10 @@ class ReportOut(Model):
     warnings: list[str] = Field(default_factory=list)
 
 
-ReportFormatName = Literal["json", "md", "html", "pdf"]
-
-
 class ReportCreate(Model):
-    formats: list[Literal["json", "md", "html", "pdf"]] = Field(
-        default_factory=lambda: list(get_args(ReportFormatName))
+    formats: list[str] = Field(
+        default_factory=lambda: ["json", "md", "html", "pdf"],
+        description="json, md, html, pdf, all (every installed format), or the name of a format a plug-in adds",
     )
     include_sensitive: bool = Field(
         default=False, description="Embed restricted evidence (screenshots taken signed in)"
@@ -387,7 +385,7 @@ class ReportCreate(Model):
 
 
 class ExportRequest(Model):
-    format: Literal["json", "md", "html", "pdf"]
+    format: str = Field(description="json, md, html, pdf, or the name of a format a plug-in adds")
     include_sensitive: bool = False
 
 

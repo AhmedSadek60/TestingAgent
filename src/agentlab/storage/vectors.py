@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentlab.core.errors import UnsupportedCapability
+from agentlab.core.errors import UnsupportedCapability, UserError
 from agentlab.core.plugins import Registry
 
 _WORD = re.compile(r"[A-Za-z0-9_]+")
@@ -114,12 +114,14 @@ class PgVectorStore(VectorStore):
 
 
 class UnsupportedVectorStore(VectorStore):
-    """Placeholder for adapters that are architecturally supported but not implemented."""
+    """A backend the adapter interface allows for and this build does not implement. Selecting it says so, in words."""
 
-    def __init__(self, name: str) -> None:
+    backend = "unsupported"
+
+    def __init__(self, *a: Any, **k: Any) -> None:
         raise UnsupportedCapability(
-            f"vector store '{name}' is not implemented in this build; implement VectorStore and register it "
-            "with agentlab.storage.vectors.VECTOR_STORES"
+            f"vector store '{self.backend}' is not implemented in this build; implement VectorStore and register it "
+            "with agentlab.storage.vectors.VECTOR_STORES (docs/plugins.md)"
         )
 
     def add(self, *a, **k):  # type: ignore[no-untyped-def]
@@ -132,6 +134,20 @@ class UnsupportedVectorStore(VectorStore):
         return 0
 
 
+class QdrantVectorStore(UnsupportedVectorStore):
+    backend = "qdrant"
+
+
 VECTOR_STORES: Registry[type[VectorStore]] = Registry("vector_stores")
 VECTOR_STORES.register("memory", InMemoryVectorStore, replace=True)
 VECTOR_STORES.register("pgvector", PgVectorStore, replace=True)
+VECTOR_STORES.register("qdrant", QdrantVectorStore, replace=True)
+
+
+def create_vector_store(name: str, **options: Any) -> VectorStore:
+    """The vector store ``name`` (built-in or plug-in), built with ``options`` (``url=`` for pgvector)."""
+    try:
+        cls = VECTOR_STORES.get(name)
+    except KeyError:
+        raise UserError(f"unknown vector store '{name}' (known: {', '.join(VECTOR_STORES.names())})") from None
+    return cls(**options)

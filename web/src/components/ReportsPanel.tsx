@@ -12,6 +12,14 @@ import { Async, Card, CopyButton, Empty, ErrorNote, Loading, Notice, saveBlob, S
 const FORMAT_LABEL: Record<ReportFormat, string> = { json: "JSON", md: "Markdown", html: "HTML (interactive)", pdf: "PDF" };
 const ALL_FORMATS: ReportFormat[] = ["html", "md", "json", "pdf"];
 
+/** A format this page knows how to show. A plug-in can add others (the API names them): those are download-only here. */
+function isKnown(format: string): format is ReportFormat {
+  return (ALL_FORMATS as string[]).includes(format);
+}
+function labelOf(format: string): string {
+  return isKnown(format) ? FORMAT_LABEL[format] : format;
+}
+
 function size(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -115,10 +123,14 @@ function VersionCard({ report, onChange, selected, onSelect }: { report: Report;
         <div className="row">
           {report.formats.map((f) => (
             <span key={f.format} className="row" style={{ gap: 4 }}>
-              <button type="button" className={`btn small${selected === f.format ? " primary" : ""}`} aria-pressed={selected === f.format} onClick={() => onSelect(f.format)} disabled={f.format === "pdf"} title={f.format === "pdf" ? "Download to read it" : "View"}>
-                <Icon name="eye" size={14} /> {FORMAT_LABEL[f.format]}
-              </button>
-              <button type="button" className="btn small ghost" onClick={() => void download(f)} disabled={busy === f.format} aria-label={`Download the ${FORMAT_LABEL[f.format]} report`}>
+              {isKnown(f.format) ? (
+                <button type="button" className={`btn small${selected === f.format ? " primary" : ""}`} aria-pressed={selected === f.format} onClick={() => isKnown(f.format) && onSelect(f.format)} disabled={f.format === "pdf"} title={f.format === "pdf" ? "Download to read it" : "View"}>
+                  <Icon name="eye" size={14} /> {labelOf(f.format)}
+                </button>
+              ) : (
+                <span className="muted small">{labelOf(f.format)}</span>
+              )}
+              <button type="button" className="btn small ghost" onClick={() => void download(f)} disabled={busy === f.format} aria-label={`Download the ${labelOf(f.format)} report`}>
                 <Icon name="download" size={14} /> {size(f.size)}
               </button>
             </span>
@@ -236,8 +248,8 @@ export function ReportsPanel({ runId, active }: { runId: string; active: boolean
                 <StateTabs
                   label="Format"
                   value={view.format}
-                  onChange={(f) => setView({ id: shown.id, format: f })}
-                  items={shown.formats.filter((f) => f.format !== "pdf").map((f) => ({ id: f.format, label: FORMAT_LABEL[f.format] }))}
+                  onChange={(f) => isKnown(f) && setView({ id: shown.id, format: f })}
+                  items={shown.formats.filter((f) => isKnown(f.format) && f.format !== "pdf").map((f) => ({ id: f.format, label: labelOf(f.format) }))}
                 />
               }
             >

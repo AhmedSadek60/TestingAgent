@@ -2433,10 +2433,9 @@ export interface components {
         ExportRequest: {
             /**
              * Format
-             * @description The format wanted
-             * @enum {string}
+             * @description json, md, html, pdf, or the name of a format a plug-in adds
              */
-            format: "json" | "md" | "html" | "pdf";
+            format: string;
             /**
              * Include Sensitive
              * @description Embed evidence taken while signed in (off by default)
@@ -3705,9 +3704,9 @@ export interface components {
         ReportCreate: {
             /**
              * Formats
-             * @description Formats to generate
+             * @description json, md, html, pdf, all (every installed format), or the name of a format a plug-in adds
              */
-            formats?: ("json" | "md" | "html" | "pdf")[];
+            formats?: string[];
             /**
              * Include Sensitive
              * @description Embed restricted evidence (screenshots taken signed in)
@@ -3727,10 +3726,9 @@ export interface components {
         ReportFileOut: {
             /**
              * Format
-             * @description json, md, html or pdf
-             * @enum {string}
+             * @description json, md, html, pdf, or the name of a format a plug-in adds
              */
-            format: "json" | "md" | "html" | "pdf";
+            format: string;
             /**
              * Artifact Id
              * @description Artifact the file is stored as
@@ -5002,6 +5000,15 @@ export interface components {
              * @description Free labels
              */
             tags?: string[];
+            /**
+             * Custom
+             * @description Interfaces that a plug-in agent adapter provides, by the name the adapter is registered under; the value is that adapter's own settings (never a secret: use credential profiles). Nothing is tested through one when no adapter of that name is installed
+             */
+            custom?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /**
          * TestCase

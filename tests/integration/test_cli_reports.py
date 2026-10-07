@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -235,3 +236,57 @@ def test_the_new_commands_are_listed_in_the_help(project: Path) -> None:
     out = run("--help").stdout
     for cmd in ("report", "compare", "review"):
         assert cmd in out
+
+
+# ================================================================================================ plug-in formats
+CSV_PLUGIN = """\
+from agentlab.reporting.renderers import REPORT_RENDERERS, ReportRenderer
+
+
+class CsvSummary(ReportRenderer):
+    file_name = "report.summary.csv"
+    media_type = "text/csv"
+
+    def render(self, report, context):
+        rows = ["test_id,status", *(f"{r.test_id},{r.status}" for r in report.results)]
+        return ("\\n".join(rows) + "\\n").encode()
+
+
+REPORT_RENDERERS.register("csv-summary", CsvSummary, replace=True)
+"""
+
+
+@pytest.fixture
+def csv_plugin(project: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A project whose configuration lists a plug-in module (``plugins:``) that adds a report format."""
+    from agentlab.reporting.renderers import REPORT_RENDERERS
+
+    (project / "csv_summary_plugin.py").write_text(CSV_PLUGIN, encoding="utf-8")
+    with (project / "agentlab.yaml").open("a", encoding="utf-8") as fh:
+        fh.write("plugins: [csv_summary_plugin]\n")
+    monkeypatch.syspath_prepend(str(project))
+    monkeypatch.delitem(sys.modules, "csv_summary_plugin", raising=False)
+    yield project
+    REPORT_RENDERERS.unregister("csv-summary")
+
+
+def test_a_format_a_plug_in_module_adds_can_be_asked_for_by_name(csv_plugin: Path) -> None:
+    res = run("test", "--mock", "success", "--intensity", "quick", "--no-second-wave", "--fail-on", "none", "-q",
+              "--report", "json,csv-summary")  # fmt: skip
+    assert res.exit_code == 0, res.output + res.stderr
+    bundle = next((csv_plugin / "reports").glob("*/v1"))
+    assert sorted(p.name for p in bundle.iterdir()) == [
+        "checksums.json", "report.json", "report.summary.csv", "run-manifest.json",
+    ]  # fmt: skip
+    rows = (bundle / "report.summary.csv").read_text(encoding="utf-8").splitlines()
+    assert rows[0] == "test_id,status" and len(rows) > 5
+
+    later = run("report", "--run", bundle.parent.name[:8], "--format", "csv-summary", "--json")
+    assert later.exit_code == 0, later.output + later.stderr
+    assert json.loads(later.stdout)["formats"] == ["csv-summary"]
+
+
+def test_a_format_nobody_provides_is_refused_with_the_names_that_exist(project: Path) -> None:
+    res = run("test", "--mock", "success", "--intensity", "quick", "--report", "csv-summary")
+    assert res.exit_code == 2 and "Traceback" not in res.output
+    assert "unknown report format 'csv-summary' (use json, md, html, pdf or all)" in flat(res.output + res.stderr)

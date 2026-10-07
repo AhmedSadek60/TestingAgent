@@ -6786,14 +6786,8 @@
         "properties": {
           "format": {
             "type": "string",
-            "enum": [
-              "json",
-              "md",
-              "html",
-              "pdf"
-            ],
             "title": "Format",
-            "description": "The format wanted"
+            "description": "json, md, html, pdf, or the name of a format a plug-in adds"
           },
           "include_sensitive": {
             "type": "boolean",
@@ -8732,17 +8726,11 @@
         "properties": {
           "formats": {
             "items": {
-              "type": "string",
-              "enum": [
-                "json",
-                "md",
-                "html",
-                "pdf"
-              ]
+              "type": "string"
             },
             "type": "array",
             "title": "Formats",
-            "description": "Formats to generate"
+            "description": "json, md, html, pdf, all (every installed format), or the name of a format a plug-in adds"
           },
           "include_sensitive": {
             "type": "boolean",
@@ -8772,14 +8760,8 @@
         "properties": {
           "format": {
             "type": "string",
-            "enum": [
-              "json",
-              "md",
-              "html",
-              "pdf"
-            ],
             "title": "Format",
-            "description": "json, md, html or pdf"
+            "description": "json, md, html, pdf, or the name of a format a plug-in adds"
           },
           "artifact_id": {
             "type": "string",
@@ -10816,6 +10798,15 @@
             "type": "array",
             "title": "Tags",
             "description": "Free labels"
+          },
+          "custom": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Custom",
+            "description": "Interfaces that a plug-in agent adapter provides, by the name the adapter is registered under; the value is that adapter's own settings (never a secret: use credential profiles). Nothing is tested through one when no adapter of that name is installed"
           }
         },
         "additionalProperties": false,

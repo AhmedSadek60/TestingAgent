@@ -22,8 +22,9 @@ from agentlab.api.schemas import (
 from agentlab.api.security import FRAMED_CSP, SANDBOX_CSP, safe_filename
 from agentlab.api.state import ApiState, state_of
 from agentlab.core.errors import InfrastructureError, NotFoundError, PolicyBlocked, UserError
-from agentlab.reporting.bundle import MEDIA_TYPES, generate_report
+from agentlab.reporting.bundle import generate_report
 from agentlab.reporting.compare import Comparison, compare_runs
+from agentlab.reporting.renderers import media_type_of
 from agentlab.storage.artifacts import ArtifactRef
 
 log = logging.getLogger(__name__)
@@ -48,9 +49,9 @@ def _file(st: ApiState, report_id: str, fmt: str, artifact_id: str) -> ReportFil
         ref = st.services.artifacts.ref(artifact_id)
         size, media = ref.size, ref.media_type
     except InfrastructureError:
-        size, media = 0, MEDIA_TYPES.get(fmt, "application/octet-stream")
+        size, media = 0, media_type_of(fmt)
     return ReportFileOut(
-        format=fmt,  # type: ignore[arg-type]
+        format=fmt,
         artifact_id=artifact_id,
         media_type=media,
         size=size,

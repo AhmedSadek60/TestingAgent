@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import re
+import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -39,6 +40,7 @@ from agentlab.reporting.material import load_material
 from agentlab.reporting.render_html import NAV, render_comparison_html, render_html
 from agentlab.reporting.render_md import render_markdown
 from agentlab.reporting.render_pdf import render_pdf
+from agentlab.reporting.renderers import REPORT_RENDERERS, RenderContext, ReportRenderer
 from agentlab.reporting.review import ReviewError, review_finding, review_result
 from agentlab.services import Services
 
@@ -811,3 +813,119 @@ def test_format_names_are_validated() -> None:
 
 def _unused(_: m.ReportData) -> None:  # keeps the model import honest: reports are typed data first
     return None
+
+
+# ================================================================================================ plug-in formats
+class JunitStyleRenderer(ReportRenderer):
+    """A third-party format: one XML ``testcase`` per result, with the prompts the tests sent."""
+
+    file_name = "report.junit.xml"
+    media_type = "application/xml"
+
+    def render(self, report: m.ReportData, context: RenderContext) -> bytes:
+        from xml.sax.saxutils import escape, quoteattr
+
+        cases = "".join(
+            f"<testcase id={quoteattr(r.test_id)} status={quoteattr(r.status)}>{escape(' | '.join(r.inputs))}</testcase>"
+            for r in report.results
+        )
+        return (
+            f'<testsuite run={quoteattr(report.run.run_id)} tests="{len(report.results)}">{cases}</testsuite>'.encode()
+        )
+
+
+@pytest.fixture
+def junit_format() -> Any:
+    REPORT_RENDERERS.register("junit-test", JunitStyleRenderer)
+    yield "junit-test"
+    REPORT_RENDERERS.unregister("junit-test")
+
+
+def test_a_format_a_plug_in_adds_is_rendered_checksummed_stored_and_listed(
+    lab: Lab, junit_format: str, tmp_path: Path
+) -> None:
+    bundle = generate_report(lab.sv, lab.good, formats=["json", junit_format], output=tmp_path / "bundle")
+    assert sorted(bundle.formats) == ["json", "junit-test"]
+    assert not [w for w in bundle.warnings if "was not written" in w]
+    path = bundle.paths[junit_format]
+    assert path.name == "report.junit.xml"
+    suite = ET.fromstring(path.read_bytes())
+    results = json.loads(bundle.paths["json"].read_text(encoding="utf-8"))["results"]
+    assert int(suite.attrib["tests"]) == len(results) == len(suite.findall("testcase"))
+    index = json.loads((bundle.directory / CHECKSUMS).read_text(encoding="utf-8"))
+    assert set(index["files"]) == {"report.json", "report.junit.xml", "run-manifest.json"}
+    assert verify_bundle(bundle.directory) == [], "a plug-in's file is covered by the checksums like any other"
+    stored = [a for a in lab.sv.store.list_artifacts(lab.good) if (a.get("meta") or {}).get("format") == junit_format]
+    assert stored and stored[-1]["media_type"] == "application/xml"
+    assert (lab.sv.store.get_report(str(bundle.report_id))["formats"]).keys() == {"json", "junit-test"}
+
+
+def test_a_plug_in_format_receives_a_report_that_has_already_been_scrubbed_of_secrets(
+    lab: Lab, junit_format: str, tmp_path: Path
+) -> None:
+    bundle = generate_report(lab.sv, lab.hostile, formats=[junit_format], output=tmp_path / "bundle")
+    xml_text = bundle.paths[junit_format].read_text(encoding="utf-8")
+    assert "USER-SECRET-1" in xml_text, "the test that carried the secret-shaped prompt is in the file"
+    assert AWS_KEY not in xml_text and GITHUB_TOKEN not in xml_text, "a renderer cannot leak what is not in its input"
+
+
+def test_a_plug_in_format_that_fails_costs_only_its_own_file(lab: Lab, tmp_path: Path) -> None:
+    class Explodes(JunitStyleRenderer):
+        file_name = "boom.txt"
+
+        def render(self, report: m.ReportData, context: RenderContext) -> bytes:
+            raise RuntimeError("the renderer has a bug")
+
+    class WrongType(JunitStyleRenderer):
+        file_name = "wrong.txt"
+
+        def render(self, report: m.ReportData, context: RenderContext) -> bytes:
+            return "text, not bytes"  # type: ignore[return-value]
+
+    class EscapesBundle(JunitStyleRenderer):
+        file_name = "../outside.txt"
+
+    for name, cls in (("boom", Explodes), ("wrong", WrongType), ("escape", EscapesBundle)):
+        REPORT_RENDERERS.register(name, cls)
+    try:
+        bundle = generate_report(
+            lab.sv, lab.good, formats=["json", "md", "boom", "wrong", "escape"], output=tmp_path / "bundle"
+        )
+    finally:
+        for name in ("boom", "wrong", "escape"):
+            REPORT_RENDERERS.unregister(name)
+    assert sorted(bundle.formats) == ["json", "md"], "the formats that work are written"
+    notes = "\n".join(bundle.warnings)
+    assert "the 'boom' file was not written: RuntimeError: the renderer has a bug" in notes
+    assert "the 'wrong' file was not written: TypeError: render() returned str, not bytes" in notes
+    assert "the 'escape' file was not written" in notes and "is not a bare file name" in notes
+    assert not (tmp_path / "outside.txt").exists() and verify_bundle(bundle.directory) == []
+
+
+def test_all_means_every_installed_format_and_the_default_stays_the_four_that_ship(
+    lab: Lab, junit_format: str, tmp_path: Path
+) -> None:
+    default = generate_report(lab.sv, lab.good, output=tmp_path / "default")
+    assert sorted(default.formats) == sorted(FORMATS)
+    everything = generate_report(lab.sv, lab.good, formats="all", output=tmp_path / "all")
+    assert sorted(everything.formats) == sorted([*FORMATS, junit_format])
+
+
+def test_a_format_nothing_provides_is_refused_when_the_services_start_not_at_the_end_of_a_run(
+    tmp_path: Path, junit_format: str
+) -> None:
+    def start(formats: list[str]) -> Services:
+        cfg = AgentLabConfig(
+            storage=StorageConfig(
+                database_url=f"sqlite:///{tmp_path}/x.db",
+                artifacts_dir=str(tmp_path / "a"),
+                secrets_file=str(tmp_path / "s.enc"),
+            ),
+            security=SecurityConfig(sandbox=SandboxConfig(provider="disabled")),
+            reporting=ReportingConfig(formats=formats),
+        )
+        return Services.create(cfg, base_dir=tmp_path)
+
+    start(["json", junit_format, "all"]).store.db.dispose()
+    with pytest.raises(UserError, match=r"unknown report format 'docx' \(use json, md, html, pdf, junit-test or all\)"):
+        start(["json", "docx"])

@@ -37,6 +37,10 @@ class Registry(Generic[T]):
             return _do
         return _do(item)
 
+    def unregister(self, name: str) -> None:
+        """Remove ``name`` (a host application that unloads a plug-in, a test that cleans up). Unknown names are ignored."""
+        self._items.pop(name, None)
+
     def _load_entry_points(self) -> None:
         if self._loaded_entry_points:
             return

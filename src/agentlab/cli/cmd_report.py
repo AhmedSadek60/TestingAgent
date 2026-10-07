@@ -30,7 +30,7 @@ from agentlab.cli.markup import esc, short, styled
 from agentlab.cli.render import STATUS_STYLE
 from agentlab.core.enums import ReviewDecision
 from agentlab.core.errors import UserError
-from agentlab.reporting.bundle import FORMATS, generate_report, normalise_formats, verify_bundle
+from agentlab.reporting.bundle import generate_report, normalise_formats, verify_bundle
 from agentlab.reporting.compare import KIND_TITLES, Comparison, compare_runs, comparison_markdown, format_metric
 from agentlab.reporting.render_html import render_comparison_html
 from agentlab.reporting.review import review_finding, review_result, subject_labels
@@ -67,7 +67,10 @@ def report(
     fmt: Annotated[
         list[str] | None,
         typer.Option(
-            "--format", "-f", help=f"{', '.join(FORMATS)} or all; repeat or separate with commas. Default: all."
+            "--format",
+            "-f",
+            help="json, md, html, pdf, all (every installed format) or a format a plug-in adds; repeat or separate "
+            "with commas. Default: json, md, html and pdf.",
         ),
     ] = None,
     output: Annotated[
@@ -108,9 +111,9 @@ def report(
             )
         raise typer.Exit(EXIT_OK if not problems else EXIT_FINDINGS)
 
-    formats = normalise_formats(fmt)
-    services = make_services(state(ctx))
+    services = make_services(state(ctx))  # loads the plug-ins, which may be what provides a format
     try:
+        formats = normalise_formats(fmt)
         if run:
             run_id = resolve_run_id(services, run)
         else:

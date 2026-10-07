@@ -75,7 +75,8 @@ export type MetricDelta = Resp<S["MetricDelta"]>;
 export type FindingDelta = Resp<S["FindingDelta"]>;
 export type CredentialKind = NonNullable<CredentialCreate["kind"]>;
 export type ReviewDecision = ReviewRequest["decision"];
-export type ReportFormat = ReportFile["format"];
+/** The formats this interface can show. The API also names any format a plug-in adds, as a plain string. */
+export type ReportFormat = "json" | "md" | "html" | "pdf";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
