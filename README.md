@@ -9,6 +9,9 @@ how serious it is, how sure it is, and what it could not test.
 $ agentlab test --mock success --intensity quick        # the built-in demo agent: no model, key or service needed
 ```
 
+The demo agent is a stand-in that answers only what a simple script can, so the run reports findings and ends with exit
+code 1 ([the codes](docs/testing-agents.md#exit-codes)).
+
 * **It plans before it runs.** A test plan is explained: which skills were chosen and why, what each test is for, what
   is predicted to be blocked and what the budget trimmed. `--plan-only` stops there.
 * **It judges in three layers.** Deterministic checks decide first; an LLM judge, independent of the agent under test,
