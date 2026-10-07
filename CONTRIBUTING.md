@@ -39,5 +39,11 @@ another team member (enforce with CODEOWNERS). AI agents may propose such change
 `python scripts/ai/validate_governance.py` must pass. It checks governance files only; your project's
 own build/test CI is separate and project-specific.
 
+## Working on AgentLab
+Setting up, the checks (`ruff`, `mypy`, `pytest`, the web interface's tests) and what each optional test needs are in
+[docs/development.md](docs/development.md). The `CI` workflow (`.github/workflows/ci.yml`) runs the same checks on every
+pull request. A change of behaviour comes with the page that describes it: `tests/unit/test_docs.py` fails when a page
+and the code disagree.
+
 ## Security
 Never commit secrets. Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
