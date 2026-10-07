@@ -123,6 +123,10 @@ Where AgentLab keeps what it writes. A relative path is relative to the configur
 | `uploads_dir` | `.agentlab/uploads` | Documents and archives sent to the API. |
 | `skill_drafts_dir` | `.agentlab/skills/drafts` | Imported and generated skills waiting for a human to promote them. |
 
+AgentLab talks to PostgreSQL in UTF-8 whatever encoding the database was created with, so text in any script is stored
+and read back as text even in a `SQL_ASCII` database (what a cluster initialised under the `C` locale gets). Create
+databases as `UTF8` where you can: `SQL_ASCII` does not check that its text is valid.
+
 ## `reporting`
 
 | Key | Default | Meaning |

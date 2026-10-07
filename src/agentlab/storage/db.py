@@ -50,11 +50,28 @@ def normalise_database_url(url: str) -> str:
     return url
 
 
+def dump_json(value: Any) -> str:
+    """JSON with its characters as they are and not as ``\\uXXXX`` escapes, which a SQL_ASCII database cannot keep in a
+    JSONB column ("Unicode escape value could not be translated to the server's encoding")."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def postgres_connect_args(url: str) -> dict[str, Any]:
+    """Text goes to and from PostgreSQL as UTF-8 whatever encoding the database was created with.
+
+    A database created as SQL_ASCII (what ``initdb`` makes when the machine's locale is ``C``) otherwise hands text back
+    as bytes, which fails at the first query, and cannot store a name in another script at all."""
+    return {"client_encoding": "utf8"} if url.startswith("postgresql") else {}
+
+
 class Database:
     def __init__(self, url: str = "sqlite:///.agentlab/agentlab.db", *, echo: bool = False) -> None:
         url = normalise_database_url(url)
         self.url = url
         kwargs: dict[str, Any] = {"echo": echo, "future": True}
+        if url.startswith("postgresql"):
+            kwargs["connect_args"] = postgres_connect_args(url)
+            kwargs["json_serializer"] = dump_json
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
             if ":memory:" in url or url == "sqlite://":

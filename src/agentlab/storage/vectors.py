@@ -83,7 +83,7 @@ class PgVectorStore(VectorStore):
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table):
             raise ValueError("invalid table name")
         self.table, self.dim = table, dim
-        self.conn = psycopg.connect(url, autocommit=True)
+        self.conn = psycopg.connect(url, autocommit=True, client_encoding="utf8")  # text, whatever the database holds
         self.conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         self.conn.execute(
             f"CREATE TABLE IF NOT EXISTS {table} (id text PRIMARY KEY, embedding vector({dim}), "  # noqa: S608
@@ -97,7 +97,7 @@ class PgVectorStore(VectorStore):
             f"INSERT INTO {self.table} (id, embedding, content, metadata) VALUES (%s, %s::vector, %s, %s) "  # noqa: S608
             "ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, content = EXCLUDED.content, "
             "metadata = EXCLUDED.metadata",
-            (id, "[" + ",".join(map(str, vector)) + "]", text, json.dumps(metadata or {})),
+            (id, "[" + ",".join(map(str, vector)) + "]", text, json.dumps(metadata or {}, ensure_ascii=False)),
         )
 
     def search(self, vector, k=5):  # type: ignore[no-untyped-def]

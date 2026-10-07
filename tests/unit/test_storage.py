@@ -11,7 +11,7 @@ from agentlab.security.credentials import CredentialProfile
 from agentlab.security.redactor import get_redactor
 from agentlab.storage import orm
 from agentlab.storage.artifacts import LocalArtifactStore, MemoryArtifactStore
-from agentlab.storage.db import Database, Store, normalise_database_url, open_store
+from agentlab.storage.db import Database, Store, normalise_database_url, open_store, postgres_connect_args
 from agentlab.storage.migrate import upgrade
 from agentlab.storage.vectors import HashingEmbedder, PgVectorStore
 
@@ -153,6 +153,51 @@ def test_the_pgvector_store_keeps_vectors_overwrites_by_id_and_ranks_by_cosine()
     finally:
         store.conn.execute(f"DROP TABLE IF EXISTS {table}")
         store.conn.close()
+
+
+def test_postgres_connections_ask_for_utf8_and_other_databases_are_left_alone():
+    assert postgres_connect_args("postgresql+psycopg://u:p@h/db") == {"client_encoding": "utf8"}
+    assert postgres_connect_args("postgres://u:p@h/db") == {}, "the URL is normalised before it gets here"
+    assert postgres_connect_args("sqlite:///x.db") == {}
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG, reason="AGENTLAB_TEST_POSTGRES_URL not set")
+def test_a_database_created_as_sql_ascii_still_stores_and_returns_text_in_any_script():
+    """``initdb`` makes SQL_ASCII databases when the machine's locale is ``C``. Without an encoding of its own the driver
+    returns bytes for text there, and the first query of the engine fails."""
+    import psycopg
+    from sqlalchemy.engine import make_url
+
+    name = "agentlab_ascii_test"
+    admin = make_url(PG)
+    libpq = admin.set(drivername="postgresql").render_as_string(hide_password=False)
+    with psycopg.connect(libpq, autocommit=True) as conn:
+        conn.execute(f"DROP DATABASE IF EXISTS {name}")
+        try:
+            conn.execute(f"CREATE DATABASE {name} ENCODING 'SQL_ASCII' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'")
+        except psycopg.errors.InsufficientPrivilege:
+            pytest.skip("this role may not create databases")
+    ascii_url = admin.set(database=name).render_as_string(hide_password=False)
+    try:
+        upgrade(ascii_url)
+        store = Store(Database(ascii_url))
+        project = store.create_project("Проект ✓ مشروع")
+        assert store.get_project(project["id"])["name"] == "Проект ✓ مشروع"
+        spec = TargetSpec(name="مساعد", description="مساعد يجيب عن الأسئلة ✓", mock={"behaviors": ["success"]})
+        added = store.add_target(project["id"], spec)
+        assert store.get_target(added["id"])[1].description == "مساعد يجيب عن الأسئلة ✓"
+        vectors = PgVectorStore(ascii_url.replace("postgresql+psycopg://", "postgresql://", 1), table="v", dim=16)
+        try:
+            embedder = HashingEmbedder(dim=16)
+            vectors.add("ключ", embedder.embed(["текст"])[0], "текст ✓", {"язык": "ru"})
+            (hit,) = vectors.search(embedder.embed(["текст"])[0], k=1)
+            assert (hit.id, hit.text, hit.metadata) == ("ключ", "текст ✓", {"язык": "ru"})
+        finally:
+            vectors.conn.close()
+    finally:
+        with psycopg.connect(libpq, autocommit=True) as conn:
+            conn.execute(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
 
 
 def test_store_roundtrip_and_versioning():
