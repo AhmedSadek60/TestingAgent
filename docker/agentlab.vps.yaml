@@ -1,0 +1,37 @@
+# AgentLab's configuration on the single VPS (docker/compose.vps.yaml mounts it over /etc/agentlab/agentlab.yaml): the base
+# configuration plus a local Ollama model as the judge (docs/deployment-vps.md#the-local-model).
+# Passwords and tokens are not written here: they come from the environment (see docker/compose.yaml).
+#   AGENTLAB_API_TOKEN     the API token every request must present (16 or more characters)
+#   AGENTLAB_DATABASE_URL  replaces storage.database_url (use it for PostgreSQL)
+#   AGENTLAB_REDIS_URL     replaces queue.redis_url
+providers:
+  - name: mock
+    type: mock
+    model: mock-judge
+  - name: local
+    type: ollama
+    base_url: http://ollama:11434
+    model: gemma3:1b
+    timeout: 300.0 # one CPU core: a reply takes a while
+
+evaluation:
+  judges:
+    - {provider: local}
+
+storage:
+  database_url: sqlite:////data/agentlab.db
+  artifacts_dir: /data/artifacts
+  secrets_file: /data/secrets.enc
+  reports_dir: /data/reports
+  work_dir: /data/work
+  uploads_dir: /data/uploads
+  skill_drafts_dir: /data/skills/drafts
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  token_ref: env:AGENTLAB_API_TOKEN
+
+queue:
+  backend: redis
+  redis_url: redis://redis:6379/0

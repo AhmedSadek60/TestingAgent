@@ -1,0 +1,16 @@
+# TLS in front of AgentLab on a VPS that has no domain (docs/deployment-vps.md).
+# Caddy makes its own certificate for the address in AGENTLAB_PUBLIC_HOST, so browsers warn until a domain and a public
+# certificate replace it; the traffic, token included, is encrypted either way.
+{
+	auto_https disable_redirects
+	# A client that connects to an IP address sends no server name, so say which certificate to offer.
+	default_sni {$AGENTLAB_PUBLIC_HOST}
+}
+
+{$AGENTLAB_PUBLIC_HOST} {
+	tls internal
+	# The event stream (server-sent events) must not be buffered.
+	reverse_proxy api:8080 {
+		flush_interval -1
+	}
+}
