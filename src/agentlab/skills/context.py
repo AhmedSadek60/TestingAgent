@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, cast, get_args
 
 from agentlab.adapters.base import AdapterCapabilities
-from agentlab.core.config import AgentLabConfig
+from agentlab.core.config import WEB_LATENCY_BUDGET_MS, AgentLabConfig
 from agentlab.core.enums import AgentType, Intensity, RiskClass, Severity
 from agentlab.core.errors import UserError
 from agentlab.core.models import (
@@ -218,7 +218,16 @@ class SkillContext:
 
     @property
     def latency_budget_ms(self) -> float:
-        return self.config.evaluation.latency_budget_ms
+        """The latency a reply should stay under: what the owner set (``evaluation.latency_budget_ms``), else the default,
+        raised for an agent reached through a web page (rendering and a model's time to write the answer)."""
+        evaluation = self.config.evaluation
+        if (
+            "latency_budget_ms" not in evaluation.model_fields_set
+            and "web" in self.interfaces
+            and "api" not in self.interfaces
+        ):
+            return max(evaluation.latency_budget_ms, WEB_LATENCY_BUDGET_MS)
+        return evaluation.latency_budget_ms
 
     @cached_property
     def expects_citations(self) -> bool:

@@ -1,0 +1,84 @@
+# AgentLab on a single VPS without a domain: docker/compose.yaml plus Caddy for TLS (docs/deployment-vps.md).
+#
+#   docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /root/agentlab/.env up -d --build
+#
+# The env file holds AGENTLAB_API_TOKEN, AGENTLAB_DB_PASSWORD and AGENTLAB_PUBLIC_HOST (the server's IP address). Only
+# Caddy publishes a port (443). The API is reachable through it alone.
+services:
+  # Both services use the same image, built with Chromium (the worker is the one that drives a browser).
+  api:
+    build:
+      args:
+        WITH_BROWSER: "1"
+    # Replaces, not extends, the base file's 127.0.0.1:8080 mapping.
+    ports: !reset []
+    volumes: &config
+      - data:/data
+      - ./agentlab.vps.yaml:/etc/agentlab/agentlab.yaml:ro
+
+  worker:
+    build:
+      args:
+        WITH_BROWSER: "1"
+    volumes: *config
+    # Chromium's own sandbox needs user namespaces, which Docker's default seccomp profile blocks. This profile is that
+    # default plus clone, clone3, unshare and setns; the container stays non-root with every capability dropped, a read-only
+    # root file system and no-new-privileges. Chromium also needs more shared memory than Docker's 64 MB.
+    security_opt:
+      - seccomp=./seccomp-chromium.json
+    shm_size: 1gb
+    # Chromium writes its crash-report database under HOME, and the root file system is read-only: use the temporary folder.
+    environment:
+      HOME: /tmp
+
+  # The database is published on this server's loopback only, so the command line installed on the host
+  # (docs/deployment-vps.md#the-host-command-line) can store its runs where the web interface shows them.
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # The local model that judges. It is published on this server's loopback only, for the command line installed on the
+  # host (docs/deployment-vps.md#the-host-command-line); the API and the worker reach it on the Compose network.
+  # The limit leaves room for the other containers on a 4 GB server (docs/deployment-vps.md#the-local-model).
+  ollama:
+    image: mirror.gcr.io/ollama/ollama:0.40.2
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    mem_limit: 1536m
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  caddy:
+    image: mirror.gcr.io/library/caddy:2-alpine
+    environment:
+      AGENTLAB_PUBLIC_HOST: ${AGENTLAB_PUBLIC_HOST:?set AGENTLAB_PUBLIC_HOST to the server's IP address}
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  ollama:
+  caddy_data:
+  caddy_config:

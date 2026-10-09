@@ -87,8 +87,31 @@ class WebConfig(Model):
     input_selector: str | None = None
     send_selector: str | None = None
     message_selector: str | None = None
+    busy_selector: str | None = Field(
+        default=None,
+        description="A CSS selector that is visible while the page is still writing its answer; the reply is not final "
+        "while it shows (a visible Stop button and status lines such as 'Processing' are recognised without it)",
+    )
+    consent: Literal["reject", "accept", "off"] = Field(
+        default="reject",
+        description="What to do with a cookie or consent dialog that covers the page: refuse optional cookies (the "
+        "default; nothing is pressed if the dialog has no such button), accept them, or leave the dialog alone",
+    )
+    dismiss_selectors: list[str] = Field(
+        default_factory=list,
+        description="Buttons of a dialog that AgentLab does not recognise by itself; each is pressed when it is showing",
+    )
+    navigation_timeout_seconds: float = Field(
+        default=30.0, gt=0, le=300, description="How long to wait for the page to open (its load event)"
+    )
     auth_credential: str | None = None
     login_url: str | None = None
+    reply_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        le=600,
+        description="How long to wait for the page to answer a message. A slow assistant needs more than a minute.",
+    )
 
 
 class CommandConfig(Model):

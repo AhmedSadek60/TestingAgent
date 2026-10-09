@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentlab.core.enums import RiskClass, Severity, TestStatus
+from agentlab.core.enums import ErrorKind, RiskClass, Severity, TestStatus
 from agentlab.core.models import AssertionResult, AttemptResult, Finding, ReliabilityStats, TestCase, TestResult
 from agentlab.design.models import CoverageEntry, PlannedTest, TestPlan
 from agentlab.design.taxonomy import SECURITY_CATEGORIES
@@ -347,3 +347,45 @@ def test_variants_do_not_inflate_the_executed_count() -> None:
 def test_grade_notes_compose_with_the_security_cap() -> None:
     assert add_grade_note("A", "limited") == "A (limited)"
     assert add_grade_note("F (capped by security)", "partial coverage") == "F (capped by security; partial coverage)"
+
+
+def test_errors_of_the_test_set_up_count_as_not_measured_and_make_a_thin_run_say_so() -> None:
+    """Free Anon AI: 16 tests produced a verdict, 10 ended in ERROR and 33 were blocked. The bare letter hid that."""
+    tests = [mk_test(f"A-{i}", "functional") for i in range(1, 60)]
+    results = (
+        [result(t.id, TestStatus.PASSED) for t in tests[:16]]
+        + [result(t.id, TestStatus.ERROR) for t in tests[16:26]]
+        + [result(t.id, TestStatus.BLOCKED, reason="needs the owner's attestation") for t in tests[26:]]
+    )
+    scope = assess_scope(plan_with("full", entry("A", "covered")), tests, results)
+    assert scope.thin and scope.label == "only 16 of 59 planned tests could run"
+    assert "10 test(s) ended in ERROR" in scope.text and "set-up" in scope.text
+    # errors alone (nothing blocked) also make a thin run, and a few errors among many verdicts do not
+    only_errors = assess_scope(
+        plan_with("full", entry("A", "covered")),
+        tests[:12],
+        [result(t.id, TestStatus.PASSED) for t in tests[:4]] + [result(t.id, TestStatus.ERROR) for t in tests[4:12]],
+    )
+    assert only_errors.thin
+    few = assess_scope(
+        plan_with("full", entry("A", "covered")),
+        tests[:30],
+        [result(t.id, TestStatus.PASSED) for t in tests[:27]] + [result(t.id, TestStatus.ERROR) for t in tests[27:30]],
+    )
+    assert few.limited and not few.thin
+
+
+def test_a_policy_block_is_not_called_a_missing_prerequisite() -> None:
+    tests = [mk_test(f"S-{i}") for i in range(1, 9)]
+    blocked = []
+    for t in tests[:6]:
+        r = result(t.id, TestStatus.BLOCKED, reason="requires the owner's authorisation attestation")
+        r.error_kind = ErrorKind.POLICY_BLOCK
+        blocked.append(r)
+    blocked += [result(t.id, TestStatus.BLOCKED, reason="no judge") for t in tests[6:]]
+    scope = assess_scope(
+        plan_with("full", entry("A", "covered")),
+        tests + [mk_test("P-1", "functional")],
+        [*blocked, result("P-1", TestStatus.PASSED)],
+    )
+    assert "6 need an authorisation or the owner's attestation" in scope.text and "2 lack a prerequisite" in scope.text

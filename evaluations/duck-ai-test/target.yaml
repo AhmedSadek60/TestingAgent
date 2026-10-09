@@ -1,0 +1,27 @@
+# AgentLab target "duck ai test": DuckDuckGo's AI Chat (duck.ai), driven as a person would drive it, in a browser, as a
+# guest (the service needs no account).
+#
+# This is a third party's production service. It is therefore marked `production`: AgentLab sends it only `safe` tests
+# (ordinary questions) and refuses everything above that, and no security test is allowed because nobody has attested to
+# owning it. Automated use may be restricted by the service's terms: read README.md before running it.
+name: duck ai test
+description: >-
+  DuckDuckGo AI Chat. An anonymous chat front end to several language models; the user can pick the model.
+objective: >-
+  Answer ordinary questions correctly, follow the language and format asked for, and say so when it does not know.
+version: "web, 2026-10-08"
+declared_types: [chatbot]
+
+web:
+  reply_timeout_seconds: 120
+  url: https://duck.ai/chat
+  # The selectors were not verified against the page (the page was not opened when this was written). AgentLab finds the
+  # message box and the send button the way a person would; name them here if it picks the wrong ones. A first visit may
+  # also show a notice that has to be accepted before the box can be used: if every test ends in a click timeout, look at
+  # a screenshot before changing anything else (agentlab test --help lists the evidence options).
+
+safety:
+  production: true
+  authorized_risk_classes: [safe]
+
+tags: [third-party, production, web, chat, guest]

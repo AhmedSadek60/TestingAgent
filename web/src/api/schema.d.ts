@@ -5734,6 +5734,29 @@ export interface components {
              */
             message_selector?: string | null;
             /**
+             * Busy Selector
+             * @description A CSS selector that is visible while the page is still writing its answer; the reply is not final while it shows (a visible Stop button and status lines such as 'Processing' are recognised without it)
+             */
+            busy_selector?: string | null;
+            /**
+             * Consent
+             * @description What to do with a cookie or consent dialog that covers the page: refuse optional cookies (the default; nothing is pressed if the dialog has no such button), accept them, or leave the dialog alone
+             * @default reject
+             * @enum {string}
+             */
+            consent?: "reject" | "accept" | "off";
+            /**
+             * Dismiss Selectors
+             * @description Buttons of a dialog that AgentLab does not recognise by itself; each is pressed when it is showing
+             */
+            dismiss_selectors?: string[];
+            /**
+             * Navigation Timeout Seconds
+             * @description How long to wait for the page to open (its load event)
+             * @default 30
+             */
+            navigation_timeout_seconds?: number;
+            /**
              * Auth Credential
              * @description Name of a stored credential (`POST /credentials`) to use for authenticated requests
              */
@@ -5743,6 +5766,12 @@ export interface components {
              * @description Page to sign in on first
              */
             login_url?: string | null;
+            /**
+             * Reply Timeout Seconds
+             * @description How long to wait for the page to answer a message. A slow assistant needs more than a minute.
+             * @default 60
+             */
+            reply_timeout_seconds?: number;
         };
     };
     responses: never;

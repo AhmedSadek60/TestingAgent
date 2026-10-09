@@ -141,6 +141,11 @@ class BrowserExecutionEngine(ExecutionEngine):
                 )
                 break
             if session.stops(step, outcome):
+                if outcome.environmental:
+                    # The step could not be done (a timeout, a missing element, no reply): the agent was never asked, or
+                    # never answered, so the test is ERROR (not scored), not a failed check on whatever was read.
+                    seen = f" [screenshot {action.get('screenshot')}]" if action.get("screenshot") else ""
+                    out.error = BrowserError(f"{step.action}: {outcome.detail}{seen}")
                 break
 
     @staticmethod

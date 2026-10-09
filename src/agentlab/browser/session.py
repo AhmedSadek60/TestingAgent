@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any
 
 from agentlab.browser.chat import first_visible, send_chat, visible_text
+from agentlab.browser.consent import dismiss_consent
 from agentlab.browser.pool import GuardedContext
-from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked, UserError
+from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked, UserError, is_environmental
 from agentlab.core.models import BrowserStep, WebConfig
 from agentlab.documents.attachments import load_attachment
 from agentlab.evaluation.context import PlaceholderResolver
@@ -27,6 +28,7 @@ from agentlab.evaluation.context import PlaceholderResolver
 MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024
 MAX_PAGE_TEXT = 20_000
 IGNORED_FAILED_RESOURCES = ("favicon.ico",)
+LOGIN_SETTLE_MS = 10_000  # how long a login form may keep showing after the click before the sign-in counts as failed
 USERNAME_SELECTORS = (
     "input[autocomplete=username]:visible",
     "input[type=email]:visible",
@@ -70,6 +72,9 @@ class StepOutcome:
     replied: bool = True
     screenshot: str | None = None  # artifact id of a screenshot step
     latency_ms: float = 0.0
+    #: the step failed because of the set-up (a timeout, a missing element, a page that did not open or never answered),
+    #: not because the page under test answered badly (an HTTP error status is an answer, not this)
+    environmental: bool = False
 
 
 class BrowserSession:
@@ -175,16 +180,30 @@ class BrowserSession:
     async def run_step(self, step: BrowserStep) -> StepOutcome:
         t0 = time.perf_counter()
         timeout = min(step.timeout_ms, self.default_timeout_ms * 4)
+        if step.action == "chat":  # a slow assistant is allowed the time the target says it needs
+            timeout = min(step.timeout_ms, max(timeout, self.reply_timeout_ms))
+        elif step.action == "goto":  # and a heavy page the time it needs to open
+            timeout = min(step.timeout_ms, max(timeout, self.navigation_timeout_ms))
         outcome = StepOutcome()
         try:
             outcome = await getattr(self, f"_do_{step.action}")(step, timeout)
         except PolicyBlocked as exc:
             outcome = StepOutcome(False, f"blocked by policy: {exc}")
         except AgentLabError as exc:
-            outcome = StepOutcome(False, str(exc))
+            outcome = StepOutcome(False, str(exc), environmental=is_environmental(exc))
         except Exception as exc:  # a missing element, a timeout or a navigation error is an observation, not a crash
-            outcome = StepOutcome(False, f"{type(exc).__name__}: {str(exc).splitlines()[0][:200] if str(exc) else ''}")
+            outcome = StepOutcome(
+                False,
+                f"{type(exc).__name__}: {str(exc).splitlines()[0][:200] if str(exc) else ''}",
+                environmental=True,
+            )
         outcome.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        if not outcome.ok and outcome.screenshot is None and step.action in STOPS_ON_FAILURE:
+            # What was on the screen when the step failed is the evidence for why (a notice in the way, a login wall).
+            with contextlib.suppress(Exception):
+                outcome.screenshot = await asyncio.wait_for(
+                    self.screenshot(name=f"failed-{step.action}-{len(self.rec.actions) + 1}"), timeout=10
+                )
         self.rec.actions.append(
             {
                 "action": step.action,
@@ -202,6 +221,14 @@ class BrowserSession:
                 self.rec.step_failures.append(f"{step.action}: {outcome.detail}"[:300])
         return outcome
 
+    @property
+    def navigation_timeout_ms(self) -> int:
+        return int(self.web.navigation_timeout_seconds * 1000) if self.web else 30_000
+
+    @property
+    def reply_timeout_ms(self) -> int:
+        return int(self.web.reply_timeout_seconds * 1000) if self.web else 60_000
+
     @staticmethod
     def stops(step: BrowserStep, outcome: StepOutcome) -> bool:
         return not outcome.ok and step.action in STOPS_ON_FAILURE
@@ -210,16 +237,30 @@ class BrowserSession:
         url = self.resolve(step.value or step.target)
         if not url:
             raise UserError("the 'goto' step needs a url in 'value'")
+        response = None
         try:
             response = await self.page.goto(url, wait_until="load", timeout=timeout)
         except Exception as exc:
-            self.rec.load_failed = True
-            return StepOutcome(False, f"navigation failed: {str(exc).splitlines()[0][:200]}")
+            # A page full of advertising and trackers can take a long time to fire its load event while it is already
+            # perfectly usable. If the document itself has been parsed, carry on instead of failing the test.
+            state = await self._ready_state()
+            if state not in {"interactive", "complete"} or self.page.url in {"", "about:blank"}:
+                self.rec.load_failed = True
+                return StepOutcome(False, f"navigation failed: {str(exc).splitlines()[0][:200]}", environmental=True)
+            return StepOutcome(True, f"loaded {self.page.url} (its load event did not fire within {timeout // 1000}s)")
         self.rec.http_status = response.status if response else None
         if response is not None and response.status >= 400:
             self.rec.load_failed = True
             return StepOutcome(False, f"the page answered HTTP {response.status}")
+        if self.web is not None:
+            await dismiss_consent(self.page, self.web.consent, self.web.dismiss_selectors)
         return StepOutcome(True, f"loaded {self.page.url}")
+
+    async def _ready_state(self) -> str:
+        try:
+            return str(await self.page.evaluate("document.readyState"))
+        except Exception:
+            return ""
 
     async def _do_click(self, step: BrowserStep, timeout: int) -> StepOutcome:
         await self._locator(step).click(timeout=timeout)
@@ -335,10 +376,15 @@ class BrowserSession:
             input_selector=(w.input_selector if w else None) or self.resolve(step.target),
             send_selector=w.send_selector if w else None,
             message_selector=w.message_selector if w else None,
-            wait_seconds=min(timeout / 1000, 60.0),
+            busy_selector=w.busy_selector if w else None,
+            consent=w.consent if w else "reject",
+            dismiss_selectors=w.dismiss_selectors if w else (),
+            wait_seconds=min(timeout / 1000, max(60.0, self.reply_timeout_ms / 1000)),
         )
         if not replied:
-            return StepOutcome(False, "no reply appeared on the page in time", reply=reply, replied=False)
+            return StepOutcome(
+                False, "no reply appeared on the page in time", reply=reply, replied=False, environmental=True
+            )
         return StepOutcome(True, f"reply of {len(reply)} characters", reply=reply)
 
     async def form_login(self, login_url: str, username: str, password: str) -> None:
@@ -361,6 +407,12 @@ class BrowserSession:
             else:
                 await pass_box.press("Enter")
             await page.wait_for_load_state("load", timeout=self.default_timeout_ms)
+            # A single-page application signs in without loading another page, so the form can still be showing for a
+            # moment after the click. Give it that moment: a form that is still there afterwards means the sign-in failed.
+            with contextlib.suppress(Exception):
+                await page.locator("input[type=password]:visible").first.wait_for(
+                    state="hidden", timeout=min(self.default_timeout_ms, LOGIN_SETTLE_MS)
+                )
             still_asking = await first_visible(page, ("input[type=password]:visible",)) is not None
         except CredentialError:
             self._record_login(login_url, False, "no login form found")

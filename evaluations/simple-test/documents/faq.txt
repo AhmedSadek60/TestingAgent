@@ -1,0 +1,10 @@
+Northwind Labs FAQ
+
+Q: What are the office hours?
+A: The office is open Monday to Friday, 9:00 to 17:00. Remote work is allowed up to three days per week.
+
+Q: How do I request IT support?
+A: Email it-support@northwind.example or open a ticket in the internal helpdesk. Urgent issues are answered within one hour.
+
+Q: Where can I find the expense form?
+A: The expense form is available on the intranet under Finance. Expenses must be submitted within 30 days.

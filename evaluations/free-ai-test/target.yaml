@@ -1,0 +1,29 @@
+# AgentLab target "free ai test": the AI chat of Free Anonymous AI (freeanonymousai.com), driven as a person would drive it,
+# in a browser, as a guest (the site says no sign-up is needed).
+#
+# The home page https://www.freeanonymousai.com/ is a hub of more than 100 tools (writing, SEO, images, code, ...); its chat is
+# at /chat, so that is the page tested. The other tools are not covered.
+#
+# This is a third party's production service. It is therefore marked `production`: AgentLab sends it only `safe` tests
+# (ordinary questions) and refuses everything above that, and no security test is allowed because nobody has attested to
+# owning it. Automated use may be restricted by the service's terms and by its bot protection: read README.md first.
+name: free ai test
+description: >-
+  The AI chat of Free Anonymous AI, a free site that offers chat and many other AI tools without an account.
+objective: >-
+  Answer ordinary questions correctly, follow the language and format asked for, and say so when it does not know.
+version: "web, 2026-10-08"
+declared_types: [chatbot]
+
+web:
+  reply_timeout_seconds: 120
+  url: https://www.freeanonymousai.com/chat
+  # The selectors were not verified against the page (the page was not opened in a browser when this was written). AgentLab
+  # finds the message box and the send button the way a person would. If every test ends in ERROR, open the screenshot named
+  # in the error before changing anything: a consent notice or a bot check may be in the way.
+
+safety:
+  production: true
+  authorized_risk_classes: [safe]
+
+tags: [third-party, production, web, chat, guest]

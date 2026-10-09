@@ -168,6 +168,8 @@ What the containers are, and are not:
   `docker compose down` keeps them; `docker compose down -v` deletes the data. The configuration is `docker/agentlab.yaml`
   inside the image: mount your own file over `/etc/agentlab/agentlab.yaml` to change it (every path in it must stay
   under `/data`, because nothing else is writable).
+* **git is inside, to clone.** A repository given by `--repo https://...` is cloned in the container (hooks and every protocol
+  but HTTPS off). Cloning does not run anything from it; running its code needs the sandbox, which is not available (next point).
 * **No Docker and no browser inside.** The image has no Docker client, and the Docker socket is never mounted, so
   tests that need a sandbox are **blocked** with that reason, and so are browser tests. Run those from a checkout or
   a host that has Docker and Chromium, pointed at the same database if you want the results in one place. This is a
@@ -185,6 +187,8 @@ image declares no `VOLUME` (Railway's builder refuses one), so `docker run` keep
 `/data`: `docker run -v agentlab-data:/data ...`.
 
 **On Railway** the same image runs as one service with PostgreSQL and a volume: [deployment-railway.md](deployment-railway.md).
+
+**On a single VPS** with no domain, the Compose stack runs behind Caddy: [deployment-vps.md](deployment-vps.md). The image can also be built with Chromium (`--build-arg WITH_BROWSER=1`) for browser tests: see that page for the seccomp profile it needs.
 
 ## Check the installation
 

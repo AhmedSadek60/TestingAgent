@@ -132,6 +132,7 @@ of its own: read [security.md](docs/security.md#web-interface-and-api) before ex
 | [Plug-ins](docs/plugins.md) | What can be added, how, and what is not pluggable. |
 | [Architecture](docs/architecture.md) | The parts, the seventeen phases of a run, the principles. |
 | [Deploying on Railway](docs/deployment-railway.md) | The deployment, its variables and what was verified. |
+| [Deploying on a VPS](docs/deployment-vps.md) | The Compose stack behind Caddy on one server with no domain, and what was verified. |
 | [Development](docs/development.md) | Setting up, the checks, the tests, and the verification status. |
 | [Assumptions](docs/assumptions.md) | What was decided where the requirements left room. |
 | [Decisions](docs/decisions/README.md) | Architecture decision records. |

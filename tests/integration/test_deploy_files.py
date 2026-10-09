@@ -63,6 +63,11 @@ def test_railway_json_asks_for_one_instance_and_only_keys_railway_defines() -> N
     assert deploy["drainingSeconds"] >= 20
 
 
+def test_the_dockerfile_installs_git_because_a_repository_given_by_url_is_cloned_with_it() -> None:
+    runtime = DOCKERFILE.read_text(encoding="utf-8").split("AS runtime", 1)[1]
+    assert re.search(r"apt-get install\b[^\n]*(\\\n[^\n]*)*\bgit\b", runtime), "git is missing from the runtime image"
+
+
 def test_the_dockerfile_has_no_volume_instruction() -> None:
     """Railway's builder stops with 'The VOLUME keyword is banned in Dockerfiles'. Compose names its volume itself."""
     assert not re.search(r"^\s*VOLUME\b", DOCKERFILE.read_text(encoding="utf-8"), re.M | re.I)

@@ -9,6 +9,24 @@ All notable changes to this project are written here. The format follows
 AgentLab 0.1.0 is the version `pyproject.toml` declares. Nothing has been tagged or published: this is what the first
 pull request adds to the governance template the repository started as.
 
+### Fixed
+
+* Web targets: a page that cannot be opened, a control that cannot be clicked, or no answer within the wait now end the
+  test in ERROR (not scored) instead of failing its checks on an empty reply, and a screenshot of the page is kept.
+  `web.reply_timeout_seconds` (default 60, at most 600) sets how long to wait for an answer.
+* Any browser test whose step could not be done (a timeout, a missing element, no reply, a page that did not open) now ends in
+  ERROR, not in a failed check on whatever was read; this includes tests with their own `browser_steps`.
+* Cookie and consent dialogs are closed before each message (`web.consent: reject|accept|off`, `web.dismiss_selectors`), a page
+  whose load event never fires is used once its document is ready, and `web.navigation_timeout_seconds` sets the wait to open it.
+* Set-up errors are no longer counted against an agent's reliability; a grade built on fewer than half of the planned tests says
+  how many ran; blocked tests are described as a policy block or a missing prerequisite; a web target gets a latency budget of at
+  least 30 seconds.
+* Web targets: a status line ("Processing", "Thinking…") or a visible *Stop* button is no longer read as the answer; the
+  labels of the page's own buttons are removed from it; `web.busy_selector` names an element that is visible while the page
+  is still writing. Discovery probes wait longer than the target's own reply wait.
+* A form login on a single-page application is no longer reported as failed because the form was still showing a moment
+  after the click.
+
 ### Added
 
 **Testing an agent**

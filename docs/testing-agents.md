@@ -228,13 +228,18 @@ web:
   message_selector: ".reply"
   auth_credential: test-user
   login_url: https://staging.example.com/login
+  reply_timeout_seconds: 120           # how long to wait for an answer (default 60, at most 600)
+  busy_selector: ".typing"             # optional: visible while the page is still writing its answer
+  consent: reject                      # a cookie dialog in the way: reject (default), accept or off
+  dismiss_selectors: ["#cookie-ok"]    # optional: buttons of a dialog AgentLab does not recognise
+  navigation_timeout_seconds: 30       # how long to wait for the page to open (default 30, at most 300)
 ```
 
 AgentLab does what a person does: opens the page, types, presses send and reads what appears, with one browser context
 (its own cookies and storage) per conversation. Unless you name the selectors it finds the message box (a visible text
 box) and the send button (a button that says *Send*, *Submit* or *Ask*) the way a person would, and takes as the reply
 the **new** text that appears after sending, once it has stopped changing; `message_selector` makes that exact. Because
-the page is the interface, only the visible reply is observable. It needs Chromium and the `playwright` package:
+the page is the interface, only the visible reply is observable. A page that cannot be opened, a control that cannot be clicked or an answer that does not arrive within `reply_timeout_seconds` ends the test in **ERROR** (not scored), never as a failed check on an empty reply; a screenshot of the page is kept as evidence. **The answer is final only when the page has stopped changing and is not still working:** a status line ("Processing", "Thinking…", "Choosing the right AI for you…"), a visible *Stop* button or the element named by `busy_selector` all mean it is still being written, and a page that only ever shows a status line did not answer. **Consent dialogs.** A cookie or consent dialog on top of the page swallows every click, so AgentLab closes it before each message and again if a click is blocked, the way a person would. `consent: reject` (the default) presses the button that refuses optional cookies and presses nothing if the dialog has none, because AgentLab never accepts tracking on its own; `consent: accept` presses the accept button (the browser is discarded after the test); `off` leaves the dialog alone. When a dialog still covers the page, the test ends in ERROR with a message that says which setting to change. **A page that opens slowly:** if the load event does not fire within `navigation_timeout_seconds` but the document itself is ready (an advertising image that never arrives holds the event back), the page is used. **Set-up errors are not failures:** a step that could not be done (a timeout, a missing element, no reply) ends the test in ERROR, whether it is the first message or the fifth step of a test you wrote; an HTTP error status the page answers with is an answer and can still fail the test. Without `message_selector` the labels of the page's own buttons ("NEW CHAT", "COPY", "REGENERATE") are removed from what is read. It needs Chromium and the `playwright` package:
 [browser-testing.md](browser-testing.md).
 
 ### A command: `command`

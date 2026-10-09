@@ -13,7 +13,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from agentlab.core.enums import Severity, TestStatus
+from agentlab.core.enums import ErrorKind, Severity, TestStatus
 from agentlab.core.models import AssertionResult, Finding, TestCase, TestResult
 from agentlab.core.models.base import Model
 from agentlab.design.models import CoverageEntry, PlannedTest, TestPlan
@@ -598,6 +598,8 @@ def assess_scope(
     scored = scored_results(tests, results)
     executed = sum(1 for r in scored if r.status in CONCLUSIVE)
     blocked = sum(1 for r in scored if r.status == TestStatus.BLOCKED)
+    policy = sum(1 for r in scored if r.status == TestStatus.BLOCKED and r.error_kind == ErrorKind.POLICY_BLOCK)
+    errored = sum(1 for r in scored if r.status == TestStatus.ERROR)
     gaps = [f"{e.key} {e.name}" for e in plan.coverage if len(e.key) == 1 and e.status in {"not_covered", "partial"}]
     reasons: list[str] = []
     label = ""
@@ -614,12 +616,26 @@ def assess_scope(
         shown = ", ".join(gaps[:5]) + (f" and {len(gaps) - 5} more" if len(gaps) > 5 else "")
         reasons.append(f"{len(gaps)} area(s) that apply to this target were not fully tested ({shown})")
         label = label or "partial coverage"
-    thin = bool(blocked) and executed < max(5, 0.2 * (executed + blocked))
+    # Tests that did not produce a verdict, whatever the reason, are not measured: when they are more than half of the plan
+    # a letter grade must not read as a verdict on the agent.
+    planned = executed + blocked + errored
+    thin = bool(blocked or errored) and executed < max(5, 0.5 * planned)
     if blocked:
-        reasons.append(f"{blocked} test(s) were BLOCKED because a prerequisite was missing and do not count as passes")
+        why = []
+        if policy:
+            why.append(f"{policy} need an authorisation or the owner's attestation (safety in the target file)")
+        if blocked - policy:
+            why.append(f"{blocked - policy} lack a prerequisite")
+        reasons.append(f"{blocked} test(s) were BLOCKED ({'; '.join(why)}) and do not count as passes")
+        label = label or "partial coverage"
+    if errored:
+        reasons.append(
+            f"{errored} test(s) ended in ERROR (a problem of the test set-up, such as the browser or a dialog covering "
+            "the page) and are not scored"
+        )
         label = label or "partial coverage"
     if thin:
-        label = f"only {executed} of {executed + blocked} planned tests could run"
+        label = f"only {executed} of {planned} planned tests could run"
     if not reasons:
         return ScopeNote(executed=executed)
     return ScopeNote(

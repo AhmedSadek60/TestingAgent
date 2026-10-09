@@ -87,3 +87,12 @@ class UnsupportedCapability(AgentLabError):
     """A capability was requested that this build does not implement or the provider lacks."""
 
     kind = ErrorKind.USER_ERROR
+
+
+def is_environmental(error: BaseException | None) -> bool:
+    """Whether ``error`` is a problem of the test set-up (the browser, the machine, AgentLab's own wait running out) and
+    says nothing about the agent being tested.
+
+    A test that ends in one is ERROR: it is not scored, and the agent is not blamed for it. An error that the agent itself
+    returned (``TargetError``, an HTTP error status) is not environmental: it is the agent's answer."""
+    return isinstance(error, (BrowserError, InfrastructureError, TimeoutExceeded))

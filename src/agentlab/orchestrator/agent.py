@@ -486,6 +486,7 @@ class TestOrchestratorAgent:
                 profile,
                 opts.scoring_profile or cfg.evaluation.scoring_profile or self._baseline_profile(spec, opts),
                 production=spec.safety.production,
+                web=spec.web is not None and not spec.api,
             )
             manifest = build_manifest(
                 run_id=run_id,

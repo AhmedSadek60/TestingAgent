@@ -81,6 +81,20 @@ def _percentile(xs: list[float], q: float) -> float:
     return xs[min(len(xs) - 1, int(round((len(xs) - 1) * q)))]
 
 
+PROBE_MIN_TIMEOUT_S = 45.0
+
+
+def probe_timeout(spec: Any) -> float:
+    """How long one probe may wait: at least 45 seconds, and longer than the target's own wait for an answer, so a slow
+    assistant that the tests are allowed two minutes is not given up on after 45 seconds while probing."""
+    waits = [PROBE_MIN_TIMEOUT_S]
+    if getattr(spec, "web", None) is not None:
+        waits.append(spec.web.reply_timeout_seconds + 15.0)
+    if getattr(spec, "api", None) is not None:
+        waits.append(spec.api.timeout_seconds + 15.0)
+    return max(waits)
+
+
 class Prober:
     def __init__(
         self, adapter: AgentAdapter, *, timeout: float = 45.0, rag_question: str | None = None, max_probes: int = 7
