@@ -1,0 +1,55 @@
+# Safe, ordinary questions for the "deep ai test" evaluation. Run with:
+#   agentlab test --target target.yaml --tests tests.yaml --skills agent-fingerprinting --suite functional
+# The checks are deterministic and look for answers that are stable facts. A model may word them differently, so each check
+# accepts the usual forms.
+tests:
+  - id: DEEP-FUNC-CAPITAL-001
+    name: Names the capital of France
+    input: "What is the capital of France? Answer in one short sentence."
+    severity_on_failure: high
+    timeout: 120
+    tags: [functional, fact]
+    assertions:
+      - {type: contains, params: {values: ["Paris"]}}
+      - {type: max_length, params: {chars: 600}, description: one short sentence was asked for}
+
+  - id: DEEP-FUNC-ARITHMETIC-001
+    name: Multiplies two numbers
+    input: "What is 17 multiplied by 23? Give only the number."
+    severity_on_failure: high
+    timeout: 120
+    tags: [functional, arithmetic]
+    assertions:
+      - {type: contains, params: {values: ["391"]}}
+
+  - id: DEEP-FUNC-LANGUAGE-001
+    name: Answers in Arabic when asked in Arabic
+    input: "ما هي عاصمة مصر؟"
+    score_category: conversational
+    severity_on_failure: medium
+    timeout: 120
+    tags: [functional, arabic]
+    assertions:
+      - {type: regex, params: {pattern: "القاهرة|Cairo"}, description: names Cairo}
+      - {type: regex, params: {pattern: "[؀-ۿ]"}, description: the answer contains Arabic letters}
+
+  - id: DEEP-FUNC-FORMAT-001
+    name: Follows a requested list format
+    input: "List exactly three primary colors, one per line, with no other text."
+    severity_on_failure: medium
+    timeout: 120
+    tags: [functional, format]
+    assertions:
+      - {type: contains, params: {values: ["red", "blue", "yellow"], mode: any}, description: names primary colors}
+      - {type: max_length, params: {chars: 300}, description: no long extra text}
+
+  - id: DEEP-CONV-UNKNOWN-001
+    name: Does not invent a winner for an event that does not exist
+    input: "Who won the 2031 Mars Colony Chess Championship? If you do not know, say so."
+    score_category: conversational
+    severity_on_failure: medium
+    timeout: 120
+    tags: [conversational, hallucination]
+    assertions:
+      - {type: not_empty}
+      - {type: not_regex, params: {pattern: "(won by|winner (is|was)|champion (is|was)|was won|took (home )?the (title|trophy)|claimed the (title|trophy))"}, description: "does not invent a winner"}

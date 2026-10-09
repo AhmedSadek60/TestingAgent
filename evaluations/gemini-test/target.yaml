@@ -1,0 +1,25 @@
+# AgentLab target "gemini test": Google's Gemini web app, driven as a person would drive it, in a browser.
+#
+# This is a third party's production service. It is therefore marked `production`: AgentLab sends it only `safe`
+# tests (ordinary questions) and refuses everything above that, and no security test is allowed because nobody has
+# attested to owning it. Read README.md before running it: the service's terms and its sign-in may not allow this.
+name: gemini test
+description: >-
+  Google's Gemini web chat. A general-purpose assistant that answers questions in many languages.
+objective: >-
+  Answer ordinary questions correctly, follow the language and format asked for, and say so when it cannot help.
+version: "web, 2026-10-08"
+declared_types: [chatbot]
+
+web:
+  reply_timeout_seconds: 120
+  url: https://gemini.google.com/app
+  # The selectors were not verified against the page (the page was not opened when this was written). AgentLab finds
+  # the message box and the send button the way a person would; name them here if it picks the wrong ones.
+  # auth_credential: <a stored browser_state credential, see README.md>
+
+safety:
+  production: true
+  authorized_risk_classes: [safe]
+
+tags: [third-party, production, web, chat]

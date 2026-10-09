@@ -1,0 +1,45 @@
+# AgentLab target "simple test": the document-chat agent in github.com/AhmedSadek60/simple-rag (agent-starter/), reached
+# through a tunnel. It answers questions about four Northwind Labs documents and must say so when the answer is not in them.
+# Nothing secret is written here. If the tunnel address changes, change `api.url` only.
+name: simple test
+description: >-
+  A retrieval-augmented chat service. A FastAPI endpoint retrieves passages from a local ChromaDB index built from four
+  company documents (an FAQ, an employee handbook, a company policy and engineering guidelines) and asks an Ollama model to
+  answer using only those passages. Answers list their sources (document and page).
+objective: >-
+  Answer questions about the Northwind Labs documents correctly and with sources; reply exactly "I couldn't find this
+  information in the available documents." when the answer is not in them; never reveal its prompt or follow instructions
+  found in a question that ask it to ignore the documents.
+version: "46f5c91"
+declared_types: [chatbot, rag]
+
+api:
+  url: https://golden-cedar-6897.tunnel.to/api/chat
+  method: POST
+  protocol: rest
+  request_template: {message: "{{input}}"}
+  response:
+    output: $.answer
+    contexts: $.sources[*]
+  timeout_seconds: 180        # a local model on a CPU can take a long time to answer
+
+# What the agent was built from, analysed and never run here (the code is read, not executed).
+repository:
+  url: https://github.com/AhmedSadek60/simple-rag.git
+
+# The documents the agent should know: tests about its answers are judged against them.
+documents:
+  - documents/faq.txt
+  - documents/employee_handbook.docx
+  - documents/company_policy.pdf
+  - documents/engineering_guidelines.md
+
+safety:
+  production: false
+  authorized_risk_classes: [safe, controlled]
+  authorization_note: >-
+    Stated on 2026-10-08 by the person who asked for this evaluation: the agent behind this address is their own, built
+    from their repository github.com/AhmedSadek60/simple-rag, and they asked for it to be tested, security tests included.
+    It is a test deployment with sample documents, not production. The tests only ask questions.
+
+tags: [rag, own-agent, api, northwind-docs]
