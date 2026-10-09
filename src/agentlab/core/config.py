@@ -258,6 +258,12 @@ class ServerConfig(Model):
     serve_ui: bool = Field(default=True, description="Serve the web interface at / when it has been built")
 
 
+#: A reply read from a web page includes the page's own rendering and, for an assistant, a model's time to write it. A
+#: latency budget written for an API (a few seconds) would score every web chat as slow, so an agent reached only through
+#: a browser gets at least this much unless the owner sets one (evaluation.latency_budget_ms).
+WEB_LATENCY_BUDGET_MS = 30_000.0
+
+
 class AgentLabConfig(Model):
     providers: list[ProviderConfig] = Field(
         default_factory=lambda: [ProviderConfig(name="mock", type="mock", model="mock-judge")]

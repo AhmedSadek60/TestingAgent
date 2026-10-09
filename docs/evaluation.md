@@ -464,3 +464,18 @@ alongside the reviewer's, and the report shows both ([reports.md](reports.md#hum
 * **A score is a summary.** It depends on the tests that ran and the profile's weights; a high score says the agent did
   well on *those tests*, and the report says how many there were and what was not tested.
 * **Covered is not secure.** The security categories count what was tested, not what is safe.
+
+
+## What the grade does and does not say
+
+* **ERROR is not a verdict.** A test that ended in ERROR because of the test set-up (the browser could not be driven, a dialog
+  covered the page, the page never answered) is not scored, and **it is not counted against the agent's reliability**: the
+  reliability score counts only errors and timeouts that the agent itself caused (`TARGET_ERROR`, `TIMEOUT`, `RATE_LIMIT`).
+* **A grade says how much of the plan it covers.** When blocked tests and errors together leave fewer than half of the planned
+  tests with a verdict, the grade reads `A (only 16 of 59 planned tests could run)` and the report says why each group did not run.
+* **Blocked tests say why.** Tests that need the owner's attestation or an authorisation are reported as such (a *policy* block,
+  fixed in `safety` in the target file); tests that lack a credential, Docker, a browser, a judge or an interface are reported as
+  missing a prerequisite.
+* **Latency budgets.** An agent reached only through a web page gets a latency budget of at least 30 seconds
+  (`evaluation.latency_budget_ms` set explicitly always wins), because the page's rendering and a model's time to write the answer
+  are in the measurement; an API keeps the shorter budget of its scoring profile.

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from agentlab.core.enums import Severity, TestStatus, normalize_score_category
-from agentlab.core.models import Finding, TestCase, TestResult
-from agentlab.evaluation.scoring import build_scorecard, grade_ceiling, load_profile
+from agentlab.core.enums import ErrorKind, Severity, TestStatus, normalize_score_category
+from agentlab.core.models import AttemptResult, Finding, TestCase, TestResult
+from agentlab.core.config import WEB_LATENCY_BUDGET_MS
+from agentlab.evaluation.scoring import blocked_summary, build_scorecard, grade_ceiling, load_profile, select_profile
 
 
 def _case(n: int, category: str = "functional_quality") -> TestCase:
@@ -107,3 +108,51 @@ def test_blocked_tests_do_not_count_for_or_against_the_agent() -> None:
     sc = build_scorecard(cases + blocked, results, [], GENERAL)
     assert sc.overall == 100.0
     assert any("BLOCKED" in n for n in sc.notes)
+
+
+def _with_attempt(result: TestResult, status: TestStatus, kind: ErrorKind | None = None) -> TestResult:
+    result.attempts = [AttemptResult(attempt=1, status=status, error_kind=kind, latency_ms=1000.0)]
+    return result
+
+
+def _reliability_of(statuses: list[tuple[TestStatus, ErrorKind | None]]) -> float | None:
+    cases = [_case(i) for i in range(len(statuses))]
+    results = [
+        _with_attempt(_result(c, status=status), status, kind)
+        for c, (status, kind) in zip(cases, statuses, strict=True)
+    ]
+    for r, (status, kind) in zip(results, statuses, strict=True):
+        r.error_kind = kind
+    card = build_scorecard(cases, results, [], load_profile("general"))
+    cats = card.categories.values() if isinstance(card.categories, dict) else card.categories
+    rel = next((c for c in cats if c.category == "reliability"), None)
+    return None if rel is None else rel.score
+
+
+def test_errors_of_the_test_set_up_are_not_held_against_the_agents_reliability() -> None:
+    ok = (TestStatus.PASSED, None)
+    browser = (TestStatus.ERROR, ErrorKind.BROWSER_ERROR)
+    assert _reliability_of([ok] * 8 + [browser] * 8) == 100.0, "a dialog covering the page is not the agent's fault"
+    agent_error = (TestStatus.ERROR, ErrorKind.TARGET_ERROR)
+    assert _reliability_of([ok] * 8 + [agent_error] * 2) == 80.0, "an error the agent itself returned still counts"
+    assert _reliability_of([ok] * 9 + [(TestStatus.TIMEOUT, ErrorKind.TIMEOUT)]) == 90.0
+
+
+def test_a_web_target_gets_a_latency_budget_that_a_chat_page_can_meet() -> None:
+    assert select_profile(None, None).latency_budget_ms == load_profile("general").latency_budget_ms
+    assert select_profile(None, None, web=True).latency_budget_ms >= WEB_LATENCY_BUDGET_MS
+    # a profile that already allows more is left alone
+    assert select_profile(None, None, web=True).latency_budget_ms == max(
+        load_profile("general").latency_budget_ms, WEB_LATENCY_BUDGET_MS
+    )
+
+
+def test_blocked_tests_are_described_by_why_they_are_blocked() -> None:
+    policy = [_result(_case(i), status=TestStatus.BLOCKED) for i in range(3)]
+    for r in policy:
+        r.error_kind = ErrorKind.POLICY_BLOCK
+    other = [_result(_case(10), status=TestStatus.BLOCKED)]
+    text = blocked_summary(policy + other)
+    assert text.startswith("4 test(s) blocked:")
+    assert "3 need an authorisation or the owner's attestation" in text and "1 lack a prerequisite" in text
+    assert "prerequisite" not in blocked_summary(policy), "a policy block is not a missing prerequisite"

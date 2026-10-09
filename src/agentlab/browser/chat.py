@@ -13,6 +13,7 @@ import time
 from collections import Counter
 from typing import Any
 
+from agentlab.browser.consent import blocking_consent, consent_hint, dismiss_consent
 from agentlab.core.errors import BrowserError
 
 INPUT_SELECTORS = (
@@ -156,8 +157,16 @@ async def first_visible(page: Any, candidates: tuple[str, ...]) -> Any | None:
     return None
 
 
+INPUT_WAIT_SECONDS = 10.0  # a page that has just loaded may still be drawing its message box
+
+
 async def find_input(page: Any, selector: str | None) -> Any:
-    locator = page.locator(selector).first if selector else await first_visible(page, INPUT_SELECTORS)
+    deadline = time.monotonic() + INPUT_WAIT_SECONDS
+    while True:
+        locator = page.locator(selector).first if selector else await first_visible(page, INPUT_SELECTORS)
+        if locator is not None or time.monotonic() >= deadline:
+            break
+        await asyncio.sleep(0.5)
     if locator is None:
         raise BrowserError("no message box found on the page (set web.input_selector in the target file)")
     return locator
@@ -165,6 +174,26 @@ async def find_input(page: Any, selector: str | None) -> Any:
 
 async def find_send(page: Any, selector: str | None) -> Any | None:
     return page.locator(selector).first if selector else await first_visible(page, SEND_SELECTORS)
+
+
+async def _act(page: Any, consent: str, dismiss_selectors: tuple[str, ...] | list[str], action: Any) -> None:
+    """Do ``action``. If it times out, a dialog that appeared in the meantime may be in the way: close it and try once more.
+    If one is still there, say so, because that (and not the agent) is why nothing was sent."""
+    try:
+        await action()
+        return
+    except Exception as first:
+        if "Timeout" not in type(first).__name__ and "Timeout" not in str(first):
+            raise
+        await dismiss_consent(page, consent, dismiss_selectors)
+        try:
+            await action()
+            return
+        except Exception:
+            shown = await blocking_consent(page)
+            if shown:
+                raise BrowserError(consent_hint(shown, consent)) from None
+            raise first from None
 
 
 async def send_chat(
@@ -175,6 +204,8 @@ async def send_chat(
     send_selector: str | None = None,
     message_selector: str | None = None,
     busy_selector: str | None = None,
+    consent: str = "reject",
+    dismiss_selectors: tuple[str, ...] | list[str] = (),
     wait_seconds: float = 20.0,
 ) -> tuple[str, bool]:
     """Type ``text`` into the page's message box, send it and return ``(reply, replied)``.
@@ -186,15 +217,16 @@ async def send_chat(
 
     ``replied`` is False when no answer appeared in time (the reply is then empty): a page that only ever showed a status
     line did not answer."""
+    await dismiss_consent(page, consent, dismiss_selectors)  # a dialog that appeared since the last message
     box = await find_input(page, input_selector)
     before = await visible_text(page)
     before_messages: list[str] = await page.locator(message_selector).all_inner_texts() if message_selector else []
-    await box.fill(text)
+    await _act(page, consent, dismiss_selectors, lambda: box.fill(text))
     send = await find_send(page, send_selector)
     if send is not None:
-        await send.click()
+        await _act(page, consent, dismiss_selectors, lambda: send.click())
     else:
-        await box.press("Enter")
+        await _act(page, consent, dismiss_selectors, lambda: box.press("Enter"))
     deadline = time.monotonic() + wait_seconds
     last, stable_since = "", time.monotonic()
     while time.monotonic() < deadline:

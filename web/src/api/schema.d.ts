@@ -5736,6 +5736,24 @@ export interface components {
             /** Busy Selector */
             busy_selector?: string | null;
             /**
+             * Consent
+             * @description What to do with a cookie or consent dialog that covers the page: refuse optional cookies (the default; nothing is pressed if the dialog has no such button), accept them, or leave the dialog alone
+             * @default reject
+             * @enum {string}
+             */
+            consent?: "reject" | "accept" | "off";
+            /**
+             * Dismiss Selectors
+             * @description Buttons of a dialog that AgentLab does not recognise by itself; each is pressed when it is showing
+             */
+            dismiss_selectors?: string[];
+            /**
+             * Navigation Timeout Seconds
+             * @description How long to wait for the page to open (its load event)
+             * @default 30
+             */
+            navigation_timeout_seconds?: number;
+            /**
              * Auth Credential
              * @description Name of a stored credential (`POST /credentials`) to use for authenticated requests
              */

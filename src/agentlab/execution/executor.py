@@ -18,7 +18,7 @@ from agentlab.adapters.base import AgentAdapter, TargetRuntime
 from agentlab.adapters.static import NullAdapter
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.enums import ErrorKind, EventType, RiskClass, TestStatus
-from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked
+from agentlab.core.errors import AgentLabError, CredentialError, PolicyBlocked, is_environmental
 from agentlab.core.ids import utcnow
 from agentlab.core.models import (
     AgentProfile,
@@ -257,7 +257,7 @@ class TestExecutor:
         err: AgentLabError | None = None
         try:
             outcome = await engine.run(test, env)
-            err = outcome.error if not outcome.responses else None
+            err = outcome.error if (not outcome.responses or is_environmental(outcome.error)) else None
         except CancelledByUser:
             return AttemptResult(attempt=n, status=TestStatus.SKIPPED, error="cancelled"), None, []
         except LimitReached as lr:
@@ -279,7 +279,7 @@ class TestExecutor:
         status = TestStatus.ERROR
         error_text: str | None = None
         error_kind: ErrorKind | None = None
-        if err is not None and not outcome.responses and not outcome.timed_out:
+        if err is not None and (not outcome.responses or is_environmental(err)) and not outcome.timed_out:
             error_text, error_kind = str(err), err.kind
             trace.record(EventType.ERROR, {"kind": err.kind.value, "message": str(err)})
             status = TestStatus.BLOCKED if isinstance(err, CredentialError) else TestStatus.ERROR

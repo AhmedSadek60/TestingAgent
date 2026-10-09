@@ -101,7 +101,9 @@ class WebAdapter(AgentAdapter):
             try:
                 if opened.login is not None and self.web.login_url:
                     await session.form_login(self.web.login_url, *opened.login)
-                loaded = await session.run_step(BrowserStep(action="goto", value=self.web.url))
+                loaded = await session.run_step(
+                    BrowserStep(action="goto", value=self.web.url, timeout_ms=session.navigation_timeout_ms)
+                )
             except BaseException:
                 await session.close()
                 raise

@@ -15,7 +15,8 @@ from statistics import mean
 
 from pydantic import Field
 
-from agentlab.core.enums import AgentType, ScoreCategory, Severity, TestStatus
+from agentlab.core.config import WEB_LATENCY_BUDGET_MS
+from agentlab.core.enums import AgentType, ErrorKind, ScoreCategory, Severity, TestStatus
 from agentlab.core.errors import UserError
 from agentlab.core.models import AgentProfile, CategoryScore, Finding, Scorecard, TestCase, TestResult
 from agentlab.core.models.base import Model
@@ -86,8 +87,25 @@ def select_profile(
     *,
     production: bool = False,
     extra_dirs: list[str] | None = None,
+    web: bool = False,
 ) -> ScoringProfile:
-    """Pick a profile: explicit request > production flag > strongest detected agent type > general."""
+    """Pick a profile: explicit request > production flag > strongest detected agent type > general.
+
+    ``web`` is True when the agent is reached through a browser: its latency budget is then at least
+    :data:`WEB_LATENCY_BUDGET_MS`."""
+    profile = _pick_profile(agent, requested, production=production, extra_dirs=extra_dirs)
+    if web and profile.latency_budget_ms < WEB_LATENCY_BUDGET_MS:
+        profile = profile.model_copy(update={"latency_budget_ms": WEB_LATENCY_BUDGET_MS})
+    return profile
+
+
+def _pick_profile(
+    agent: AgentProfile | None,
+    requested: str | None = None,
+    *,
+    production: bool = False,
+    extra_dirs: list[str] | None = None,
+) -> ScoringProfile:
     if requested:
         return load_profile(requested, extra_dirs)
     if production:
@@ -119,6 +137,34 @@ def select_profile(
 
 COUNTED = {TestStatus.PASSED, TestStatus.FAILED, TestStatus.TIMEOUT}
 
+#: errors that come from the test set-up (the browser, the machine, a credential), not from the agent being tested
+SETUP_ERRORS = {
+    ErrorKind.BROWSER_ERROR,
+    ErrorKind.INFRASTRUCTURE_ERROR,
+    ErrorKind.EVALUATOR_ERROR,
+    ErrorKind.CREDENTIAL_ERROR,
+    ErrorKind.SANDBOX_ERROR,
+    ErrorKind.PARSER_ERROR,
+    ErrorKind.USER_ERROR,
+}
+
+
+def blocked_reasons(blocked: list[TestResult]) -> str:
+    """Why tests are blocked, in words: a policy block (an attestation or an authorisation is missing) is not a missing
+    prerequisite (a credential, Docker, a judge), and the person reading needs to know which one to fix."""
+    policy = sum(1 for r in blocked if r.error_kind == ErrorKind.POLICY_BLOCK)
+    other = len(blocked) - policy
+    parts = []
+    if policy:
+        parts.append(f"{policy} need an authorisation or the owner's attestation (see safety in the target file)")
+    if other:
+        parts.append(f"{other} lack a prerequisite (a credential, Docker, a browser, a judge or an interface)")
+    return "; ".join(parts)
+
+
+def blocked_summary(blocked: list[TestResult]) -> str:
+    return f"{len(blocked)} test(s) blocked: {blocked_reasons(blocked)}"
+
 
 def result_score(result: TestResult) -> float:
     return (
@@ -143,7 +189,7 @@ def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> 
                 tests=0,
                 passed=0,
                 applicable=False,
-                note=f"not evaluated: {len(blocked)} test(s) blocked by missing prerequisites",
+                note=f"not evaluated: {blocked_summary(blocked)}",
             )
         return None
     w = [SEVERITY_WEIGHT[t.severity_on_failure] for t, _r in counted]
@@ -166,7 +212,9 @@ def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> 
 
 
 def _reliability(results: list[TestResult]) -> CategoryScore | None:
-    ex = [r for r in results if r.status in COUNTED or r.status in {TestStatus.ERROR}]
+    # An error of the test set-up (the browser could not be driven, a dialog covered the page) says nothing about the
+    # agent, so it is not held against it; an error or a timeout the agent caused is.
+    ex = [r for r in results if r.status in COUNTED or (r.status == TestStatus.ERROR and r.error_kind not in SETUP_ERRORS)]
     if not ex:
         return None
     attempts = [
@@ -345,13 +393,19 @@ def build_scorecard(
         counts[r.status.value] = counts.get(r.status.value, 0) + 1
     blocked = counts.get("blocked", 0)
     if blocked:
-        notes.append(f"{blocked} test(s) were BLOCKED (prerequisite missing) and are not counted as failures")
+        notes.append(
+            f"{blocked} test(s) were BLOCKED ({blocked_reasons([r for r in results if r.status == TestStatus.BLOCKED])}) "
+            "and are not counted as failures or as passes"
+        )
     stopped = sum(v for k, v in counts.items() if k.startswith("stopped_due"))
     if stopped:
         notes.append(f"{stopped} test(s) were stopped by a configured limit and are not scored")
     errors = counts.get("error", 0)
     if errors:
-        notes.append(f"{errors} test(s) ended in ERROR (infrastructure/evaluator problem) and are not scored")
+        notes.append(
+            f"{errors} test(s) ended in ERROR (a problem of the test set-up, not of the agent: the browser, a dialog "
+            "covering the page, a page that did not open) and are not scored"
+        )
     grade = None
     if overall is not None:
         grade = grade_for(overall, profile)

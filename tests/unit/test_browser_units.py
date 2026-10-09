@@ -215,3 +215,42 @@ def test_probes_wait_longer_than_the_target_is_allowed_to_take_to_answer() -> No
     assert probe_timeout(TargetSpec(name="t", web={"url": "https://x.test/", "reply_timeout_seconds": 120})) == 135.0
     assert probe_timeout(TargetSpec(name="t", web={"url": "https://x.test/", "reply_timeout_seconds": 10})) == 45.0
     assert probe_timeout(TargetSpec(name="t", api={"url": "https://x.test/", "timeout_seconds": 180})) == 195.0
+
+
+def test_only_problems_of_the_set_up_are_environmental() -> None:
+    from agentlab.core.errors import (
+        BrowserError,
+        InfrastructureError,
+        TargetError,
+        TimeoutExceeded,
+        UserError,
+        is_environmental,
+    )
+
+    assert all(is_environmental(e) for e in (BrowserError("x"), InfrastructureError("x"), TimeoutExceeded("x")))
+    assert not any(is_environmental(e) for e in (TargetError("the agent said no"), UserError("x"), ValueError("x"), None))
+
+
+def test_the_consent_and_navigation_settings_of_a_web_target_are_checked() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from agentlab.core.models import WebConfig
+
+    web = WebConfig(url="https://example.test/")
+    assert (web.consent, web.dismiss_selectors, web.navigation_timeout_seconds) == ("reject", [], 30.0)
+    assert WebConfig(url="https://example.test/", consent="accept", dismiss_selectors=["#ok"]).consent == "accept"
+    for bad in ({"consent": "maybe"}, {"navigation_timeout_seconds": 0}, {"navigation_timeout_seconds": 301}):
+        with pytest.raises(ValidationError):
+            WebConfig(url="https://example.test/", **bad)
+
+
+def test_consent_buttons_are_recognised_by_what_they_say() -> None:
+    from agentlab.browser.consent import ACCEPT, REJECT
+
+    for label in ("Reject all", "Decline", "Necessary only", "Only essential cookies", "No, thanks", "REJECT ALL COOKIES"):
+        assert REJECT.match(label) and not ACCEPT.match(label), label
+    for label in ("Accept all", "I agree", "Allow all cookies", "Got it", "OK"):
+        assert ACCEPT.match(label) and not REJECT.match(label), label
+    for label in ("Settings", "Privacy notice", "Manage preferences", "Send", "Accept the terms of the contract"):
+        assert not REJECT.match(label) and not ACCEPT.match(label), label
