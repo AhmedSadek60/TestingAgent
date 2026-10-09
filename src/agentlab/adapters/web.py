@@ -22,10 +22,9 @@ from agentlab.browser.auth import open_context
 from agentlab.browser.environment import browser_status
 from agentlab.browser.pool import BrowserPool
 from agentlab.browser.session import BrowserSession
-from agentlab.core.errors import BrowserError, TargetError
+from agentlab.core.errors import BrowserError, TargetError, TimeoutExceeded
 from agentlab.core.models import AgentRequest, AgentResponse, BrowserStep, TargetSpec, WebConfig
 
-CHAT_TIMEOUT_MS = 60_000
 PROBE_TIMEOUT_S = 10.0
 
 
@@ -93,7 +92,11 @@ class WebAdapter(AgentAdapter):
             opened = await open_context(self._pool, self.web, self.ctx.credentials)
             page = await opened.guarded.context.new_page()
             session = BrowserSession(
-                opened.guarded, page, web=self.web, default_timeout_ms=self.ctx.config.browser.default_timeout_ms
+                opened.guarded,
+                page,
+                web=self.web,
+                save=self._saver(),
+                default_timeout_ms=self.ctx.config.browser.default_timeout_ms,
             )
             try:
                 if opened.login is not None and self.web.login_url:
@@ -104,7 +107,7 @@ class WebAdapter(AgentAdapter):
                 raise
             if not loaded.ok:
                 await session.close()
-                raise TargetError(f"could not open {self.web.url}: {loaded.detail}")
+                raise BrowserError(f"could not open {self.web.url}: {loaded.detail}")
             self._sessions[session_id] = session
             return session
 
@@ -113,15 +116,37 @@ class WebAdapter(AgentAdapter):
         if session is not None:
             await session.close()
 
+    def _saver(self) -> Any:
+        """Keeps what the browser saw (a screenshot of the page when a step failed) as restricted evidence of the run."""
+        store = self.ctx.artifacts
+        if store is None:
+            return None
+
+        def save(data: bytes, *, kind: str, name: str, media_type: str) -> str | None:
+            ref = store.put(
+                data, kind=kind, name=name, media_type=media_type, run_id=self.ctx.run_id, sensitivity="restricted"
+            )
+            return ref.id
+
+        return save
+
     # ---------------------------------------------------------------------------------------------------- send
     async def send(self, request: AgentRequest) -> AgentResponse:
         session = await self._session(request.session_id)
         t0 = time.perf_counter()
-        outcome = await session.run_step(BrowserStep(action="chat", value=request.input, timeout_ms=CHAT_TIMEOUT_MS))
+        outcome = await session.run_step(
+            BrowserStep(action="chat", value=request.input, timeout_ms=session.reply_timeout_ms)
+        )
+        if not outcome.ok:
+            # The page was never asked, or never answered: that says nothing about the answer, so the test ends in ERROR
+            # (not scored) instead of failing on an empty reply. The screenshot kept at that moment is named in the error.
+            seen = f" [screenshot {session.rec.screenshots[-1]}]" if session.rec.screenshots else ""
+            if outcome.replied is False and outcome.detail.startswith("no reply"):
+                raise TimeoutExceeded(f"{outcome.detail} (waited up to {session.reply_timeout_ms // 1000}s){seen}")
+            raise BrowserError(f"{outcome.detail}{seen}")
         return AgentResponse(
             output=outcome.reply or "",
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
-            error=None if outcome.ok else outcome.detail,
             observed={"browser": True, "url": session.page.url},
         )
 

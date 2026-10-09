@@ -87,8 +87,15 @@ class WebConfig(Model):
     input_selector: str | None = None
     send_selector: str | None = None
     message_selector: str | None = None
+    busy_selector: str | None = None
     auth_credential: str | None = None
     login_url: str | None = None
+    reply_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        le=600,
+        description="How long to wait for the page to answer a message. A slow assistant needs more than a minute.",
+    )
 
 
 class CommandConfig(Model):

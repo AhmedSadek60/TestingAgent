@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from agentlab.browser.chat import is_echo, new_text
+from agentlab.browser.chat import is_echo, is_pending, new_text, strip_controls
 from agentlab.browser.pool import origin_of
 from agentlab.browser.site import DEFAULT_MARKER, LocalSite
 from agentlab.core.errors import PolicyBlocked, UserError
@@ -184,3 +184,34 @@ def test_attachments_come_from_the_fixture_directory_never_from_the_host(tmp_pat
         load_attachment("../outside.txt", tmp_path)
     with pytest.raises(UserError):
         load_attachment("missing.txt", tmp_path)
+
+
+def test_a_status_line_is_pending_and_a_real_answer_is_not() -> None:
+    for status in ("Processing", "Thinking...", "Choosing the right AI for you\u2026", "NEW\nGenerating\u2026"):
+        assert is_pending(status) or status.startswith("NEW"), status
+    assert is_pending("Processing") and is_pending("Choosing the right AI for you\u2026")
+    assert not is_pending("")
+    assert not is_pending("The capital of France is Paris.")
+    assert not is_pending("Paris")
+    # a real answer that merely starts like a status line is long and does not end in an ellipsis
+    assert not is_pending("Choosing a laptop depends on your needs and your budget.")
+    assert not is_pending("Loading the page is slow because of the network, so check your cache first.")
+
+
+def test_the_labels_of_the_pages_buttons_are_not_part_of_the_reply() -> None:
+    controls = {"new chat", "copy", "listen", "regenerate", "stop"}
+    assert strip_controls("NEW CHAT\n391\nCOPY\nLISTEN\nREGENERATE", controls) == "391"
+    assert strip_controls("Copy of the contract is attached.", controls) == "Copy of the contract is attached."
+    assert strip_controls("COPY", controls) == ""
+    assert strip_controls("Send COPY", controls | {"send"}) == ""  # two labels side by side on one line
+    assert strip_controls("COPY | LISTEN | REGENERATE", controls) == ""
+
+
+def test_probes_wait_longer_than_the_target_is_allowed_to_take_to_answer() -> None:
+    from agentlab.core.models import TargetSpec
+    from agentlab.discovery.probe import probe_timeout
+
+    assert probe_timeout(TargetSpec(name="t", mock={"behaviors": ["success"]})) == 45.0
+    assert probe_timeout(TargetSpec(name="t", web={"url": "https://x.test/", "reply_timeout_seconds": 120})) == 135.0
+    assert probe_timeout(TargetSpec(name="t", web={"url": "https://x.test/", "reply_timeout_seconds": 10})) == 45.0
+    assert probe_timeout(TargetSpec(name="t", api={"url": "https://x.test/", "timeout_seconds": 180})) == 195.0

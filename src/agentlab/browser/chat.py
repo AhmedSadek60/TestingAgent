@@ -8,6 +8,7 @@ text appears on the page after sending, once it has stopped changing: pages stre
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections import Counter
 from typing import Any
@@ -32,6 +33,72 @@ SEND_SELECTORS = (
 QUIET_SECONDS = 0.8  # text that has not changed for this long is the finished answer
 POLL_SECONDS = 0.2
 MAX_TEXT_CHARS = 50_000
+
+
+# What a page shows while it is still working on an answer. That text is not the answer, however long it stays on screen.
+PENDING_WORDS = re.compile(
+    r"^\W*(processing|thinking|generating|loading|typing|searching|analy[sz]ing|working|please wait|one moment)\W*$", re.I
+)
+PENDING_MAX_CHARS = 60  # a line this short that ends in an ellipsis ("Choosing the right AI for you\u2026") is a status
+STOP_BUTTON = re.compile(r"^\s*stop( generating| response)?\s*$", re.I)  # shown while an answer is being written
+MAX_CONTROL = 40  # a button or link label is short; a reply that long is never mistaken for one
+
+
+def is_pending(reply: str) -> bool:
+    """Whether ``reply`` is only a status line ("Processing", "Thinking\u2026", "Choosing the right AI for you\u2026").
+
+    A reply that has real text in it, or that is long, is not pending."""
+    lines = [line.strip() for line in reply.splitlines() if line.strip()]
+    if not lines:
+        return False
+    return all(
+        PENDING_WORDS.match(line) or (len(line) <= PENDING_MAX_CHARS and line.endswith(("\u2026", "...")))
+        for line in lines
+    )
+
+
+SEPARATORS = " \t|\u00b7\u2022/\\-\u2013\u2014,;:"
+
+
+def strip_controls(reply: str, controls: set[str]) -> str:
+    """The reply without the lines that consist only of the labels of buttons and links on the page ("NEW CHAT",
+    "COPY | LISTEN | REGENERATE"): page furniture that appeared with the answer, not part of it.
+
+    A line with any other word in it is kept whole, so an answer that happens to contain a label is not touched."""
+    labels = sorted((c for c in controls if c), key=len, reverse=True)
+    kept: list[str] = []
+    for line in reply.splitlines():
+        rest = " ".join(line.split()).casefold()
+        for label in labels:
+            rest = rest.replace(label, " ")
+        if rest.strip(SEPARATORS):
+            kept.append(line)
+    return "\n".join(kept).strip()
+
+
+async def page_controls(page: Any) -> set[str]:
+    """The labels of the visible buttons, links and menu items of the page, lower-cased."""
+    try:
+        labels = await page.eval_on_selector_all(
+            "button, a, [role=button], [role=menuitem], summary",
+            "els => els.filter(e => e.offsetParent !== null).map(e => (e.innerText || e.getAttribute('aria-label') || '').trim())",
+        )
+    except Exception:
+        return set()
+    return {" ".join(t.split()).casefold() for t in labels if t and len(t) <= MAX_CONTROL}
+
+
+async def is_busy(page: Any, busy_selector: str | None) -> bool:
+    """Whether the page says it is still writing: a visible *Stop* button, or the element the owner named."""
+    candidates = [page.locator(busy_selector).first] if busy_selector else []
+    candidates.append(page.get_by_role("button", name=STOP_BUTTON).first)
+    for locator in candidates:
+        try:
+            if await locator.count() and await locator.is_visible():
+                return True
+        except Exception:  # noqa: S112 - a selector that cannot be evaluated says nothing about the page
+            continue
+    return False
 
 
 LABEL_CHARS = " :-\u2013\u2014>\u00b7\u2022\t"
@@ -107,11 +174,18 @@ async def send_chat(
     input_selector: str | None = None,
     send_selector: str | None = None,
     message_selector: str | None = None,
+    busy_selector: str | None = None,
     wait_seconds: float = 20.0,
 ) -> tuple[str, bool]:
     """Type ``text`` into the page's message box, send it and return ``(reply, replied)``.
 
-    ``replied`` is False when nothing new appeared in time (the reply is then empty)."""
+    The reply is final when it has stopped changing **and** the page is not still working: a status line such as
+    "Processing" or "Thinking\u2026", a visible *Stop* button, or the element named by ``busy_selector`` all mean the
+    answer is still being written, however long they stay on screen. Without ``message_selector`` the labels of the
+    page's own buttons and links are removed from what is read.
+
+    ``replied`` is False when no answer appeared in time (the reply is then empty): a page that only ever showed a status
+    line did not answer."""
     box = await find_input(page, input_selector)
     before = await visible_text(page)
     before_messages: list[str] = await page.locator(message_selector).all_inner_texts() if message_selector else []
@@ -132,9 +206,17 @@ async def send_chat(
                 m.strip() for m in messages[len(before_messages) :] if m.strip() and m.strip() != text.strip()
             )
         else:
-            reply = new_text(before, now_text, text)
+            reply = strip_controls(new_text(before, now_text, text), await page_controls(page))
         if reply != last:
             last, stable_since = reply, time.monotonic()
-        elif reply and time.monotonic() - stable_since >= QUIET_SECONDS:
+        elif (
+            reply
+            and time.monotonic() - stable_since >= QUIET_SECONDS
+            and not is_pending(reply)
+            and not await is_busy(page, busy_selector)
+        ):
             return reply, True
+    # The time is up. A status line is not an answer; what was written so far, while the page was still busy, is returned.
+    if is_pending(last):
+        return "", False
     return last, bool(last)

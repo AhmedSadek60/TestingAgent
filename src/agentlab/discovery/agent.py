@@ -27,7 +27,7 @@ from agentlab.core.enums import EventType
 from agentlab.core.errors import AgentLabError, UserError
 from agentlab.core.models import AgentProfile, TargetSpec, ToolInfo
 from agentlab.discovery.fingerprint import FingerprintInputs, build_profile
-from agentlab.discovery.probe import Prober, ProbeResult
+from agentlab.discovery.probe import Prober, ProbeResult, probe_timeout
 from agentlab.documents.analyzer import DocumentAnalyzer, extract_facts
 from agentlab.documents.models import AnalyzedDocument
 from agentlab.repository.analyzer import RepositoryAnalyzer
@@ -221,7 +221,7 @@ class TargetDiscoveryAgent:
                             if facts:
                                 rag_q = facts[0].question
                                 break
-                        probe_res = await Prober(adapter, rag_question=rag_q).run()
+                        probe_res = await Prober(adapter, timeout=probe_timeout(spec), rag_question=rag_q).run()
                         warnings += [f"probe: {e}" for e in probe_res.errors]
                 mcp_adapter = rt.adapters.get("mcp") if rt else None
                 if mcp_adapter is not None and hasattr(mcp_adapter, "discover_tools"):

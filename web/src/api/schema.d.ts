@@ -5733,6 +5733,8 @@ export interface components {
              * @description CSS selector of the replies
              */
             message_selector?: string | null;
+            /** Busy Selector */
+            busy_selector?: string | null;
             /**
              * Auth Credential
              * @description Name of a stored credential (`POST /credentials`) to use for authenticated requests
@@ -5743,6 +5745,12 @@ export interface components {
              * @description Page to sign in on first
              */
             login_url?: string | null;
+            /**
+             * Reply Timeout Seconds
+             * @description How long to wait for the page to answer a message. A slow assistant needs more than a minute.
+             * @default 60
+             */
+            reply_timeout_seconds?: number;
         };
     };
     responses: never;

@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
+from pydantic import ValidationError
 
 from agentlab.adapters.base import AdapterContext
 from agentlab.adapters.web import WebAdapter
@@ -26,11 +27,12 @@ from agentlab.browser.pool import BrowserPool
 from agentlab.browser.session import BrowserSession
 from agentlab.browser.site import LocalSite
 from agentlab.core.config import AgentLabConfig
-from agentlab.core.errors import CredentialError
+from agentlab.core.errors import BrowserError, CredentialError, TimeoutExceeded
 from agentlab.core.models import AgentRequest, BrowserStep, TargetSpec, WebConfig
 from agentlab.fixtures import BrowserAgentFixture
 from agentlab.security.credentials import CredentialManager, CredentialProfile, EncryptedSecretStore
 from agentlab.security.egress import EgressPolicy
+from agentlab.storage.artifacts import MemoryArtifactStore
 from tests.support.browser import browser_ok
 from tests.support.servers import serve
 
@@ -247,6 +249,65 @@ async def test_the_login_form_is_filled_in_and_the_password_is_not_recorded(pool
     await s.close()
 
 
+async def test_a_single_page_login_that_finishes_after_the_click_is_not_mistaken_for_a_failure(
+    pool: BrowserPool, site: Any
+) -> None:
+    """A page that signs in without loading another page removes its form a moment after the click."""
+    _state, url = site
+    page_html = (
+        "<form onsubmit=\"event.preventDefault(); setTimeout(() => document.querySelector('form').remove(), 1500)\">"
+        "<input name=username type=text><input type=password><button type=submit>Sign in</button></form>"
+    )
+    s = await new_session(pool)
+    await s.page.route(url + "/login", lambda route: route.fulfill(status=200, content_type="text/html", body=page_html))
+    await s.form_login(url + "/login", "demo", "hunter2-not-a-secret")
+    login = next(a for a in s.rec.actions if a["action"] == "login")
+    assert login["ok"]
+    await s.close()
+
+
+CHAT_PAGE = """<button>NEW CHAT</button><div id=log></div><input id=m><button id=send onclick="go()">Send</button>
+<script>
+function go() {
+  const log = document.getElementById('log'); const q = document.getElementById('m').value;
+  log.innerHTML += '<div>' + q + '</div><div id=bot>%s</div>';
+  %s
+}
+</script>"""
+FINISHES = """const stop = document.createElement('button'); stop.textContent = 'STOP'; document.body.appendChild(stop);
+  setTimeout(() => { document.getElementById('bot').textContent = 'Paris is the capital of France.'; stop.remove();
+    const copy = document.createElement('button'); copy.textContent = 'COPY'; document.body.appendChild(copy); }, 2500);"""
+
+
+async def test_a_status_line_and_a_stop_button_are_not_the_reply_and_page_buttons_are_not_part_of_it(
+    pool: BrowserPool, site: Any
+) -> None:
+    """The page shows "Processing\u2026" and a STOP button for a while, then the answer and a COPY button."""
+    _state, url = site
+    s = await new_session(pool)
+    html = CHAT_PAGE % ("Processing\u2026", FINISHES)
+    await s.page.route(url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html))
+    await s.page.goto(url + "/chat-test")
+    from agentlab.browser.chat import send_chat
+
+    reply, replied = await send_chat(s.page, "What is the capital of France?", wait_seconds=15)
+    assert replied and reply == "Paris is the capital of France."
+    await s.close()
+
+
+async def test_a_page_that_only_ever_shows_a_status_line_did_not_answer(pool: BrowserPool, site: Any) -> None:
+    _state, url = site
+    s = await new_session(pool)
+    html = CHAT_PAGE % ("Thinking\u2026", "")
+    await s.page.route(url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html))
+    await s.page.goto(url + "/chat-test")
+    from agentlab.browser.chat import send_chat
+
+    reply, replied = await send_chat(s.page, "What is the capital of France?", wait_seconds=3)
+    assert (reply, replied) == ("", False)
+    await s.close()
+
+
 async def test_a_login_that_keeps_asking_is_blocked_not_failed(pool: BrowserPool) -> None:
     lookalike = LocalSite(lookalike=True)
     with lookalike.serve() as url:
@@ -373,6 +434,41 @@ async def test_a_message_typed_into_the_page_is_answered(pool: BrowserPool, surf
     assert reply.error is None and "Paris" in reply.output
     assert "What is the capital" not in reply.output, "the echo of the question is not part of the reply"
     await adapter.close()
+
+
+async def test_a_page_that_never_answers_is_a_timeout_error_not_an_empty_answer(
+    pool: BrowserPool, surf: TargetSpec
+) -> None:
+    """No reply says nothing about the answer: the test must end in ERROR, not fail its checks on an empty reply."""
+    store = MemoryArtifactStore()
+    adapter = adapter_for(surf, pool, message_selector=".nothing-matches-this", reply_timeout_seconds=2)
+    adapter.ctx.artifacts = store
+    await adapter.open()
+    sid = await adapter.new_session()
+    with pytest.raises(TimeoutExceeded, match=r"no reply appeared.*waited up to 2s\) \[screenshot sha256-") as caught:
+        await adapter.send(AgentRequest(input="What is the capital of France?", session_id=sid))
+    shot = str(caught.value).split("[screenshot ")[1].rstrip("]")
+    assert store.get(shot).startswith(b"\x89PNG"), "the screenshot of the page is kept as evidence"
+    await adapter.close()
+
+
+async def test_a_page_that_cannot_be_opened_is_a_browser_error_not_an_empty_answer(
+    pool: BrowserPool, surf: TargetSpec
+) -> None:
+    adapter = adapter_for(surf, pool, url="http://127.0.0.1:9/")
+    await adapter.open()
+    sid = await adapter.new_session()
+    with pytest.raises(BrowserError, match="could not open"):
+        await adapter.send(AgentRequest(input="hello", session_id=sid))
+    await adapter.close()
+
+
+def test_the_reply_wait_of_a_web_target_is_bounded() -> None:
+    assert WebConfig(url="https://example.test/").reply_timeout_seconds == 60.0
+    assert WebConfig(url="https://example.test/", reply_timeout_seconds=180).reply_timeout_seconds == 180
+    for bad in (0, -1, 601):
+        with pytest.raises(ValidationError):
+            WebConfig(url="https://example.test/", reply_timeout_seconds=bad)
 
 
 async def test_explicit_selectors_read_exactly_the_messages_of_the_agent(pool: BrowserPool, surf: TargetSpec) -> None:

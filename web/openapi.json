@@ -11946,6 +11946,17 @@
             "title": "Message Selector",
             "description": "CSS selector of the replies"
           },
+          "busy_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy Selector"
+          },
           "auth_credential": {
             "anyOf": [
               {
@@ -11969,6 +11980,14 @@
             ],
             "title": "Login Url",
             "description": "Page to sign in on first"
+          },
+          "reply_timeout_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Reply Timeout Seconds",
+            "description": "How long to wait for the page to answer a message. A slow assistant needs more than a minute.",
+            "default": 60.0
           }
         },
         "additionalProperties": false,
