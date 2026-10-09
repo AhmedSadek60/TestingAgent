@@ -12,6 +12,10 @@ $ agentlab test --mock success --intensity quick        # the built-in demo agen
 The demo agent is a stand-in that answers only what a simple script can, so the run reports findings and ends with exit
 code 1 ([the codes](docs/testing-agents.md#exit-codes)).
 
+**Status:** version 0.1.0, not yet tagged or published, and tested on Linux only. What was not verified (a deployment on
+Railway, the hosted model providers with real keys, other operating systems, an independent security review) is listed
+part by part in [docs/development.md](docs/development.md#verification-status).
+
 * **It plans before it runs.** A test plan is explained: which skills were chosen and why, what each test is for, what
   is predicted to be blocked and what the budget trimmed. `--plan-only` stops there.
 * **It judges in three layers.** Deterministic checks decide first; an LLM judge, independent of the agent under test,
@@ -51,12 +55,31 @@ says nothing about your agent, and the command ends with exit code 1 because it 
 [testing-agents.md](docs/testing-agents.md#exit-codes)). To test yours, describe it in `target.yaml` or pass flags such
 as `--api-url http://localhost:8000/chat`, and start with `--plan-only`: [testing-agents.md](docs/testing-agents.md).
 
-The web interface, served by the same process as the API:
+The web interface is served by the same process as the API. An eight-step wizard describes a target and ends in a plan
+you can read before anything runs; a run is shown as it happens; and there are screens for results, findings, the
+scorecard, traces, reports, the comparison of two runs, skills, providers and credentials:
 
 ```bash
 cd web && npm ci && npm run build && cd ..
 agentlab serve                       # http://127.0.0.1:8080
 ```
+
+### The commands
+
+These are all the commands. Each one takes `--help`.
+
+| Command | What it does |
+|---|---|
+| `agentlab init` | Writes `agentlab.yaml`, `target.yaml`, a `skills/` folder and the private `.agentlab/` data folder. |
+| `agentlab doctor` | Checks what this machine can do: Docker, a browser, providers, storage, skills. |
+| `agentlab discover` | Fingerprints a target with harmless probes: what kind of agent it is, its tools, interfaces and risks. |
+| `agentlab test` | Discovers, plans, runs safely, evaluates, scores and reports. `--plan-only` stops at the plan. |
+| `agentlab report`, `compare`, `review` | Write the reports of a finished run, compare two runs, and record a person's review beside an evaluation without changing it. |
+| `agentlab runs` | Lists the stored runs and shows a result, a plan or a finding. |
+| `agentlab skills`, `providers`, `models`, `credentials` | The test skills, the configured model providers and the models they offer, and the encrypted test credentials. |
+| `agentlab fixtures` | Example agents with planted defects: serves one, prints its target file, or proves that AgentLab finds the defects. |
+| `agentlab serve`, `worker` | The REST API with the web interface, and a worker for the Redis queue. |
+| `agentlab plugins` | Lists the installed plug-ins. |
 
 ## What it can test
 
@@ -84,9 +107,10 @@ providers, other operating systems) is in [docs/development.md](docs/development
 
 * **Docker:** one image runs the API, the web interface and the worker, with Compose files for Redis and PostgreSQL
   ([installation.md](docs/installation.md#docker)).
-* **Railway:** one service from the same Dockerfile, with a PostgreSQL service and one volume. The files are in the
-  repository, but **it has not been deployed on Railway**: [deployment-railway.md](docs/deployment-railway.md) says what
-  was checked and what was not.
+* **Railway:** one service built from the same Dockerfile (it serves the API, the web interface and the jobs), a
+  PostgreSQL service and one volume at `/data`. Set `AGENTLAB_API_TOKEN` and `RAILWAY_RUN_UID=0`, then follow
+  [the six steps](docs/deployment-railway.md#deploy). The files are in the repository, but **it has not been deployed on
+  Railway**: [deployment-railway.md](docs/deployment-railway.md) says what was checked and what was not.
 
 A server that listens beyond loopback needs an API token and refuses to start without one. It has no accounts and no TLS
 of its own: read [security.md](docs/security.md#web-interface-and-api) before exposing it.
@@ -124,7 +148,10 @@ through a pull request with a human review; [CONTRIBUTING.md](CONTRIBUTING.md) h
 python3 scripts/ai/validate_governance.py        # the governance files (Python 3 only)
 ```
 
-The checks for the code and the pages are in [docs/development.md](docs/development.md#the-checks).
+[docs/development.md](docs/development.md#where-things-are) lists where things are in the repository and, under
+[the checks](docs/development.md#the-checks), the commands that check the code and the pages. The `CI` workflow
+([`ci.yml`](.github/workflows/ci.yml)) runs them on every pull request and every push to `main`; the governance
+validator has a workflow of its own.
 
 ### Worktree workflow
 
