@@ -246,9 +246,7 @@ class BrowserSession:
             state = await self._ready_state()
             if state not in {"interactive", "complete"} or self.page.url in {"", "about:blank"}:
                 self.rec.load_failed = True
-                return StepOutcome(
-                    False, f"navigation failed: {str(exc).splitlines()[0][:200]}", environmental=True
-                )
+                return StepOutcome(False, f"navigation failed: {str(exc).splitlines()[0][:200]}", environmental=True)
             return StepOutcome(True, f"loaded {self.page.url} (its load event did not fire within {timeout // 1000}s)")
         self.rec.http_status = response.status if response else None
         if response is not None and response.status >= 400:

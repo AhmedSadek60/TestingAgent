@@ -214,7 +214,9 @@ def _category_from_tests(cat: str, items: list[tuple[TestCase, TestResult]]) -> 
 def _reliability(results: list[TestResult]) -> CategoryScore | None:
     # An error of the test set-up (the browser could not be driven, a dialog covered the page) says nothing about the
     # agent, so it is not held against it; an error or a timeout the agent caused is.
-    ex = [r for r in results if r.status in COUNTED or (r.status == TestStatus.ERROR and r.error_kind not in SETUP_ERRORS)]
+    ex = [
+        r for r in results if r.status in COUNTED or (r.status == TestStatus.ERROR and r.error_kind not in SETUP_ERRORS)
+    ]
     if not ex:
         return None
     attempts = [

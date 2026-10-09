@@ -259,7 +259,9 @@ async def test_a_single_page_login_that_finishes_after_the_click_is_not_mistaken
         "<input name=username type=text><input type=password><button type=submit>Sign in</button></form>"
     )
     s = await new_session(pool)
-    await s.page.route(url + "/login", lambda route: route.fulfill(status=200, content_type="text/html", body=page_html))
+    await s.page.route(
+        url + "/login", lambda route: route.fulfill(status=200, content_type="text/html", body=page_html)
+    )
     await s.form_login(url + "/login", "demo", "hunter2-not-a-secret")
     login = next(a for a in s.rec.actions if a["action"] == "login")
     assert login["ok"]
@@ -286,7 +288,9 @@ async def test_a_status_line_and_a_stop_button_are_not_the_reply_and_page_button
     _state, url = site
     s = await new_session(pool)
     html = CHAT_PAGE % ("Processing\u2026", FINISHES)
-    await s.page.route(url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html))
+    await s.page.route(
+        url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html)
+    )
     await s.page.goto(url + "/chat-test")
     from agentlab.browser.chat import send_chat
 
@@ -299,7 +303,9 @@ async def test_a_page_that_only_ever_shows_a_status_line_did_not_answer(pool: Br
     _state, url = site
     s = await new_session(pool)
     html = CHAT_PAGE % ("Thinking\u2026", "")
-    await s.page.route(url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html))
+    await s.page.route(
+        url + "/chat-test", lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html)
+    )
     await s.page.goto(url + "/chat-test")
     from agentlab.browser.chat import send_chat
 
@@ -638,7 +644,9 @@ async def test_a_step_that_could_not_be_done_is_a_set_up_error_and_a_wrong_answe
     _state, url = site
     s = await new_session(pool)
     missing = await s.run_step(BrowserStep(action="click", target="#does-not-exist", timeout_ms=800))
-    assert not missing.ok and missing.environmental, "no such button: nothing was asked, nothing is known about the agent"
+    assert not missing.ok and missing.environmental, (
+        "no such button: nothing was asked, nothing is known about the agent"
+    )
     await s.page.route(url + "/gone", lambda route: route.fulfill(status=404, content_type="text/html", body="no"))
     answered = await s.run_step(BrowserStep(action="goto", value=url + "/gone"))
     assert not answered.ok and not answered.environmental, "HTTP 404 is what the page answered"
@@ -682,4 +690,6 @@ async def test_a_browser_test_whose_click_cannot_be_done_ends_in_error_not_in_a_
             )
         result = next(r for r in lab.store.list_results(out.run_id) if r.test_id == "USER-TWO-TURNS-001")
         assert result.status == TestStatus.ERROR and result.error_kind == ErrorKind.BROWSER_ERROR
-        assert "no-such-send-button" in (result.attempts[0].error or "") or "Timeout" in (result.attempts[0].error or "")
+        assert "no-such-send-button" in (result.attempts[0].error or "") or "Timeout" in (
+            result.attempts[0].error or ""
+        )

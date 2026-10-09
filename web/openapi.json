@@ -11955,7 +11955,8 @@
                 "type": "null"
               }
             ],
-            "title": "Busy Selector"
+            "title": "Busy Selector",
+            "description": "A CSS selector that is visible while the page is still writing its answer; the reply is not final while it shows (a visible Stop button and status lines such as 'Processing' are recognised without it)"
           },
           "consent": {
             "type": "string",

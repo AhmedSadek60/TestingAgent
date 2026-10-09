@@ -95,7 +95,7 @@ async def dismiss_consent(page: Any, mode: str = "reject", selectors: tuple[str,
         containers = page.locator(css)
         try:
             n = min(await containers.count(), 5)
-        except Exception:
+        except Exception:  # noqa: S112 - a selector the page cannot evaluate says nothing about a dialog; try the next
             continue
         for i in range(n):
             container = containers.nth(i)
@@ -122,7 +122,7 @@ async def blocking_consent(page: Any) -> str | None:
         containers = page.locator(css)
         try:
             n = min(await containers.count(), 5)
-        except Exception:
+        except Exception:  # noqa: S112 - a selector the page cannot evaluate says nothing about a dialog; try the next
             continue
         for i in range(n):
             container = containers.nth(i)

@@ -228,7 +228,9 @@ def test_only_problems_of_the_set_up_are_environmental() -> None:
     )
 
     assert all(is_environmental(e) for e in (BrowserError("x"), InfrastructureError("x"), TimeoutExceeded("x")))
-    assert not any(is_environmental(e) for e in (TargetError("the agent said no"), UserError("x"), ValueError("x"), None))
+    assert not any(
+        is_environmental(e) for e in (TargetError("the agent said no"), UserError("x"), ValueError("x"), None)
+    )
 
 
 def test_the_consent_and_navigation_settings_of_a_web_target_are_checked() -> None:
@@ -248,7 +250,14 @@ def test_the_consent_and_navigation_settings_of_a_web_target_are_checked() -> No
 def test_consent_buttons_are_recognised_by_what_they_say() -> None:
     from agentlab.browser.consent import ACCEPT, REJECT
 
-    for label in ("Reject all", "Decline", "Necessary only", "Only essential cookies", "No, thanks", "REJECT ALL COOKIES"):
+    for label in (
+        "Reject all",
+        "Decline",
+        "Necessary only",
+        "Only essential cookies",
+        "No, thanks",
+        "REJECT ALL COOKIES",
+    ):
         assert REJECT.match(label) and not ACCEPT.match(label), label
     for label in ("Accept all", "I agree", "Allow all cookies", "Got it", "OK"):
         assert ACCEPT.match(label) and not REJECT.match(label), label

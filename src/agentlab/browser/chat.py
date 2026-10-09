@@ -38,7 +38,8 @@ MAX_TEXT_CHARS = 50_000
 
 # What a page shows while it is still working on an answer. That text is not the answer, however long it stays on screen.
 PENDING_WORDS = re.compile(
-    r"^\W*(processing|thinking|generating|loading|typing|searching|analy[sz]ing|working|please wait|one moment)\W*$", re.I
+    r"^\W*(processing|thinking|generating|loading|typing|searching|analy[sz]ing|working|please wait|one moment)\W*$",
+    re.I,
 )
 PENDING_MAX_CHARS = 60  # a line this short that ends in an ellipsis ("Choosing the right AI for you\u2026") is a status
 STOP_BUTTON = re.compile(r"^\s*stop( generating| response)?\s*$", re.I)  # shown while an answer is being written

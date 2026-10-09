@@ -221,7 +221,11 @@ class SkillContext:
         """The latency a reply should stay under: what the owner set (``evaluation.latency_budget_ms``), else the default,
         raised for an agent reached through a web page (rendering and a model's time to write the answer)."""
         evaluation = self.config.evaluation
-        if "latency_budget_ms" not in evaluation.model_fields_set and "web" in self.interfaces and "api" not in self.interfaces:
+        if (
+            "latency_budget_ms" not in evaluation.model_fields_set
+            and "web" in self.interfaces
+            and "api" not in self.interfaces
+        ):
             return max(evaluation.latency_budget_ms, WEB_LATENCY_BUDGET_MS)
         return evaluation.latency_budget_ms
 

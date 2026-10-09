@@ -87,7 +87,11 @@ class WebConfig(Model):
     input_selector: str | None = None
     send_selector: str | None = None
     message_selector: str | None = None
-    busy_selector: str | None = None
+    busy_selector: str | None = Field(
+        default=None,
+        description="A CSS selector that is visible while the page is still writing its answer; the reply is not final "
+        "while it shows (a visible Stop button and status lines such as 'Processing' are recognised without it)",
+    )
     consent: Literal["reject", "accept", "off"] = Field(
         default="reject",
         description="What to do with a cookie or consent dialog that covers the page: refuse optional cookies (the "

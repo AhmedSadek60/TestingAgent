@@ -5733,7 +5733,10 @@ export interface components {
              * @description CSS selector of the replies
              */
             message_selector?: string | null;
-            /** Busy Selector */
+            /**
+             * Busy Selector
+             * @description A CSS selector that is visible while the page is still writing its answer; the reply is not final while it shows (a visible Stop button and status lines such as 'Processing' are recognised without it)
+             */
             busy_selector?: string | null;
             /**
              * Consent

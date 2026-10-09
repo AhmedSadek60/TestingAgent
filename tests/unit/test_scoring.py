@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from agentlab.core.config import WEB_LATENCY_BUDGET_MS
 from agentlab.core.enums import ErrorKind, Severity, TestStatus, normalize_score_category
 from agentlab.core.models import AttemptResult, Finding, TestCase, TestResult
-from agentlab.core.config import WEB_LATENCY_BUDGET_MS
 from agentlab.evaluation.scoring import blocked_summary, build_scorecard, grade_ceiling, load_profile, select_profile
 
 
