@@ -70,7 +70,9 @@ def test_only_caddy_is_published_to_the_world_and_every_other_port_is_on_the_loo
     assert services["api"]["ports"] == [], "the API is reached through Caddy only: the base file's host port is reset"
     assert services["caddy"]["ports"] == ["443:443"]
     for name in ("postgres", "ollama"):
-        assert all(str(p).startswith("127.0.0.1:") for p in services[name]["ports"]), f"{name} must stay on the loopback"
+        assert all(str(p).startswith("127.0.0.1:") for p in services[name]["ports"]), (
+            f"{name} must stay on the loopback"
+        )
     assert "ports" not in services["worker"] and "ports" not in services.get("redis", {})
 
 
