@@ -41,7 +41,7 @@ def canonical_hash(obj: Any) -> str:
 def normalise_database_url(url: str) -> str:
     """The URL a hosting platform hands out, in the form SQLAlchemy needs for the driver AgentLab installs.
 
-    Railway, Heroku, Render and others give a PostgreSQL URL as ``postgres://`` or ``postgresql://``. SQLAlchemy opens
+    Hosting platforms (Heroku, Render and others) give a PostgreSQL URL as ``postgres://`` or ``postgresql://``. SQLAlchemy opens
     those with psycopg2, which AgentLab does not install (it uses psycopg 3), so both mean ``postgresql+psycopg://``.
     A URL that names its driver, and every other database, is returned as it is."""
     for scheme in ("postgres://", "postgresql://"):

@@ -18,6 +18,9 @@ flowchart LR
   worker --- vol
 ```
 
+Changes reach this server through [the staged release process](development.md#the-staged-release-process), whose last step
+(`scripts/ship.py publish`) rebuilds and replaces the API and worker and rolls back if the smoke test fails.
+
 ## Set up
 
 ```bash

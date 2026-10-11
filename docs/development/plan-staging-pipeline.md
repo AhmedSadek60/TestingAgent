@@ -1,24 +1,26 @@
-# Implementation Plan: A staged release process, and removing Railway
+# Implementation Plan: A staged release process, and removing the hosted-platform deployment path
 
 - Issue: none yet (unknown)
 - Author / agent: Claude Code
 - Risk class: HIGH RISK (CI/CD process, deployment, merge policy, deletion of a deployment path)
 - Date: 2026-10-11
-- Status: **waiting for human approval of the open decisions below. Nothing in this plan has been run.**
+- Status: decisions answered on 2026-10-11 (1: amend `AGENTS.md`; 2: delete the history too; 3: publish automatically after the
+  merge); implemented in the pull request that carries this file. Record: [ADR 0010](../decisions/0010-staged-release-process.md).
 
 ## Objective
 
 1. Every change reaches the system through the same nine steps: test locally, verify, open a pull request, wait for the
    checks, verify they are green, fix what is red, repeat until green, merge to `main`, publish to the system link
    (the dashboard on the VPS).
-2. Railway is removed from the whole system: the repository and the VPS.
+2. The deployment path for a single hosted-container service (one service, one volume) is removed from the whole system: the
+   repository and the VPS. The server is deployed with the Compose files in `docker/` ([deployment-vps.md](../deployment-vps.md)).
 
 ## Context and constraints
 
 | Fact | Evidence |
 |---|---|
-| Railway appears in 5 file names (`railway.json`, `docker/railway-start.sh`, `docker/agentlab.railway.yaml`, `docs/deployment-railway.md`, `docs/decisions/0007-railway-one-service-one-volume.md`) and in 178 lines of about 20 files: the Dockerfile, `tests/integration/test_deploy_files.py`, README, installation, architecture, development, assumptions, the first implementation plan, the changelog, and one comment each in `src/agentlab/storage/db.py` and `tests/unit/test_storage.py`. | `git grep -i railway` |
-| The VPS has **no Railway service, CLI, environment variable, cron job, systemd unit, Docker volume or container**. The only trace is two files inside the running image (`/usr/local/bin/agentlab-railway-start`, `/etc/agentlab/railway.yaml`), copied there by the Dockerfile. Other matches are old build logs, a stale scratch copy of this repository under `/tmp`, and the unrelated `simple-rag` repository's own `railway.toml`. | `find`, `docker`, `crontab`, `systemctl` on 2026-10-11 |
+| The hosted-platform path was 5 files (its configuration, start script, runtime configuration, guide and decision record) and 178 lines in about 20 others: the Dockerfile, the deploy-files tests, the README, installation, architecture, development and assumptions pages, the first implementation plan, the changelog, and a comment each in `src/agentlab/storage/db.py` and `tests/unit/test_storage.py`. | `git grep` for the platform's name |
+| The VPS had **no service, CLI, environment variable, cron job, systemd unit, Docker volume or container** of that platform. The only trace was two files inside the running image, copied there by the Dockerfile. Other matches were old build logs, a stale scratch copy of this repository under `/tmp`, and the unrelated `simple-rag` repository's own platform file. | `find`, `docker`, `crontab`, `systemctl` on 2026-10-11 |
 | The CI workflow (`.github/workflows/ci.yml`) has four jobs: `python (lint, types, tests)`, `web (types, tests, build)`, `image (docker build)` and `validate-governance`. | the workflow file and the check runs of PR 5 |
 | The server has no GitHub credentials. A pull request, its checks and its merge need the GitHub API; pushing needs a credential too. `gh` is not installed. | earlier session |
 | `AGENTS.md` section 8: "Never merge your own work, bypass review". Step 8 of the requested process merges. | `AGENTS.md` |
@@ -27,7 +29,7 @@
 
 ## Proposed approach
 
-### A. The release script, `scripts/ship` (new, in the repository)
+### A. The release script, `scripts/ship.py` (new, in the repository)
 
 One script with one sub-command per stage, so a person or an agent runs the same steps and nobody has to remember them.
 
@@ -40,28 +42,28 @@ One script with one sub-command per stage, so a person or an agent runs the same
 | 7 loop | `scripts/ship check && scripts/ship pr && scripts/ship wait` | Runs again on the new head. Repeat until `wait` exits 0. A run that has not changed after a push is a stalled check, not a pass. | |
 | 8 merge | `scripts/ship merge` | Merges only if every check on the **current head** is `success`, the pull request is mergeable, and no review requests changes. Uses a merge commit and pins the head sha, so a push after the checks cannot be merged by mistake. | any condition fails |
 | 9 publish | `scripts/ship publish` | On the VPS: fast-forward the checkout to `main`, take a backup, build the image, replace the API and worker, and run the smoke test (`/health` 200; an API route 401 without the token and 200 with it; the web interface 200). On failure it puts the previous image back and reports. | the smoke test fails (it then rolls back) |
-| all | `scripts/ship all` | Runs 1 to 9 in order and stops at the first problem, saying which step and why. | |
+| all | `scripts/ship.py all` | Runs 1 to 9 in order and stops at the first problem, saying which step and why. | |
 
 The credential is read from `/root/.config/agentlab-ship/github-token` (owner-only, outside the repository, created by the owner;
 fine-grained, one repository, pull requests read and write, contents read and write, actions read, short expiry). It is never
 printed or logged and never written into a git config.
 
-### B. Removing Railway
+### B. Removing the hosted-platform path
 
 Repository:
-1. Delete `railway.json`, `docker/railway-start.sh`, `docker/agentlab.railway.yaml` and `docs/deployment-railway.md`.
-2. `docker/Dockerfile`: remove the two `COPY` lines for the Railway files and the comments that explain Railway's builder; keep
-   `PORT` (generic) and the health check; drop "no VOLUME" reasoning that exists only for Railway.
-3. `tests/integration/test_deploy_files.py`: remove the Railway tests (railway.json, the start script, the Railway configuration);
-   keep the tests that are not Railway-specific (git installed, health check answered without a token).
-4. Docs: README, installation, architecture, development, assumptions and the first implementation plan lose their Railway
-   sections and point to `docs/deployment-vps.md`; the quick path becomes the VPS Compose stack. The changelog keeps its history and
-   gains a "Removed" entry. `src/agentlab/storage/db.py` and `tests/unit/test_storage.py` keep the generic `postgres://` URL support
-   and lose the platform's name from their comments.
-5. ADR 0007 is **superseded, not deleted** (ADR 0010: "Railway is no longer a deployment target"); see decision 2.
+1. Delete its four files (configuration as code, start script, runtime configuration, deployment guide).
+2. `docker/Dockerfile`: remove the two `COPY` lines for them and the comments that explain that platform's builder; keep `PORT`
+   (generic) and the health check.
+3. `tests/integration/test_deploy_files.py`: replace the tests of those files with tests of the files that ship now (the VPS
+   Compose overlay, Caddy, the seccomp profile, the server configuration, the image, and "no secret in a deployment file").
+4. Docs: README, installation, architecture, development, assumptions and the first implementation plan lose that platform's
+   sections and point to `docs/deployment-vps.md`. The changelog loses the entries that described it and gains a "Removed" entry.
+   `src/agentlab/storage/db.py` and `tests/unit/test_storage.py` keep the generic `postgres://` URL support and lose the platform's
+   name from their comments.
+5. Its decision record is deleted, as the owner chose (decision 2); the git history keeps it.
 
-VPS: nothing to uninstall. The rebuilt image (step 9) no longer contains the two Railway files; the old build logs and the stale
-scratch copy are deleted by name. The unrelated `simple-rag` clone is left alone.
+VPS: nothing to uninstall. The rebuilt image (step 9) no longer contains the two files; the old build logs and the stale scratch
+copy are deleted by name. The unrelated `simple-rag` clone is left alone.
 
 ### C. Documentation of the process
 `CONTRIBUTING.md` and `docs/development.md` describe the nine steps and the script; `AGENTS.md` is changed only as decision 1 says.
@@ -70,19 +72,19 @@ scratch copy are deleted by name. The unrelated `simple-rag` clone is left alone
 
 - **Do the merge and publish in GitHub Actions.** Rejected for now: it needs deployment secrets in GitHub and wider CI permissions
   (section 13 of `AGENTS.md`), and the server is the only place that can build and restart the stack. A later ADR can revisit it.
-- **Delete ADR 0007.** Rejected by the repository's own rule that ADRs are history; decision 2 lets the owner overrule.
-- **Keep a thin Railway note in the docs.** Rejected: the request is to remove it from the whole system.
+- **Keep the decision record as superseded history.** The repository's own rule for ADRs; the owner chose to delete it instead.
+- **Keep a thin note in the docs.** Rejected: the request is to remove the path from the whole system.
 
 ## Affected components and files
 
-New: `scripts/ship`, `docs/decisions/0010-...`, this plan. Changed: the files listed in B and C. Deleted: the four Railway files.
+New: `scripts/ship.py`, `docs/decisions/0010-...`, this plan. Changed: the files listed in B and C. Deleted: the four files of that path and its decision record.
 Not touched: application code (other than a comment), the CI workflow, branch protection, secrets.
 
 ## Verification plan
 
 1. `scripts/ship check` on the branch (it is the test of the script as much as of the change).
-2. `git grep -i railway` returns only the ADR history, the changelog history and `docs/development/plan-staging-pipeline.md`.
-3. The stack on the VPS is rebuilt and `scripts/ship publish`'s smoke test passes; `docker exec ... ls /usr/local/bin/agentlab-railway-start` fails.
+2. `git grep` for the platform's name returns nothing.
+3. The stack on the VPS is rebuilt and the publish step's smoke test passes; the start script of the removed path is absent from the container.
 4. A dry run of `scripts/ship wait` and `scripts/ship merge` on this plan's own pull request, including a deliberately red check.
 
 ## Risks, rollback, migrations
@@ -94,7 +96,7 @@ Not touched: application code (other than a comment), the CI workflow, branch pr
 - **Merging is the step the repository's rules protect.** The script refuses to merge unless every check on the head is green; it
   is not a substitute for branch protection, which is a repository security setting (see decisions).
 - **The token on the server** is the new sensitive item: scoped to one repository, short expiry, revoked after use.
-- Rollback of the whole change: revert the merge commit; the Railway files return from history.
+- Rollback of the whole change: revert the merge commit; the removed files return from history.
 
 ## Irreversible steps and human approval point
 
@@ -106,7 +108,7 @@ Approve the decisions below. Until then nothing is deleted, pushed or published.
 1. **May the pipeline merge its own pull request?** `AGENTS.md` forbids it today. Options: amend section 8 so the staged pipeline may
    merge once every check on the head is green and the owner has enabled it; or keep the rule, so the pipeline stops after step 7
    and a person merges.
-2. **ADR 0007 and the changelog:** keep as superseded history (recommended), or delete the Railway ADR too.
+2. **The removed path's decision record and changelog entries:** keep as superseded history (recommended), or delete them too.
 3. **Publish:** automatically after a merge, or only when asked.
 4. Assumed: the "system link" is the dashboard at the server's address; and that branch protection (required checks on `main`) is
    recommended but left to the owner, because it is a repository security setting.

@@ -9,6 +9,17 @@ All notable changes to this project are written here. The format follows
 AgentLab 0.1.0 is the version `pyproject.toml` declares. Nothing has been tagged or published: this is what the first
 pull request adds to the governance template the repository started as.
 
+### Added
+
+* `scripts/ship.py`, the staged release process: `check` (what CI runs, locally), `pr`, `wait`, `merge` (only when every check on the
+  exact head is green) and `publish` (backup, build, smoke test, rollback) ([ADR 0010](docs/decisions/0010-staged-release-process.md)).
+
+### Removed
+
+* The deployment files for a single hosted-container service with one volume (its configuration, start script, runtime
+  configuration, guide and decision record). A server is deployed with the Compose files in `docker/` and
+  `docs/deployment-vps.md`; the image no longer contains a start script for a platform.
+
 ### Fixed
 
 * Web targets: a page that cannot be opened, a control that cannot be clicked, or no answer within the wait now end the
@@ -81,8 +92,6 @@ pull request adds to the governance template the repository started as.
 **Deployment**
 
 - One Docker image for the API, the interface and the jobs, with Compose files for Redis and PostgreSQL.
-- Files for one Railway service with a PostgreSQL service and one volume (`railway.json`, `docker/railway-start.sh`,
-  `docker/agentlab.railway.yaml`). **It has not been deployed on Railway.**
 
 **Example agents**
 
@@ -107,7 +116,7 @@ pull request adds to the governance template the repository started as.
   client certificates, and the S3 and Qdrant backends are **not supported**, and AgentLab says so where one is asked for.
 - The hosted model providers (Gemini, OpenRouter, OpenAI, Anthropic) were run only against local stand-ins of their
   APIs; Ollama was also run against a real server.
-- The Railway files have not been run on Railway. The image cannot run Docker containers or a browser, so those tests
+- The image cannot run Docker containers or a browser, so those tests
   are blocked there.
 - Linux is the only platform it was run on, and nobody outside the project has audited it for security.
 

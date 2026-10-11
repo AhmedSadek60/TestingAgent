@@ -12,8 +12,8 @@ $ agentlab test --mock success --intensity quick        # the built-in demo agen
 The demo agent is a stand-in that answers only what a simple script can, so the run reports findings and ends with exit
 code 1 ([the codes](docs/testing-agents.md#exit-codes)).
 
-**Status:** version 0.1.0, not yet tagged or published, and tested on Linux only. What was not verified (a deployment on
-Railway, the hosted model providers with real keys, other operating systems, an independent security review) is listed
+**Status:** version 0.1.0, not yet tagged or published, and tested on Linux only. What was not verified (the hosted model
+providers with real keys, other operating systems, an independent security review) is listed
 part by part in [docs/development.md](docs/development.md#verification-status).
 
 * **It plans before it runs.** A test plan is explained: which skills were chosen and why, what each test is for, what
@@ -100,17 +100,16 @@ endpoint, and a built-in offline mock. **The hosted providers were verified only
 Reports are written as JSON, Markdown, HTML and PDF, versioned and checksummed. Two runs can be compared, and a person
 can review a result without the original evaluation ever being rewritten: [reports.md](docs/reports.md).
 
-Everything above says what was implemented. What was *verified*, how, and what was not (Railway itself, the hosted
+Everything above says what was implemented. What was *verified*, how, and what was not (the hosted
 providers, other operating systems) is in [docs/development.md](docs/development.md#verification-status).
 
 ## Run it as a service
 
 * **Docker:** one image runs the API, the web interface and the worker, with Compose files for Redis and PostgreSQL
   ([installation.md](docs/installation.md#docker)).
-* **Railway:** one service built from the same Dockerfile (it serves the API, the web interface and the jobs), a
-  PostgreSQL service and one volume at `/data`. Set `AGENTLAB_API_TOKEN` and `RAILWAY_RUN_UID=0`, then follow
-  [the six steps](docs/deployment-railway.md#deploy). The files are in the repository, but **it has not been deployed on
-  Railway**: [deployment-railway.md](docs/deployment-railway.md) says what was checked and what was not.
+* **One server, no domain:** the Compose stack behind Caddy (TLS on the server's address), a local judge model and a worker
+  with Chromium: [deployment-vps.md](docs/deployment-vps.md). Changes reach it through
+  [the staged release process](docs/development.md#the-staged-release-process).
 
 A server that listens beyond loopback needs an API token and refuses to start without one. It has no accounts and no TLS
 of its own: read [security.md](docs/security.md#web-interface-and-api) before exposing it.
@@ -131,7 +130,6 @@ of its own: read [security.md](docs/security.md#web-interface-and-api) before ex
 | [Reports](docs/reports.md) | Formats, comparison of runs, human review, the API for reports. |
 | [Plug-ins](docs/plugins.md) | What can be added, how, and what is not pluggable. |
 | [Architecture](docs/architecture.md) | The parts, the seventeen phases of a run, the principles. |
-| [Deploying on Railway](docs/deployment-railway.md) | The deployment, its variables and what was verified. |
 | [Deploying on a VPS](docs/deployment-vps.md) | The Compose stack behind Caddy on one server with no domain, and what was verified. |
 | [Development](docs/development.md) | Setting up, the checks, the tests, and the verification status. |
 | [Assumptions](docs/assumptions.md) | What was decided where the requirements left room. |

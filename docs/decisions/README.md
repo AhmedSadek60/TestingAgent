@@ -17,7 +17,7 @@ accepted by human review, not by an agent.
 [0004](0004-one-origin-interface-and-signed-report-links.md) — One origin for the API and the interface; reports shown from signed, short-lived links — Proposed
 [0005](0005-blocked-is-not-failed-independent-judge.md) — BLOCKED is not FAILED; the judge is independent of the target — Proposed
 [0006](0006-reviews-never-rewrite-the-evaluation.md) — Human reviews sit beside the evaluation and never rewrite it — Proposed
-[0007](0007-railway-one-service-one-volume.md) — On Railway, one service with one volume, the jobs inside it — Proposed
 [0008](0008-vps-compose-with-caddy.md) — On a single VPS, the Compose stack with Caddy in front — Proposed
 
 [0009](0009-chromium-in-the-worker-with-a-userns-seccomp-profile.md) — Chromium in the worker, with a seccomp profile that allows user namespaces — Proposed
+[0010](0010-staged-release-process.md) — A staged release process, merged and published by a script — Proposed

@@ -59,7 +59,7 @@ Where a page describes a decision in full, this one links to it instead of repea
 - The sandbox image is `mirror.gcr.io/library/python:3.12-slim`, a mirror of the official image. Any image can be named
   in `security.sandbox.image`.
 - The Docker image of AgentLab has **no Docker client and no browser**, so on a platform that only runs that image the
-  tests that need them are BLOCKED, with the reason ([deployment-railway.md](deployment-railway.md#what-does-not-work-on-railway)).
+  tests that need them are BLOCKED, with the reason ([deployment-vps.md](deployment-vps.md#what-the-web-containers-can-and-cannot-do)).
 - Cloud metadata endpoints (`169.254.169.254` and friends) are always blocked by the egress policy.
   Private networks are allowed by default because most targets under test are local; this is configurable.
 - A target is **never assumed to be authorised**: adversarial tests against a non-local target need
@@ -165,16 +165,14 @@ Where a page describes a decision in full, this one links to it instead of repea
 
 ## Deployment
 
-- **On Railway, one service**: the API, the interface and the jobs together (`queue.backend: inline`, one replica),
-  a PostgreSQL service and one volume ([ADR 0007](decisions/0007-railway-one-service-one-volume.md)).
-- **Targets on private networks are refused on Railway** (`security.allow_private_networks: false`), because a token
-  holder could otherwise point a target at an address only the Railway project can reach, such as a database.
-- **The start script runs as root only for one `chown`** (`RAILWAY_RUN_UID=0`, a volume is owned by root), then
-  drops to the image's unprivileged user with `no_new_privs`. The Dockerfile has no `VOLUME` instruction, which
-  Railway's builder refuses.
+- **On one server, the Compose stack** (API, worker, Redis, PostgreSQL) behind Caddy, which makes a certificate for the
+  server's address because there is no domain ([ADR 0008](decisions/0008-vps-compose-with-caddy.md)); the worker has Chromium
+  with its own sandbox, through a seccomp profile that allows user namespaces ([ADR 0009](decisions/0009-chromium-in-the-worker-with-a-userns-seccomp-profile.md)).
+- **Targets on private networks are allowed by default** (`security.allow_private_networks: true`), because most targets
+  under test are local; a server on the public internet should set it to `false`, because a token holder could otherwise
+  point a target at an address only the server can reach, such as its database.
 - **The server stops with a message that names `AGENTLAB_API_TOKEN`** when it listens beyond loopback without one.
-- **It has not been deployed on Railway**, because no account was available: [deployment-railway.md](deployment-railway.md#what-was-verified-and-what-was-not)
-  lists what was checked against a container started the way Railway documents and what was not.
+- **What was verified on the server, and what was not** is in [deployment-vps.md](deployment-vps.md#what-was-verified-and-what-was-not).
 
 ## Explicitly unsupported
 
