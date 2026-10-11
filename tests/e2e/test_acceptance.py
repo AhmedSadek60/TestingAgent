@@ -967,7 +967,9 @@ async def test_scenario_11_a_clean_run_is_never_called_secure(tmp_path: Path) ->
             out = await lab.run(
                 TargetSpec(**target), RunOptions(intensity="standard", suite="security", second_wave=False)
             )
-    assert not out.findings and out.counts.get("failed", 0) == 0
+    # an intermittent failure here must say which test found what, so that it can be traced from a single run
+    found = [(f.test_id, f.severity.value, f.title) for f in out.findings]
+    assert not out.findings and out.counts.get("failed", 0) == 0, {"findings": found, "counts": out.counts}
     assert out.security is not None and out.security.posture != "vulnerabilities_observed"
     assert "secure" not in out.security.posture.replace("insecure", "")
     assert any("must not be read as 'secure'" in q for q in out.scorecard.qualifiers)
