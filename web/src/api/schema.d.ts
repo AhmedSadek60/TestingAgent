@@ -24,6 +24,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How people can sign in here
+         * @description Answers without a token: whether registration is open, how long a password must be, and which ways of signing in this server offers. The sign-in page asks this before anyone is signed in.
+         */
+        get: operations["auth_options_auth_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register an account
+         * @description Creates an account with the server's default role (a reporter unless the owner chose otherwise) and, when registration is open, signs the person in. With `approval` the account waits for an administrator; with `closed` this is refused. Registrations are limited per client address.
+         */
+        post: operations["register_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with a password
+         * @description Checks the user name and password and starts a session: the cookie is HttpOnly and SameSite=Strict (Secure over HTTPS). The answer carries the CSRF token to send as `X-CSRF-Token` on requests that change something. Wrong answers are slowed down, and repeated wrong passwords lock the account for a while.
+         */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -852,10 +912,272 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who am I
+         * @description The caller as the server sees it: a signed-in person, the shared API token or the local machine, with the role and what it allows. The web interface asks this to decide what to show.
+         */
+        get: operations["me_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out
+         * @description Ends the session of the cookie that was sent, on the server, and clears the cookie. Signing out of a session that has already ended is not an error.
+         */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my password
+         * @description Checks the current password, applies the password rules to the new one, and ends every other session of this account. Needed once after an administrator made or reset the account with a temporary password.
+         */
+        post: operations["change_password_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accounts
+         * @description Every account with its role and status, oldest first. Administrators only.
+         */
+        get: operations["list_users_users_get"];
+        put?: never;
+        /**
+         * Create an account
+         * @description Makes an account with the role given. With no password a temporary one is made and returned once; either way the person must change it at the first sign-in. Administrators only.
+         */
+        post: operations["create_user_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change an account
+         * @description Changes the role, the status (approve a pending account, disable or enable one) or the display name. A role or status change ends the account's sessions. The last active administrator cannot be demoted or disabled.
+         */
+        patch: operations["update_user_users__user_id__patch"];
+        trace?: never;
+    };
+    "/users/{user_id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset a password
+         * @description Sets a temporary password, returned once, ends the account's sessions and unlocks it. The person must change the password at the next sign-in. There is no e-mail: hand it over yourself.
+         */
+        post: operations["reset_password_users__user_id__reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock an account
+         * @description Clears the lock that repeated wrong passwords set, so the person can try again at once.
+         */
+        post: operations["unlock_user_users__user_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Account audit trail
+         * @description The most recent registrations, sign-ins (and failures), locks, role and status changes, password changes and resets. Contains no password, hash or token. Administrators only.
+         */
+        get: operations["account_events_users_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountEventOut
+         * @description One line of the account audit trail.
+         */
+        AccountEventOut: {
+            /**
+             * Event
+             * @description What happened: registered, signed_in, sign_in_failed, locked, role_changed, ...
+             */
+            event: string;
+            /**
+             * Actor
+             * @description Who did it (a user name, or empty)
+             */
+            actor: string;
+            /**
+             * Subject
+             * @description The account it was done to
+             */
+            subject: string;
+            /**
+             * Client
+             * @description The network address it came from
+             */
+            client: string;
+            /**
+             * Detail
+             * @description Facts about the event; never a password or a token
+             */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * At
+             * Format: date-time
+             * @description When
+             */
+            at: string;
+        };
+        /**
+         * AccountOut
+         * @description An account. Never contains a password, a hash or a session.
+         */
+        AccountOut: {
+            /**
+             * Id
+             * @description The account's id
+             */
+            id: string;
+            /**
+             * Username
+             * @description The user name
+             */
+            username: string;
+            /**
+             * Display Name
+             * @description The name shown to other people
+             */
+            display_name: string;
+            /**
+             * Email
+             * @description The e-mail address the person gave, if any
+             */
+            email: string | null;
+            /**
+             * Role
+             * @description reporter: Feedback & Support only; maintainer: everything the shared token reaches plus triage; admin: a maintainer who also manages accounts
+             * @enum {string}
+             */
+            role: "reporter" | "maintainer" | "admin";
+            /**
+             * Status
+             * @description pending: waiting for an administrator to approve it
+             * @enum {string}
+             */
+            status: "active" | "pending" | "disabled";
+            /**
+             * Must Change Password
+             * @description True while the password is a temporary one that has to be replaced
+             */
+            must_change_password: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When the account was made
+             */
+            created_at: string;
+            /**
+             * Last Login At
+             * @description When the person last signed in
+             */
+            last_login_at: string | null;
+            /**
+             * Locked Until
+             * @description Set while the account is locked after repeated wrong passwords
+             */
+            locked_until: string | null;
+        };
         /**
          * AgentProfile
          * @description Output of the TargetDiscoveryAgent (spec section 5).
@@ -1387,6 +1709,33 @@ export interface components {
             trace_id?: string | null;
         };
         /**
+         * AuthOptions
+         * @description What the sign-in page needs to know before anyone is signed in.
+         */
+        AuthOptions: {
+            /**
+             * Registration
+             * @description Who may create an account on this server
+             * @enum {string}
+             */
+            registration: "open" | "approval" | "closed";
+            /**
+             * Min Password Length
+             * @description The shortest password a new account may have
+             */
+            min_password_length: number;
+            /**
+             * Api Token Sign In
+             * @description Whether this server also accepts the shared API token in the web interface
+             */
+            api_token_sign_in: boolean;
+            /**
+             * Password Sign In
+             * @description Whether sign-in with a user name and password is available
+             */
+            password_sign_in: boolean;
+        };
+        /**
          * Body_upload_document_documents_post
          * @description The multipart form of a document upload
          */
@@ -1669,6 +2018,22 @@ export interface components {
             note?: string | null;
         };
         /**
+         * ChangePasswordRequest
+         * @description Changing the password of the signed-in account.
+         */
+        ChangePasswordRequest: {
+            /**
+             * Current Password
+             * @description The password in use now
+             */
+            current_password: string;
+            /**
+             * New Password
+             * @description The new password
+             */
+            new_password: string;
+        };
+        /**
          * CommandConfig
          * @description A target run as a command inside the sandbox (coding/CLI agents).
          *
@@ -1925,6 +2290,39 @@ export interface components {
              * @default
              */
             note?: string;
+        };
+        /**
+         * CreateUserRequest
+         * @description An administrator making an account.
+         */
+        CreateUserRequest: {
+            /**
+             * Username
+             * @description The user name
+             */
+            username: string;
+            /**
+             * Role
+             * @description The role to give
+             * @enum {string}
+             */
+            role: "reporter" | "maintainer" | "admin";
+            /**
+             * Password
+             * @description A password; when omitted a temporary one is made
+             */
+            password?: string | null;
+            /**
+             * Display Name
+             * @description The name shown to other people
+             * @default
+             */
+            display_name?: string;
+            /**
+             * Email
+             * @description Optional e-mail address, shown to administrators only
+             */
+            email?: string | null;
         };
         /**
          * CredentialCreate
@@ -3056,6 +3454,22 @@ export interface components {
             side_effects?: string;
         };
         /**
+         * LoginRequest
+         * @description A user name and a password.
+         */
+        LoginRequest: {
+            /**
+             * Username
+             * @description The user name (case does not matter)
+             */
+            username: string;
+            /**
+             * Password
+             * @description The password
+             */
+            password: string;
+        };
+        /**
          * ManifestDifference
          * @description One thing that differs between two runs' manifests
          */
@@ -3142,6 +3556,54 @@ export interface components {
             env?: {
                 [key: string]: string;
             };
+        };
+        /**
+         * MeOut
+         * @description Who the server believes is calling, and what that allows.
+         */
+        MeOut: {
+            /**
+             * Kind
+             * @description user: a signed-in person; service: the shared API token; local: a machine that needs no token
+             * @enum {string}
+             */
+            kind: "user" | "service" | "local";
+            /**
+             * Role
+             * @description The role the caller has
+             * @enum {string}
+             */
+            role: "reporter" | "maintainer" | "admin";
+            /**
+             * Username
+             * @description The user name, for a signed-in person
+             */
+            username: string | null;
+            /**
+             * Display Name
+             * @description The name shown to other people
+             */
+            display_name: string | null;
+            /**
+             * Must Change Password
+             * @description True while the password is a temporary one: only changing it is allowed
+             */
+            must_change_password: boolean;
+            /**
+             * Csrf Token
+             * @description Send this value as X-CSRF-Token on every request that changes something, when authenticated by cookie
+             */
+            csrf_token: string | null;
+            /**
+             * Operator
+             * @description Whether the caller may use runs, targets, credentials and reports
+             */
+            operator: boolean;
+            /**
+             * Can Manage Accounts
+             * @description Whether the caller may use the account administration endpoints
+             */
+            can_manage_accounts: boolean;
         };
         /**
          * MetricDelta
@@ -3635,6 +4097,48 @@ export interface components {
              * @description Why the adapter cannot be built, if it cannot
              */
             configured_error?: string | null;
+        };
+        /**
+         * RegisterRequest
+         * @description A person asking for an account.
+         */
+        RegisterRequest: {
+            /**
+             * Username
+             * @description 3 to 64 characters: letters, digits, dot, dash, underscore
+             */
+            username: string;
+            /**
+             * Password
+             * @description The password; the server's rules say what is accepted
+             */
+            password: string;
+            /**
+             * Display Name
+             * @description The name shown to other people (default: the user name)
+             * @default
+             */
+            display_name?: string;
+            /**
+             * Email
+             * @description Optional. Only shown to administrators; nothing is sent to it
+             */
+            email?: string | null;
+        };
+        /**
+         * RegistrationOut
+         * @description The result of registering.
+         */
+        RegistrationOut: {
+            /** @description The new account */
+            account: components["schemas"]["AccountOut"];
+            /**
+             * Signed In
+             * @description False when the account has to be approved by an administrator first
+             */
+            signed_in: boolean;
+            /** @description The signed-in caller, when the account was active at once */
+            me: components["schemas"]["MeOut"] | null;
         };
         /**
          * ReliabilityStats
@@ -4624,6 +5128,16 @@ export interface components {
             };
         };
         /**
+         * SessionOut
+         * @description The result of signing in or registering.
+         */
+        SessionOut: {
+            /** @description The signed-in caller */
+            me: components["schemas"]["MeOut"];
+            /** @description The account */
+            account: components["schemas"]["AccountOut"];
+        };
+        /**
          * SettingsOut
          * @description The server's configuration as the interface may show it: nothing secret, and nothing the API can change.
          */
@@ -5009,6 +5523,19 @@ export interface components {
                     [key: string]: unknown;
                 };
             };
+        };
+        /**
+         * TemporaryPassword
+         * @description An account together with the temporary password that was set for it. Shown once.
+         */
+        TemporaryPassword: {
+            /** @description The account */
+            account: components["schemas"]["AccountOut"];
+            /**
+             * Temporary Password
+             * @description The temporary password, to be handed to the person once. It must be changed at the next sign-in
+             */
+            temporary_password: string | null;
         };
         /**
          * TestCase
@@ -5693,6 +6220,27 @@ export interface components {
             evidence?: components["schemas"]["Evidence"][];
         };
         /**
+         * UpdateUserRequest
+         * @description What an administrator may change about an account.
+         */
+        UpdateUserRequest: {
+            /**
+             * Role
+             * @description The new role
+             */
+            role?: ("reporter" | "maintainer" | "admin") | null;
+            /**
+             * Status
+             * @description The new status
+             */
+            status?: ("active" | "pending" | "disabled") | null;
+            /**
+             * Display Name
+             * @description The new display name
+             */
+            display_name?: string | null;
+        };
+        /**
          * ViewLink
          * @description A short-lived link that shows a report in a sandboxed frame
          */
@@ -5798,6 +6346,209 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    auth_options_auth_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthOptions"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    register_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -9031,6 +9782,611 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_password_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_users_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_user_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemporaryPassword"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_user_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of an account, from `GET /users` */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reset_password_users__user_id__reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of an account, from `GET /users` */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemporaryPassword"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unlock_user_users__user_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of an account, from `GET /users` */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    account_events_users_events_get: {
+        parameters: {
+            query?: {
+                /** @description Largest number of events to return (at most 500) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEventOut"][];
                 };
             };
             /** @description The API token is missing or wrong */

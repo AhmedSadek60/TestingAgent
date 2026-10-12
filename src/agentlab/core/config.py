@@ -258,6 +258,40 @@ class ServerConfig(Model):
     serve_ui: bool = Field(default=True, description="Serve the web interface at / when it has been built")
 
 
+class AccountsConfig(Model):
+    """People who sign in to the web interface: who may register, how long a session lasts, how passwords are held to account."""
+
+    registration: Literal["open", "approval", "closed"] = Field(
+        default="open",
+        description="Who may create an account: `open` (anyone who reaches the server, as a reporter), `approval` (anyone may "
+        "ask; an admin activates the account) or `closed` (an admin creates every account)",
+    )
+    default_role: Literal["reporter", "maintainer"] = Field(
+        default="reporter",
+        description="The role of an account made by registration. A reporter may use Feedback & Support only; a maintainer "
+        "has everything the shared API token has. Keep `reporter` on a server that anyone can reach",
+    )
+    session_idle_minutes: int = Field(
+        default=60, ge=5, le=10_080, description="A session ends after this long without a request"
+    )
+    session_absolute_hours: int = Field(
+        default=12, ge=1, le=720, description="A session ends this long after sign-in, whatever it does"
+    )
+    min_password_length: int = Field(default=12, ge=8, le=128, description="The shortest password accepted")
+    max_failed_attempts: int = Field(
+        default=5, ge=3, le=20, description="Wrong passwords in a row before an account is locked"
+    )
+    lock_minutes: int = Field(default=15, ge=1, le=1_440, description="How long a locked account stays locked")
+    registrations_per_hour: int = Field(
+        default=5, ge=1, le=1_000, description="Registrations accepted per client address per hour"
+    )
+    cookie_secure: Literal["auto", "always", "never"] = Field(
+        default="auto",
+        description="Whether the session cookie is marked Secure: `auto` when the request came over HTTPS (or a proxy said "
+        "so with X-Forwarded-Proto), `always`, or `never` (a plain-HTTP deployment on a trusted network)",
+    )
+
+
 #: A reply read from a web page includes the page's own rendering and, for an assistant, a model's time to write it. A
 #: latency budget written for an API (a few seconds) would score every web chat as slow, so an agent reached only through
 #: a browser gets at least this much unless the owner sets one (evaluation.latency_budget_ms).
@@ -276,6 +310,7 @@ class AgentLabConfig(Model):
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     queue: QueueConfig = Field(default_factory=QueueConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+    accounts: AccountsConfig = Field(default_factory=AccountsConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4
     skill_dirs: list[str] = Field(default_factory=list)

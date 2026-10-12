@@ -157,6 +157,22 @@ databases as `UTF8` where you can: `SQL_ASCII` does not check that its text is v
 | `allowed_paths` | `[]` | Folders on the server that a request may point a target at. Empty means API clients cannot name server paths at all (uploads are always allowed). |
 | `serve_ui` | `true` | Serve the web interface at `/` when it has been built. |
 
+## `accounts`
+
+People who sign in to the web interface: [accounts.md](accounts.md). The shared API token (`server.token_ref`) is unchanged.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `registration` | `open` | Who may create an account: `open` (anyone who reaches the server, with the `default_role`), `approval` (anyone may ask; an admin activates the account) or `closed` (an admin creates every account). |
+| `default_role` | `reporter` | The role of an account made by registration. A reporter may use Feedback & Support only; a maintainer has everything the shared token has. Keep `reporter` on a server that anyone can reach. |
+| `session_idle_minutes` | `60` | A session ends after this long without a request. |
+| `session_absolute_hours` | `12` | A session ends this long after sign-in, whatever it does. |
+| `min_password_length` | `12` | The shortest password accepted. |
+| `max_failed_attempts` | `5` | Wrong passwords in a row before an account is locked. |
+| `lock_minutes` | `15` | How long a locked account stays locked. |
+| `registrations_per_hour` | `5` | Registrations accepted per client address per hour. |
+| `cookie_secure` | `auto` | Whether the session cookie is marked Secure: `auto` when the request came over HTTPS (or a proxy said so with `X-Forwarded-Proto`), `always`, or `never`. |
+
 ## `planning`
 
 | Key | Default | Meaning |

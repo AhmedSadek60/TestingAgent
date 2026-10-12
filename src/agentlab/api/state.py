@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import Request
 
+from agentlab.accounts import AccountService
 from agentlab.api.security import LinkSigner, TokenGuard
 from agentlab.jobs.queue import JobQueue
 from agentlab.jobs.worker import Worker
@@ -18,6 +19,7 @@ class ApiState:
     services: Services
     queue: JobQueue
     guard: TokenGuard
+    accounts: AccountService | None = None
     worker: Worker | None = None
     uploads_dir: Path = field(default_factory=lambda: Path(".agentlab/uploads"))
     allowed_roots: list[Path] = field(default_factory=list)

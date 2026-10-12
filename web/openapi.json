@@ -31,6 +31,242 @@
         }
       }
     },
+    "/auth/options": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "How people can sign in here",
+        "description": "Answers without a token: whether registration is open, how long a password must be, and which ways of signing in this server offers. The sign-in page asks this before anyone is signed in.",
+        "operationId": "auth_options_auth_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Register an account",
+        "description": "Creates an account with the server's default role (a reporter unless the owner chose otherwise) and, when registration is open, signs the person in. With `approval` the account waits for an administrator; with `closed` this is refused. Registrations are limited per client address.",
+        "operationId": "register_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Sign in with a password",
+        "description": "Checks the user name and password and starts a session: the cookie is HttpOnly and SameSite=Strict (Secure over HTTPS). The answer carries the CSRF token to send as `X-CSRF-Token` on requests that change something. Wrong answers are slowed down, and repeated wrong passwords lock the account for a while.",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects": {
       "get": {
         "tags": [
@@ -4448,10 +4684,885 @@
           }
         }
       }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Who am I",
+        "description": "The caller as the server sees it: a signed-in person, the shared API token or the local machine, with the role and what it allows. The web interface asks this to decide what to show.",
+        "operationId": "me_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Sign out",
+        "description": "Ends the session of the cookie that was sent, on the server, and clears the cookie. Signing out of a session that has already ended is not an error.",
+        "operationId": "logout_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Change my password",
+        "description": "Checks the current password, applies the password rules to the new one, and ends every other session of this account. Needed once after an administrator made or reset the account with a temporary password.",
+        "operationId": "change_password_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "List accounts",
+        "description": "Every account with its role and status, oldest first. Administrators only.",
+        "operationId": "list_users_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccountOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Users Users Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Create an account",
+        "description": "Makes an account with the role given. With no password a temporary one is made and returned once; either way the person must change it at the first sign-in. Administrators only.",
+        "operationId": "create_user_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPassword"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}": {
+      "patch": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Change an account",
+        "description": "Changes the role, the status (approve a pending account, disable or enable one) or the display name. A role or status change ends the account's sessions. The last active administrator cannot be demoted or disabled.",
+        "operationId": "update_user_users__user_id__patch",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Id of an account, from `GET /users`",
+              "title": "User Id"
+            },
+            "description": "Id of an account, from `GET /users`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/reset-password": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Reset a password",
+        "description": "Sets a temporary password, returned once, ends the account's sessions and unlocks it. The person must change the password at the next sign-in. There is no e-mail: hand it over yourself.",
+        "operationId": "reset_password_users__user_id__reset_password_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Id of an account, from `GET /users`",
+              "title": "User Id"
+            },
+            "description": "Id of an account, from `GET /users`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPassword"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/unlock": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Unlock an account",
+        "description": "Clears the lock that repeated wrong passwords set, so the person can try again at once.",
+        "operationId": "unlock_user_users__user_id__unlock_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Id of an account, from `GET /users`",
+              "title": "User Id"
+            },
+            "description": "Id of an account, from `GET /users`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/events": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Account audit trail",
+        "description": "The most recent registrations, sign-ins (and failures), locks, role and status changes, password changes and resets. Contains no password, hash or token. Administrators only.",
+        "operationId": "account_events_users_events_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Largest number of events to return (at most 500)",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Largest number of events to return (at most 500)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountEventOut"
+                  },
+                  "title": "Response Account Events Users Events Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccountEventOut": {
+        "properties": {
+          "event": {
+            "type": "string",
+            "title": "Event",
+            "description": "What happened: registered, signed_in, sign_in_failed, locked, role_changed, ..."
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "description": "Who did it (a user name, or empty)"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "The account it was done to"
+          },
+          "client": {
+            "type": "string",
+            "title": "Client",
+            "description": "The network address it came from"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail",
+            "description": "Facts about the event; never a password or a token"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At",
+            "description": "When"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event",
+          "actor",
+          "subject",
+          "client",
+          "detail",
+          "at"
+        ],
+        "title": "AccountEventOut",
+        "description": "One line of the account audit trail."
+      },
+      "AccountOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The account's id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "The user name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "The name shown to other people"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "The e-mail address the person gave, if any"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reporter",
+              "maintainer",
+              "admin"
+            ],
+            "title": "Role",
+            "description": "reporter: Feedback & Support only; maintainer: everything the shared token reaches plus triage; admin: a maintainer who also manages accounts"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "disabled"
+            ],
+            "title": "Status",
+            "description": "pending: waiting for an administrator to approve it"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "description": "True while the password is a temporary one that has to be replaced"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the account was made"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At",
+            "description": "When the person last signed in"
+          },
+          "locked_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until",
+            "description": "Set while the account is locked after repeated wrong passwords"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "email",
+          "role",
+          "status",
+          "must_change_password",
+          "created_at",
+          "last_login_at",
+          "locked_until"
+        ],
+        "title": "AccountOut",
+        "description": "An account. Never contains a password, a hash or a session."
+      },
       "AgentProfile": {
         "properties": {
           "target_name": {
@@ -5257,6 +6368,45 @@
         "title": "AttemptResult",
         "description": "One repetition of a test."
       },
+      "AuthOptions": {
+        "properties": {
+          "registration": {
+            "type": "string",
+            "enum": [
+              "open",
+              "approval",
+              "closed"
+            ],
+            "title": "Registration",
+            "description": "Who may create an account on this server"
+          },
+          "min_password_length": {
+            "type": "integer",
+            "title": "Min Password Length",
+            "description": "The shortest password a new account may have"
+          },
+          "api_token_sign_in": {
+            "type": "boolean",
+            "title": "Api Token Sign In",
+            "description": "Whether this server also accepts the shared API token in the web interface"
+          },
+          "password_sign_in": {
+            "type": "boolean",
+            "title": "Password Sign In",
+            "description": "Whether sign-in with a user name and password is available"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "registration",
+          "min_password_length",
+          "api_token_sign_in",
+          "password_sign_in"
+        ],
+        "title": "AuthOptions",
+        "description": "What the sign-in page needs to know before anyone is signed in."
+      },
       "Body_upload_document_documents_post": {
         "properties": {
           "file": {
@@ -5690,6 +6840,30 @@
         "title": "CategoryScore",
         "description": "The score of one category and how well it was tested"
       },
+      "ChangePasswordRequest": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Current Password",
+            "description": "The password in use now"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "New Password",
+            "description": "The new password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "description": "Changing the password of the signed-in account."
+      },
       "CommandConfig": {
         "properties": {
           "mode": {
@@ -6044,6 +7218,68 @@
         ],
         "title": "CoverageEntry",
         "description": "How well one taxonomy letter or security category is covered by a plan"
+      },
+      "CreateUserRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "title": "Username",
+            "description": "The user name"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reporter",
+              "maintainer",
+              "admin"
+            ],
+            "title": "Role",
+            "description": "The role to give"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password",
+            "description": "A password; when omitted a temporary one is made"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Display Name",
+            "description": "The name shown to other people",
+            "default": ""
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional e-mail address, shown to administrators only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "role"
+        ],
+        "title": "CreateUserRequest",
+        "description": "An administrator making an account."
       },
       "CredentialCreate": {
         "properties": {
@@ -7706,6 +8942,30 @@
         "title": "LlmToolDef",
         "description": "A tool offered to the model under test, with a fixed result"
       },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Username",
+            "description": "The user name (case does not matter)"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Password",
+            "description": "The password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "description": "A user name and a password."
+      },
       "ManifestDifference": {
         "properties": {
           "field": {
@@ -7838,6 +9098,95 @@
         "type": "object",
         "title": "McpConfig",
         "description": "A Model Context Protocol server as the target. Over HTTP the server is already running; over stdio the owner's\n``command`` is started *inside the sandbox* from the target's repository (never on the evaluator host)."
+      },
+      "MeOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "service",
+              "local"
+            ],
+            "title": "Kind",
+            "description": "user: a signed-in person; service: the shared API token; local: a machine that needs no token"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reporter",
+              "maintainer",
+              "admin"
+            ],
+            "title": "Role",
+            "description": "The role the caller has"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username",
+            "description": "The user name, for a signed-in person"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "The name shown to other people"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "description": "True while the password is a temporary one: only changing it is allowed"
+          },
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token",
+            "description": "Send this value as X-CSRF-Token on every request that changes something, when authenticated by cookie"
+          },
+          "operator": {
+            "type": "boolean",
+            "title": "Operator",
+            "description": "Whether the caller may use runs, targets, credentials and reports"
+          },
+          "can_manage_accounts": {
+            "type": "boolean",
+            "title": "Can Manage Accounts",
+            "description": "Whether the caller may use the account administration endpoints"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "role",
+          "username",
+          "display_name",
+          "must_change_password",
+          "csrf_token",
+          "operator",
+          "can_manage_accounts"
+        ],
+        "title": "MeOut",
+        "description": "Who the server believes is calling, and what that allows."
       },
       "MetricDelta": {
         "properties": {
@@ -8651,6 +10000,85 @@
         ],
         "title": "ProviderOut",
         "description": "A configured LLM provider"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "title": "Username",
+            "description": "3 to 64 characters: letters, digits, dot, dash, underscore"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "description": "The password; the server's rules say what is accepted"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Display Name",
+            "description": "The name shown to other people (default: the user name)",
+            "default": ""
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional. Only shown to administrators; nothing is sent to it"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "RegisterRequest",
+        "description": "A person asking for an account."
+      },
+      "RegistrationOut": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountOut",
+            "description": "The new account"
+          },
+          "signed_in": {
+            "type": "boolean",
+            "title": "Signed In",
+            "description": "False when the account has to be approved by an administrator first"
+          },
+          "me": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MeOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signed-in caller, when the account was active at once"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account",
+          "signed_in",
+          "me"
+        ],
+        "title": "RegistrationOut",
+        "description": "The result of registering."
       },
       "ReliabilityStats": {
         "properties": {
@@ -10214,6 +11642,26 @@
         "title": "ScoringProfileOut",
         "description": "How a scoring profile weighs the categories"
       },
+      "SessionOut": {
+        "properties": {
+          "me": {
+            "$ref": "#/components/schemas/MeOut",
+            "description": "The signed-in caller"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountOut",
+            "description": "The account"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "me",
+          "account"
+        ],
+        "title": "SessionOut",
+        "description": "The result of signing in or registering."
+      },
       "SettingsOut": {
         "properties": {
           "version": {
@@ -10816,6 +12264,34 @@
         ],
         "title": "TargetSpec",
         "description": "Everything known about a target before discovery. Loaded from ``target.yaml``."
+      },
+      "TemporaryPassword": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountOut",
+            "description": "The account"
+          },
+          "temporary_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temporary Password",
+            "description": "The temporary password, to be handed to the person once. It must be changed at the next sign-in"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account",
+          "temporary_password"
+        ],
+        "title": "TemporaryPassword",
+        "description": "An account together with the temporary password that was set for it. Shown once."
       },
       "TestCase": {
         "properties": {
@@ -11881,6 +13357,61 @@
         "title": "TypeScore",
         "description": "How strongly the target looks like one kind of agent"
       },
+      "UpdateUserRequest": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reporter",
+                  "maintainer",
+                  "admin"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "The new role"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "pending",
+                  "disabled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "The new status"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "The new display name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "UpdateUserRequest",
+        "description": "What an administrator may change about an account."
+      },
       "ViewLink": {
         "properties": {
           "url": {
@@ -12032,6 +13563,10 @@
     {
       "name": "Server",
       "description": "Health, the environment this server can use, and its configuration."
+    },
+    {
+      "name": "Accounts",
+      "description": "Registration, sign-in with a password, the signed-in person, and account administration."
     },
     {
       "name": "Projects",

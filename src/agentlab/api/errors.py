@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from agentlab.accounts.errors import AccountConflict, AccountLocked, SignInFailed
 from agentlab.core.errors import (
     AgentLabError,
     CredentialError,
@@ -36,6 +37,12 @@ def _body(kind: str, message: str, details: list[dict[str, Any]] | None = None) 
 
 
 def status_for(exc: AgentLabError) -> tuple[int, str]:
+    if isinstance(exc, SignInFailed):
+        return 401, "unauthorized"
+    if isinstance(exc, AccountLocked):
+        return 429, "rate_limited"
+    if isinstance(exc, AccountConflict):
+        return 409, "conflict"
     if isinstance(exc, NotFoundError):
         return 404, "not_found"
     if isinstance(exc, ConflictError):
@@ -59,7 +66,12 @@ def install(app: FastAPI) -> None:
         status, kind = status_for(exc)
         if status >= 500:
             log.warning("request failed: %s", redact(str(exc)))
-        return JSONResponse(_body(kind, str(exc)), status_code=status)
+        headers = (
+            {"Retry-After": str(exc.retry_after_seconds)}
+            if isinstance(exc, AccountLocked) and exc.retry_after_seconds
+            else None
+        )
+        return JSONResponse(_body(kind, str(exc)), status_code=status, headers=headers)
 
     @app.exception_handler(HTTPException)
     async def http_error(_: Request, exc: HTTPException) -> JSONResponse:

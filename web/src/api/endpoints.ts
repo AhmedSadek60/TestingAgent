@@ -1,5 +1,15 @@
 import type { ApiClient } from "./client";
 import type {
+  Account,
+  AccountEvent,
+  AuthOptions,
+  CreateUserRequest,
+  Me,
+  RegisterRequest,
+  RegistrationResult,
+  SessionResult,
+  TemporaryPassword,
+  UpdateUserRequest,
   Artifact,
   CancelResponse,
   Comparison,
@@ -46,6 +56,22 @@ const id = encodeURIComponent;
 export function createApi(client: ApiClient) {
   return {
     health: (signal?: AbortSignal) => client.get<Health>("/health", { signal }),
+
+    // accounts
+    authOptions: (signal?: AbortSignal) => client.get<AuthOptions>("/auth/options", { signal }),
+    me: (signal?: AbortSignal) => client.get<Me>("/auth/me", { signal, silentUnauthorized: true }),
+    login: (username: string, password: string) =>
+      client.post<SessionResult>("/auth/login", { username, password }, { silentUnauthorized: true }),
+    register: (body: RegisterRequest) => client.post<RegistrationResult>("/auth/register", body, { silentUnauthorized: true }),
+    logout: () => client.post<void>("/auth/logout"),
+    changePassword: (current_password: string, new_password: string) =>
+      client.post<void>("/auth/password", { current_password, new_password }),
+    users: (signal?: AbortSignal) => client.get<Account[]>("/users", { signal }),
+    createUser: (body: CreateUserRequest) => client.post<TemporaryPassword>("/users", body),
+    updateUser: (userId: string, body: UpdateUserRequest) => client.patch<Account>(`/users/${id(userId)}`, body),
+    resetPassword: (userId: string) => client.post<TemporaryPassword>(`/users/${id(userId)}/reset-password`),
+    unlockUser: (userId: string) => client.post<Account>(`/users/${id(userId)}/unlock`),
+    accountEvents: (signal?: AbortSignal) => client.get<AccountEvent[]>("/users/events", { query: { limit: 100 }, signal }),
     environment: (live = false, signal?: AbortSignal) => client.get<Environment>("/environment", { query: { live }, signal }),
     settings: (signal?: AbortSignal) => client.get<Settings>("/settings", { signal }),
 

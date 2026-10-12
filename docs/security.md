@@ -481,8 +481,9 @@ in layers.
 * **The interface keeps the token only in memory and in the tab's session storage**, and writes secrets once: stored
   credentials show their field names and never their values.
 
-AgentLab has **one shared token and no accounts**: whoever holds it can do everything the API can. Reviews are signed with a
-reviewer name that is typed in and is not verified ([reports.md](reports.md#human-review)). It does not terminate TLS: put a
+AgentLab has **one shared token**: whoever holds it can do everything the API can. People can also have **accounts** with a role
+([accounts.md](accounts.md)): a *reporter* reaches only Feedback & Support, a *maintainer* has what the token has, an *admin* also manages
+accounts. Reviews are signed with a reviewer name that is typed in and is not verified ([reports.md](reports.md#human-review)). It does not terminate TLS: put a
 reverse proxy that does in front of a team server, one that keeps a single origin for the interface and the API.
 
 Tested by `tests/api/test_api_security.py` (token, throttling, host and origin checks, headers, paths, uploads),
@@ -512,7 +513,9 @@ runs are rows in the database and the artifacts are files, and removing them is 
 * **The attestation is a statement.** AgentLab refuses to proceed without it and cannot check that it is true.
 * **The network `allowlist` mode, WebSocket agent endpoints, client certificates and browsers other than Chromium are not
   supported.** AgentLab says so where you ask for them instead of ignoring the request.
-* **No accounts, roles or TLS** in the server, and no data-retention controls.
+* **No TLS in the server** (put a reverse proxy in front), **no multi-factor authentication or single sign-on**, no e-mail channel, and no
+  data-retention controls. Accounts have three roles only; inside the rest of AgentLab a maintainer has everything the token has
+  ([accounts.md](accounts.md#limits)).
 * **Hosted model providers were verified only against local stand-ins** of their APIs (Ollama was also exercised live); see
   [development.md](development.md#verification-status).
 * **A passing run is not a certificate.** It says the tests that ran passed, and the report says what was not tested.
