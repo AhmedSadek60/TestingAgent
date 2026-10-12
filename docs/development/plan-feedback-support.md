@@ -5,7 +5,8 @@
 - Risk class: HIGH RISK (authentication and authorization, a new database schema and migration, a public API contract, file
   uploads from untrusted users, secret handling, an optional external integration)
 - Date: 2026-10-12
-- Status: **waiting for human approval of the open decisions below. Nothing in this plan has been implemented.**
+- Status: decisions answered by the owner on 2026-10-12 (see "Decisions"); **one safeguard added by the author is flagged for the owner's
+  confirmation**. Implementation proceeds slice by slice, each through the staged release process.
 
 ## Objective
 
@@ -79,12 +80,51 @@ maintainer queue and triage panel; handoff preview and download. Unsaved-draft c
 
 ### Delivery in slices (each a pull request through `scripts/ship.py`)
 
-1. **Core**: schema and migration `0002`, identity and roles (decision 1), submissions API, comments, status history, audit.
+0. **Accounts**: users, password sign-in, sessions, roles, registration, the first administrator, user management, the sign-in page
+   (see "Accounts design"). Nothing of Feedback & Support is in this slice, so it can be reviewed and reverted alone.
+1. **Core**: schema and migration, submissions API, comments, status history, audit, authorization by role and ownership.
 2. **Attachments and redaction**: the attachment service, `DiagnosticRedactor`, their security tests.
 3. **Diagnostics**: the collector, the log capture (decision 4), the browser-error endpoint.
 4. **Handoff**: `EngineeringHandoffService`, `CLAUDE_CODE_TASK.md`, export, audit.
 5. **Frontend**: all pages and components, web tests, an end-to-end test of both workflows.
 6. **Integrations and operations**: provider interface and GitHub implementation, retention and purge, documentation.
+
+## Accounts design (slice 0)
+
+* **Principals.** One `Principal` per request: the shared API token (a *service credential*, unchanged for the CLI, CI and today's web
+  sign-in; counts as a maintainer), or a signed-in user (`reporter`, `maintainer` or `admin`).
+* **Roles and what they reach.** `reporter`: Feedback & Support only (their own submissions, their account). `maintainer`: everything
+  the shared token reaches today, plus triage, security reports and handoff export. `admin`: maintainer plus user management.
+  The role check for the existing API is **one rule in the authentication layer** (a path classification), not an edit of every route.
+* **Safeguard flagged for confirmation.** The owner chose open self-registration *and* "signed-in users keep today's access". Together
+  they would give every self-registered person the full power of the shared token (run evaluations, store credentials, send requests
+  from the server's network). So self-registered accounts are `reporter`; promotion to `maintainer` is an admin action;
+  `accounts.registration` (`open` by default, `approval`, `closed`) and `accounts.default_role` can be changed in configuration.
+* **Passwords.** `hashlib.scrypt` from the standard library (no new dependency), per-user random salt, parameters stored with the
+  hash so they can be raised; minimum 12 characters, a common-password check, constant-time verification, the same error for an
+  unknown user and a wrong password. Sign-in is rate limited per address and per user name, with a lock after repeated failures.
+* **Sessions.** Server-side: a 256-bit random id in an `HttpOnly`, `SameSite=Strict` cookie (`Secure` when served over HTTPS),
+  stored hashed; an idle and an absolute lifetime; revocable (sign-out, password change, admin disable). Requests authenticated by
+  cookie must carry a CSRF token; requests authenticated by an `Authorization` header are not subject to CSRF.
+* **First administrator.** `agentlab users create --role admin NAME` on the server, password at a hidden prompt or on standard
+  input. No password in a file or the environment.
+* **No e-mail exists**, so there is no e-mail verification or reset link: an admin resets a password (a temporary one that must be
+  changed at the next sign-in), and a user can change their own with the current one. Self-registration is therefore bounded by
+  quotas (submissions per day, attachment bytes) and rate limits, and documented as a risk.
+* **Audit.** Registration, sign-in success and failure, lock, sign-out, password change and reset, role change, disable and enable.
+* **Not in scope:** multi-factor authentication, single sign-on, an e-mail channel, role-based access for the rest of AgentLab.
+
+## Decisions (answered by the owner on 2026-10-12)
+
+1. **Identity: full accounts with sign-in** (not the recommended smaller options): see "Accounts design".
+2. **Delivery: six slices**, plus slice 0 for accounts.
+3. **Notifications: in-app only.**
+4. **Logs: add bounded capture.**
+5. **Registration: open self-registration** (not the recommended invite-only option), made safe by the safeguard above.
+6. **The shared token stays** as a service credential.
+7. **Signed-in users keep today's access to the rest of AgentLab**, which for self-registered `reporter` accounts is the safeguard's
+   exception; maintainers and admins have it.
+8. **The first administrator is created by a command on the server.**
 
 ## Alternatives considered
 
@@ -126,18 +166,8 @@ publish step of the staged process, after a backup, and only after the slice's p
 
 ## Open questions / assumptions
 
-1. **Identity and roles** (the blocker). AgentLab has no users. Options:
-   - **A. Two shared tokens**: the existing token stays and gains the *reporter* role; a new `server.maintainer_token_ref` is the
-     *maintainer* role. A reporter's name is typed and remembered in the browser; "My submissions" filters by that name, which is
-     **not** a security boundary between people who share the reporter token. Security-report access and maintainer actions are
-     enforced in the backend. Smallest change; AC-10 is met only between roles, and the limitation is documented.
-   - **B. Per-person tokens issued by a maintainer** (recommended): a maintainer creates and revokes named tokens (stored as
-     hashes, shown once); each token is a *reporter* or a *maintainer*; the existing shared token keeps working as a maintainer
-     (backwards compatible). Isolation between reporters is real and AC-10 is met. Cost: token management endpoints and one page.
-   - **C. Full accounts with sign-in.** Not proposed: it is a different product change.
-2. **Slices**: deliver in the six pull requests above (recommended), or one large pull request.
-3. **Notifications**: in-app only (recommended; nothing new to operate), or add an outbound webhook or SMTP setting.
-4. **Application logs**: add a bounded, redacted, run-correlated log capture (recommended; without it log diagnostics cannot be
-   offered), or offer only traces, run summaries, environment and browser errors.
-5. Assumed: file limits and retention periods start at the defaults in the request and are configuration; GitHub publishing is
-   off until an owner configures it; no malware scanner exists here, so attachments are labelled "not scanned".
+1. **Confirm the safeguard**: self-registered accounts are feedback-only until an admin promotes them. If the owner wants
+   self-registered users to have today's full access, that is `accounts.default_role: maintainer`, and the plan's risk section
+   should be read first.
+2. Assumed: file limits and retention periods start at the defaults in the request and are configuration; GitHub publishing is off
+   until an owner configures it; there is no malware scanner here, so attachments are labelled "not scanned".
