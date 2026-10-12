@@ -27,7 +27,9 @@ _PRIVATE_KEY_BEGIN = "-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIV
 _PRIVATE_KEY_END = "-----END (?:RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIVATE" + " KEY-----"
 
 BUILTIN_PATTERNS: dict[str, str] = {
-    "private_key": _PRIVATE_KEY_BEGIN + r"[\s\S]+?" + _PRIVATE_KEY_END,
+    # the body may not hold another "-----BEGIN" and is bounded: with a plain lazy [\s\S]+? a text of repeated BEGIN markers and
+    # no END is read to its end from every marker (quadratic, over text a person supplied)
+    "private_key": _PRIVATE_KEY_BEGIN + r"(?:(?!-----BEGIN)[\s\S]){1,20000}?" + _PRIVATE_KEY_END,
     "aws_access_key": r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",
     "aws_secret_key": r"(?i)(aws_secret_access_key|aws_secret)\s*[:=]\s*\\*['\"]?[A-Za-z0-9/+=]{40}",
     "jwt": r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b",
@@ -39,7 +41,8 @@ BUILTIN_PATTERNS: dict[str, str] = {
     "anthropic_key": r"\bsk-ant-[A-Za-z0-9_\-]{20,}\b",
     "openrouter_key": r"\bsk-or-[A-Za-z0-9_\-]{20,}\b",
     "openai_key": r"\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}\b",
-    "connection_string": r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s:/@]+:[^\s@/]+@[^\s/]+",
+    # (?<![...]) and not \b: \b is true at every dot of "a.a.a.a...", and from each the scheme is read to the end of the run
+    "connection_string": r"(?<![A-Za-z0-9+.\-])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s:/@]+:[^\s@/]+@[^\s/]+",
     # the value may sit in JSON text, where its quotes are escaped (``\"``): the backslashes are part of the quote, not of it
     "password_assignment": r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token)\b"
     r"(\s*[:=]\s*)(\\*['\"]?)[^\s'\"\\,;]{4,}",

@@ -123,6 +123,11 @@ class ArtifactStore(ABC):
     def local_path(self, artifact_id: str) -> Path:
         raise InfrastructureError("this artifact store has no local filesystem path")
 
+    def delete(self, artifact_id: str, *, kind: str) -> bool:
+        """Forget the artifact of this ``kind`` and, when no other kind of it is kept, its bytes. Returns whether the bytes
+        are gone. A store that cannot delete says so by returning False, and what it kept stays kept."""
+        return False
+
 
 def _prepare(data: bytes | str | Path, media_type: str, redact: bool) -> tuple[bytes, bool]:
     if isinstance(data, Path):
@@ -220,6 +225,21 @@ class LocalArtifactStore(ArtifactStore):
         shutil.copyfile(self.local_path(artifact_id), dest)
         return dest
 
+    def delete(self, artifact_id: str, *, kind: str) -> bool:
+        digest = self._check(artifact_id)
+        remaining = 0
+        for meta in sorted((self.root / "meta").glob(f"{digest}.*.json")):
+            ref = ArtifactRef.model_validate_json(meta.read_text(encoding="utf-8"))
+            if ref.kind == kind:
+                meta.unlink(missing_ok=True)
+            else:
+                remaining += 1
+        if remaining:
+            return False  # another kind of evidence shares these bytes
+        for area in ("restricted", "objects"):
+            (self.root / area / digest[:2] / digest).unlink(missing_ok=True)
+        return True
+
 
 class MemoryArtifactStore(ArtifactStore):
     """Keeps evidence in this process only: for tests and throw-away runs, nothing survives the process."""
@@ -267,6 +287,13 @@ class MemoryArtifactStore(ArtifactStore):
 
     def list(self, run_id: str | None = None) -> list[ArtifactRef]:
         return [r for r in self._refs if run_id is None or r.run_id == run_id]
+
+    def delete(self, artifact_id: str, *, kind: str) -> bool:
+        self._refs = [r for r in self._refs if not (r.id == artifact_id and r.kind == kind)]
+        if any(r.id == artifact_id for r in self._refs):
+            return False
+        self._data.pop(artifact_id.removeprefix("sha256-"), None)
+        return True
 
 
 class UnsupportedObjectStore(ArtifactStore):

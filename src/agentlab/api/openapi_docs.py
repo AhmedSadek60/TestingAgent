@@ -983,6 +983,7 @@ ArtifactOut: One piece of stored evidence
 AssertionResult: The outcome of one deterministic check
 AssertionSpec: A deterministic check to run on the answer
 AttemptResult: One repetition of a test
+Body_attach_submissions__submission_id__attachments_post: The multipart form of an attachment upload
 Body_upload_document_documents_post: The multipart form of a document upload
 BrowserStep: One step a browser test performs
 BudgetEstimate: What a plan is expected to cost and how long it is expected to take

@@ -4,10 +4,13 @@ Who may see what is decided in ``agentlab.feedback.policy`` and applied to the q
 
 from __future__ import annotations
 
+import re
+import urllib.parse
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Query, Request, Response, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from agentlab.api.routes.common import RESPONSES, client_of, current_principal, require_staff, require_user
 from agentlab.api.schemas import ErrorResponse
@@ -23,8 +26,11 @@ from agentlab.feedback import (
     SubmissionService,
     actor_for,
 )
+from agentlab.feedback.attachments import AttachmentService
 from agentlab.feedback.models import (
     AssigneeOut,
+    AttachmentOut,
+    AttachmentPreview,
     AuditEventOut,
     CommentOut,
     FeedbackOptions,
@@ -365,3 +371,156 @@ def audit(
 ) -> list[AuditEventOut]:
     st = state_of(request)
     return _service(st).audit_trail(_actor(request, st), submission_id, limit=limit)
+
+
+# ================================================================================================= attachments
+ATTACHMENT = Annotated[
+    str,
+    Path(
+        min_length=8, max_length=40, pattern=r"^[A-Za-z0-9\-]+$", description="Id of an attachment, from the submission"
+    ),
+]
+
+
+def _attachments(st: ApiState) -> AttachmentService:
+    if st.attachments is None:
+        raise UserError("attachments are not available on this server")
+    return st.attachments
+
+
+def _content_disposition(name: str) -> str:
+    """An attachment header that cannot be broken out of: an ASCII fallback, and the real name percent-encoded."""
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", name.encode("ascii", "ignore").decode()).strip("._") or "attachment"
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{urllib.parse.quote(name, safe='')}"
+
+
+@router.post(
+    "/submissions/{submission_id}/attachments",
+    response_model=AttachmentOut,
+    status_code=201,
+    summary="Attach a file to a submission",
+    description="One file per request, as `multipart/form-data`. The type is decided by looking at the file (its signature, "
+    "its text, an archive's directory), not by its name or by what the browser says; the file is kept privately under a name "
+    "made from its hash; a text file is also given a sanitized copy with secrets masked, and the original is kept as it "
+    "was. A malware scan runs only if the owner configured a scanner, and the answer says which. Limits are in "
+    "`feedback.attachments`.",
+    dependencies=[Depends(require_user)],
+)
+async def attach(
+    submission_id: SUBMISSION,
+    request: Request,
+    file: Annotated[UploadFile, File(description="The file to attach")],
+    visibility: Annotated[
+        Literal["public", "internal"],
+        Form(description="internal: only maintainers can see the file (a reporter may not choose it)"),
+    ] = "public",
+) -> AttachmentOut:
+    st = state_of(request)
+    cfg = st.services.config.feedback.attachments
+    limit = cfg.max_file_mb * 1024 * 1024
+    received = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        received += chunk
+        if len(received) > limit:
+            raise HTTPException(413, f"the file is larger than {cfg.max_file_mb} MB (feedback.attachments.max_file_mb)")
+    return await run_in_threadpool(
+        _attachments(st).add,
+        _actor(request, st),
+        submission_id,
+        filename=file.filename or "",
+        declared_type=file.content_type or "",
+        data=bytes(received),
+        visibility=visibility,
+        client=client_of(request),
+    )
+
+
+@router.get(
+    "/submissions/{submission_id}/attachments",
+    response_model=list[AttachmentOut],
+    summary="List the attachments of a submission",
+    description="What is attached, with what each file was found to be, whether it was scanned, and what the check for "
+    "secrets found. A reporter does not see files that maintainers attached for their own use.",
+    dependencies=[Depends(require_user)],
+)
+def attachments(submission_id: SUBMISSION, request: Request) -> list[AttachmentOut]:
+    st = state_of(request)
+    return _attachments(st).of_submission(_actor(request, st), submission_id, client=client_of(request))
+
+
+@router.get(
+    "/submissions/{submission_id}/attachments/{attachment_id}",
+    response_model=AttachmentOut,
+    summary="Read the details of an attachment",
+    description="The same record the list gives, for one file.",
+    dependencies=[Depends(require_user)],
+)
+def attachment(submission_id: SUBMISSION, attachment_id: ATTACHMENT, request: Request) -> AttachmentOut:
+    st = state_of(request)
+    return _attachments(st).get(_actor(request, st), submission_id, attachment_id, client=client_of(request))
+
+
+@router.get(
+    "/submissions/{submission_id}/attachments/{attachment_id}/preview",
+    response_model=AttachmentPreview,
+    summary="Preview an attachment",
+    description="For a text file, its first characters with secrets masked. For an image, say so (download it to look at "
+    "it). Nothing is rendered by the server.",
+    dependencies=[Depends(require_user)],
+)
+def preview(submission_id: SUBMISSION, attachment_id: ATTACHMENT, request: Request) -> AttachmentPreview:
+    st = state_of(request)
+    return _attachments(st).preview(_actor(request, st), submission_id, attachment_id, client=client_of(request))
+
+
+@router.get(
+    "/submissions/{submission_id}/attachments/{attachment_id}/download",
+    summary="Download an attachment",
+    description="The file as it was uploaded, or with `version=sanitized` (a text file) the copy with secrets masked. It "
+    "is always sent as a download of unknown type, never to be shown by the browser, and every download is recorded.",
+    response_class=Response,
+    responses={200: {"content": {"application/octet-stream": {}}, "description": "The file's bytes"}},
+    dependencies=[Depends(require_user)],
+)
+def download(
+    submission_id: SUBMISSION,
+    attachment_id: ATTACHMENT,
+    request: Request,
+    version: Annotated[
+        Literal["original", "sanitized"], Query(description="original: as uploaded; sanitized: secrets masked (text)")
+    ] = "original",
+) -> Response:
+    st = state_of(request)
+    data, meta = _attachments(st).download(
+        _actor(request, st),
+        submission_id,
+        attachment_id,
+        sanitized=version == "sanitized",
+        client=client_of(request),
+    )
+    name = meta.name if version == "original" else f"{meta.name}.sanitized.txt"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition(name),
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.delete(
+    "/submissions/{submission_id}/attachments/{attachment_id}",
+    status_code=204,
+    summary="Remove an attachment",
+    description="Takes the file away: it can no longer be listed or downloaded, and its stored bytes are deleted when "
+    "nothing else uses them. The record stays in the audit trail. A reporter may remove what they attached; a maintainer "
+    "anything.",
+    dependencies=[Depends(require_user)],
+)
+def remove_attachment(submission_id: SUBMISSION, attachment_id: ATTACHMENT, request: Request) -> Response:
+    st = state_of(request)
+    _attachments(st).remove(_actor(request, st), submission_id, attachment_id, client=client_of(request))
+    return Response(status_code=204)

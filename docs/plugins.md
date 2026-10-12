@@ -317,6 +317,10 @@ storage:
   artifact_store_options: {bucket: my-evidence}      # never a secret: read credentials from the environment
 ```
 
+A store may also implement `delete(artifact_id, *, kind) -> bool`, which forgets one kind of an artifact and, when no other
+kind shares the bytes, the bytes too (it returns whether they are gone). It is how a removed attachment stops being kept. The
+default keeps everything and returns `False`, which AgentLab reports as "not deleted" and never as deleted.
+
 Built in: `local` (the default: files under `storage.artifacts_dir`, restricted evidence in a `0700` folder), `memory`
 (for tests and throw-away runs: **gone when the process ends**; `agentlab doctor` warns) and `s3`, which is **not
 implemented**: selecting it stops AgentLab with a message saying so. Evidence marked `restricted` (screenshots taken

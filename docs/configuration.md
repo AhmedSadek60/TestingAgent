@@ -192,6 +192,20 @@ what a submission moves through; changing them changes the forms and the maintai
 | `max_submissions_per_day` | `20` | Submissions one person with the role `reporter` may make in 24 hours. Maintainers have no limit. |
 | `max_comments_per_day` | `100` | Comments one person with the role `reporter` may write in 24 hours. |
 | `similar_limit` | `5` | How many possibly similar submissions are suggested while a title is typed. |
+| `attachments.allowed_extensions` | `png`, `jpg`, `jpeg`, `webp`, `pdf`, `docx`, `txt`, `md`, `csv`, `json`, `jsonl`, `yaml`, `yml`, `log`, `zip` | The file types that may be attached. Each is checked against its signature or its text; a type outside this list cannot be enabled. |
+| `attachments.max_files` | `10` | Attachments one submission may have. |
+| `attachments.max_file_mb` | `25` | The largest single attachment. The server's upload ceiling follows it when it is larger than `server.max_upload_mb`. |
+| `attachments.max_total_mb` | `100` | What the attachments of one submission may add up to. |
+| `attachments.max_uploads_per_day` | `50` | Attachments one person with the role `reporter` may add in 24 hours (removing one does not give it back). |
+| `attachments.zip_max_entries` | `200` | The most entries an archive may list. |
+| `attachments.zip_max_expanded_mb` | `200` | The most an archive may expand to, by what it declares. It is never extracted. |
+| `attachments.zip_max_ratio` | `100` | The largest ratio of expanded to stored size, for the archive or for an entry of 1 MB or more. |
+| `attachments.sanitize_max_mb` | `10` | The largest text attachment that is checked for secrets and given a sanitized copy. A larger one is kept and marked `not_inspected`. |
+| `attachments.scanner_command` | `[]` | A command that scans a file for malware: its arguments, with `{path}` where the file goes (it is appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and attachments are recorded as not scanned. |
+| `attachments.scanner_timeout_seconds` | `60` | How long the scanner may take for one file. |
+| `attachments.scanner_required` | `false` | Refuse an attachment when the scanner is configured but fails or times out. Otherwise it is kept and recorded as a scan error. |
+| `redaction.rules` | `[]` | Patterns of your own, each `{name, pattern}`, that attached and collected text is masked by, beyond the built-in ones. They appear in reports as `custom:<name>`. |
+| `redaction.redact_ip_addresses` | `false` | Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on. |
 | `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |
 
 ## `planning`

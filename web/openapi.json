@@ -7348,6 +7348,665 @@
           }
         }
       }
+    },
+    "/submissions/{submission_id}/attachments": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Attach a file to a submission",
+        "description": "One file per request, as `multipart/form-data`. The type is decided by looking at the file (its signature, its text, an archive's directory), not by its name or by what the browser says; the file is kept privately under a name made from its hash; a text file is also given a sanitized copy with secrets masked, and the original is kept as it was. A malware scan runs only if the owner configured a scanner, and the answer says which. Limits are in `feedback.attachments`.",
+        "operationId": "attach_submissions__submission_id__attachments_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_attach_submissions__submission_id__attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "List the attachments of a submission",
+        "description": "What is attached, with what each file was found to be, whether it was scanned, and what the check for secrets found. A reporter does not see files that maintainers attached for their own use.",
+        "operationId": "attachments_submissions__submission_id__attachments_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachmentOut"
+                  },
+                  "title": "Response Attachments Submissions  Submission Id  Attachments Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/attachments/{attachment_id}": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read the details of an attachment",
+        "description": "The same record the list gives, for one file.",
+        "operationId": "attachment_submissions__submission_id__attachments__attachment_id__get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of an attachment, from the submission",
+              "title": "Attachment Id"
+            },
+            "description": "Id of an attachment, from the submission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Remove an attachment",
+        "description": "Takes the file away: it can no longer be listed or downloaded, and its stored bytes are deleted when nothing else uses them. The record stays in the audit trail. A reporter may remove what they attached; a maintainer anything.",
+        "operationId": "remove_attachment_submissions__submission_id__attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of an attachment, from the submission",
+              "title": "Attachment Id"
+            },
+            "description": "Id of an attachment, from the submission"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/attachments/{attachment_id}/preview": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Preview an attachment",
+        "description": "For a text file, its first characters with secrets masked. For an image, say so (download it to look at it). Nothing is rendered by the server.",
+        "operationId": "preview_submissions__submission_id__attachments__attachment_id__preview_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of an attachment, from the submission",
+              "title": "Attachment Id"
+            },
+            "description": "Id of an attachment, from the submission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/attachments/{attachment_id}/download": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Download an attachment",
+        "description": "The file as it was uploaded, or with `version=sanitized` (a text file) the copy with secrets masked. It is always sent as a download of unknown type, never to be shown by the browser, and every download is recorded.",
+        "operationId": "download_submissions__submission_id__attachments__attachment_id__download_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of an attachment, from the submission",
+              "title": "Attachment Id"
+            },
+            "description": "Id of an attachment, from the submission"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "original",
+                "sanitized"
+              ],
+              "type": "string",
+              "description": "original: as uploaded; sanitized: secrets masked (text)",
+              "default": "original",
+              "title": "Version"
+            },
+            "description": "original: as uploaded; sanitized: secrets masked (text)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's bytes",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8221,6 +8880,181 @@
         "title": "AssigneeOut",
         "description": "A person a submission is assigned to."
       },
+      "AttachmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The attachment's id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The file name the person gave it, made safe to show"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "description": "Its type by extension"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "What it was found to be by looking at its content"
+          },
+          "declared_type": {
+            "type": "string",
+            "title": "Declared Type",
+            "description": "What the browser said it was; not trusted"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "Its size in bytes"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "The SHA-256 of the file as it was uploaded"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ],
+            "title": "Visibility",
+            "description": "internal: maintainers only"
+          },
+          "uploader": {
+            "type": "string",
+            "title": "Uploader",
+            "description": "Who attached it (a reporter is not told which maintainer)"
+          },
+          "uploader_is_staff": {
+            "type": "boolean",
+            "title": "Uploader Is Staff",
+            "description": "True when a maintainer or the shared token attached it"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine",
+            "description": "True when the caller attached it"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When it was attached"
+          },
+          "text_like": {
+            "type": "boolean",
+            "title": "Text Like",
+            "description": "True for text files, which can be previewed and have a sanitized copy"
+          },
+          "secrets": {
+            "$ref": "#/components/schemas/SecretsSummary",
+            "description": "The check for secrets in a text file"
+          },
+          "scan": {
+            "$ref": "#/components/schemas/ScanSummary",
+            "description": "The malware scan"
+          },
+          "archive": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive",
+            "description": "For a ZIP archive or a Word document: what its directory lists"
+          },
+          "sanitized_available": {
+            "type": "boolean",
+            "title": "Sanitized Available",
+            "description": "True when a sanitized copy can be downloaded with version=sanitized"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "extension",
+          "type",
+          "declared_type",
+          "size",
+          "sha256",
+          "visibility",
+          "uploader",
+          "uploader_is_staff",
+          "mine",
+          "created_at",
+          "text_like",
+          "secrets",
+          "scan",
+          "archive",
+          "sanitized_available"
+        ],
+        "title": "AttachmentOut",
+        "description": "A file attached to a submission."
+      },
+      "AttachmentPreview": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "none"
+            ],
+            "title": "Kind",
+            "description": "text: the sanitized text is in `text`; image: download it and show it; none: no preview exists"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The sanitized text, up to a limit"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when the text was cut at the limit"
+          },
+          "sanitized": {
+            "type": "boolean",
+            "title": "Sanitized",
+            "description": "True when secrets were masked in the text shown"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "What to know about this preview"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "text",
+          "truncated",
+          "sanitized",
+          "message"
+        ],
+        "title": "AttachmentPreview",
+        "description": "A preview of an attachment, as the caller may see it."
+      },
       "AttemptResult": {
         "properties": {
           "attempt": {
@@ -8405,6 +9239,32 @@
         ],
         "title": "AuthOptions",
         "description": "What the sign-in page needs to know before anyone is signed in."
+      },
+      "Body_attach_submissions__submission_id__attachments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "The file to attach"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ],
+            "title": "Visibility",
+            "description": "internal: only maintainers can see the file (a reporter may not choose it)",
+            "default": "public"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_attach_submissions__submission_id__attachments_post",
+        "description": "The multipart form of an attachment upload"
       },
       "Body_upload_document_documents_post": {
         "properties": {
@@ -14277,6 +15137,34 @@
         "title": "SafetyPolicy",
         "description": "What the owner of the target has authorised (spec section 35)."
       },
+      "ScanSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_scanned",
+              "clean",
+              "infected",
+              "error"
+            ],
+            "title": "Status",
+            "description": "not_scanned: no scanner is configured or it did not run; clean: the scanner found nothing; error: the scanner failed, so the file is not known to be clean"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "What the scanner said, or why it did not run"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "ScanSummary",
+        "description": "Whether a malware scanner looked at the file. 'not_scanned' means exactly that: no scanner ran."
+      },
       "Scorecard": {
         "properties": {
           "profile": {
@@ -14430,6 +15318,50 @@
         ],
         "title": "ScoringProfileOut",
         "description": "How a scoring profile weighs the categories"
+      },
+      "SecretsSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_applicable",
+              "none",
+              "redacted",
+              "needs_review",
+              "not_inspected"
+            ],
+            "title": "Status",
+            "description": "not_applicable: not a text file; none: nothing found; redacted: patterns matched and a sanitized copy was made; needs_review: the second inspection found more, so the file must be reviewed before it is shared outside AgentLab; not_inspected: the file is too large to inspect"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "How many of each kind of thing were masked"
+          },
+          "external_sharing_blocked": {
+            "type": "boolean",
+            "title": "External Sharing Blocked",
+            "description": "True when the file may not leave AgentLab until it has been reviewed"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "What this does and does not tell you"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "counts",
+          "external_sharing_blocked",
+          "note"
+        ],
+        "title": "SecretsSummary",
+        "description": "What the check for secrets in an attached text file found. Values are never shown."
       },
       "SessionOut": {
         "properties": {

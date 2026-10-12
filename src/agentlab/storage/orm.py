@@ -513,3 +513,35 @@ class SubmissionAuditRow(Entity):
     actor_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     client: Mapped[str] = mapped_column(String(64), default="")
     detail: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+
+
+class SubmissionAttachmentRow(Entity):
+    """A file attached to a submission. The bytes are in the artifact store, restricted; this row is what is known about them.
+
+    ``status`` is ``available`` or ``removed``. A removed attachment keeps its row (for the audit trail) and loses its bytes
+    when nothing else uses them."""
+
+    __tablename__ = "submission_attachments"
+    submission_id: Mapped[str] = _fk("submissions")
+    uploader_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    uploader_label: Mapped[str] = mapped_column(String(80), default="")
+    uploader_is_staff: Mapped[bool] = mapped_column(default=False)
+    visibility: Mapped[str] = mapped_column(String(10), default="public")  # public | internal
+    original_name: Mapped[str] = mapped_column(String(200), default="")
+    extension: Mapped[str] = mapped_column(String(16), default="")
+    declared_type: Mapped[str] = mapped_column(String(120), default="")
+    detected_type: Mapped[str] = mapped_column(String(120), default="")
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    artifact_id: Mapped[str] = mapped_column(String(80))
+    sanitized_artifact_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    text_like: Mapped[bool] = mapped_column(default=False)
+    secrets_status: Mapped[str] = mapped_column(String(16), default="not_applicable")
+    secrets_report: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    scan_status: Mapped[str] = mapped_column(String(16), default="not_scanned")
+    scan_detail: Mapped[str] = mapped_column(String(200), default="")
+    archive_summary: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    removed_by_label: Mapped[str] = mapped_column(String(80), default="")

@@ -11,6 +11,11 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Attachments and the DiagnosticRedactor** ([feedback-support.md](docs/feedback-support.md#attachments)): files on a submission,
+  checked by content, archives refused when hostile, kept privately under a hash, text files given a sanitized copy with the
+  secrets masked and a record of what was masked and where, a malware scan when a scanner is configured and an honest
+  `not_scanned` when not. Migration `0004`. The redaction patterns are held to linear time by a test, and the existing
+  `private_key` and `connection_string` patterns were made linear.
 * **Feedback & Support, core** ([feedback-support.md](docs/feedback-support.md)): feature requests and issue reports through the
   API, with numbers (`FR-2026-00042`, `IR-2026-00042`), a configurable workflow and status history, comments and internal notes,
   assigned priority and severity kept apart from what the reporter asked for, labels, assignment, links between submissions,
