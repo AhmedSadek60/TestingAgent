@@ -79,7 +79,7 @@ def test_migrations_create_schema_matching_models(tmp_path):
     ],
 )
 def test_a_hosts_postgres_url_gets_the_driver_agentlab_installs(given, expected):
-    """Railway, Heroku and Render hand out postgres:// or postgresql://, which SQLAlchemy opens with psycopg2."""
+    """Hosting platforms hand out postgres:// or postgresql://, which SQLAlchemy opens with psycopg2."""
     assert normalise_database_url(given) == expected
 
 

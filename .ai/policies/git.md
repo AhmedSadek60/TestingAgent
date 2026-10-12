@@ -33,4 +33,11 @@ Keep branches short-lived; merge/rebase from `main` using your team's convention
 but never rewrite a branch others have pulled.
 
 ## Merging
-Agents never merge their own PRs and never claim approval. A human reviewer approves.
+Agents never merge their own PRs by hand and never claim approval. A human reviewer approves.
+
+**Exception chosen by the repository owner: the staged release process.** `scripts/ship.py merge` (and `all`) may merge the
+pull request of its own branch, and only when all of these hold on the exact head commit: every check reported for it is
+`success`, `neutral` or `skipped` (and at least one check was reported); the pull request is open, not a draft and mergeable;
+and no reviewer's latest verdict is "changes requested". The merge is pinned to that head sha, so a push after the checks cannot
+be merged by mistake. The process never pushes to `main`, never skips or edits a check to make it pass, and never changes branch
+protection or CI permissions: those stay with the owner.
