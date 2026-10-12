@@ -461,6 +461,10 @@ in layers.
   inside the folders listed in `server.allowed_paths`, after following links. With the default empty list a client cannot
   name a server path at all and uploads instead (`server.max_upload_mb`, 25 MB), whose file names are reduced to a harmless
   last component.
+* **Request size.** A request body larger than `server.max_body_mb` (4 MB; an upload may be `server.max_upload_mb` plus a
+  little) is refused with `413` before it is read. The framework parses a body before it asks who is calling, so without this
+  limit any client that can reach the server, signed in or not, could use up its memory with one request. A body with no
+  declared length is counted as it arrives.
 * **No secrets inline.** A target sent to the API cannot carry a secret: a header or an environment value that is named like
   a secret, or that matches a [secret pattern](#redaction), is refused with the instruction to store it with
   `POST /credentials` and name it in `auth_credential`. Header names must be valid and a value cannot contain a line break.

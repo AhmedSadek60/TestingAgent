@@ -22,7 +22,7 @@ from agentlab.api import errors, openapi_docs
 from agentlab.api.routes import accounts, catalog, feedback, projects, reports, runs
 from agentlab.api.security import UI_CSP, RequestGuard, TokenGuard, is_loopback, resolve_token
 from agentlab.api.state import ApiState
-from agentlab.core.config import AgentLabConfig
+from agentlab.core.config import AgentLabConfig, ServerConfig
 from agentlab.core.errors import PolicyBlocked
 from agentlab.feedback import SubmissionService
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
@@ -209,8 +209,15 @@ def create_app(
         hosts = (
             LOOPBACK_HOSTS  # no token: only this machine's names, so a web page cannot reach the API by DNS rebinding
         )
-    cors = cfg_hint.server.cors_origins if cfg_hint else []
-    app.add_middleware(RequestGuard, allowed_hosts=hosts, allowed_origins=cors)
+    server_config = cfg_hint.server if cfg_hint else ServerConfig()
+    cors = server_config.cors_origins
+    app.add_middleware(
+        RequestGuard,
+        allowed_hosts=hosts,
+        allowed_origins=cors,
+        max_body_bytes=server_config.max_body_mb * 1024 * 1024,
+        max_upload_bytes=server_config.max_upload_mb * 1024 * 1024,
+    )
     if cors:
         app.add_middleware(
             CORSMiddleware,

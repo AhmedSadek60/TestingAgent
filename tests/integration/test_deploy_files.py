@@ -76,6 +76,16 @@ def test_only_caddy_is_published_to_the_world_and_every_other_port_is_on_the_loo
     assert "ports" not in services["worker"] and "ports" not in services.get("redis", {})
 
 
+def test_the_api_takes_the_visitors_address_from_the_proxy_and_is_reachable_through_it_alone() -> None:
+    """Behind Caddy every request comes from Caddy's address unless the API reads X-Forwarded-For; that is only safe because
+    nothing but Caddy can reach the API."""
+    api = _compose(COMPOSE_VPS)["services"]["api"]
+    assert api["environment"]["FORWARDED_ALLOW_IPS"] == "*"
+    assert api["ports"] == [], "trusting the header is only safe when the API is not published"
+    caddy = CADDYFILE.read_text(encoding="utf-8")
+    assert "trusted_proxies" not in caddy, "Caddy must replace, not pass on, a forwarded address the visitor sent"
+
+
 def test_the_worker_has_the_chromium_profile_and_keeps_the_rest_of_its_hardening() -> None:
     base = _compose(COMPOSE)["services"]
     vps = _compose(COMPOSE_VPS)["services"]["worker"]
@@ -115,6 +125,17 @@ def test_caddy_serves_the_certificate_it_made_for_the_address_even_when_the_clie
     text = CADDYFILE.read_text(encoding="utf-8")
     assert "default_sni {$AGENTLAB_PUBLIC_HOST}" in text, "a client that connects to an IP sends no server name"
     assert "tls internal" in text and "reverse_proxy api:8080" in text and "flush_interval -1" in text
+
+
+def test_caddy_does_not_pass_on_a_request_larger_than_an_upload() -> None:
+    """The application bounds a body itself; the proxy in front of it bounds it first and with a number that is at least
+    what an upload of `server.max_upload_mb` needs."""
+    text = CADDYFILE.read_text(encoding="utf-8")
+    found = re.search(r"request_body\s*\{[^}]*max_size\s+(\d+)\s*MB", text)
+    assert found, "docker/Caddyfile does not bound the request body"
+    assert int(found.group(1)) > AgentLabConfig().server.max_upload_mb, (
+        "an allowed upload would be refused by the proxy"
+    )
 
 
 # ============================================================================== docker/agentlab.vps.yaml, and no secret anywhere

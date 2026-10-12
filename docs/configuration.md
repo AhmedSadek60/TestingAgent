@@ -154,6 +154,7 @@ databases as `UTF8` where you can: `SQL_ASCII` does not check that its text is v
 | `token_ref` | none | `env:NAME` or `secret:NAME`: the API token (16 or more characters) every request must present. |
 | `cors_origins` | `[]` | Origins that may call the API from a page of their own. The bundled interface needs none. |
 | `max_upload_mb` | `25` | The largest document or archive an upload may carry. |
+| `max_body_mb` | `4` | The largest request body the server reads, an upload excepted. A larger one is refused with `413` before it is parsed, so one oversized request cannot use up the server's memory. |
 | `allowed_paths` | `[]` | Folders on the server that a request may point a target at. Empty means API clients cannot name server paths at all (uploads are always allowed). |
 | `serve_ui` | `true` | Serve the web interface at `/` when it has been built. |
 
