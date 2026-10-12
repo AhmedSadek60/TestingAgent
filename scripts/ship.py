@@ -53,7 +53,6 @@ COMPOSE = [
     str(ENV_FILE),
 ]
 IMAGE = "agentlab:local"
-MARKER = ROOT / ".git" / "ship-checked"
 PYTEST_MARKS = "not docker and not browser and not postgres and not redis and not ollama and not matrix"
 GOOD = {"success", "neutral", "skipped"}  # conclusions that do not block a merge
 WAIT_START = 180  # seconds to wait for the first check to appear after a push
@@ -215,6 +214,21 @@ def head() -> str:
     return git("rev-parse", "HEAD")
 
 
+def git_dir(root: Path = ROOT) -> Path:
+    """The repository's git directory for this checkout. In a linked worktree ``.git`` is a file that points elsewhere, so the
+    directory is asked for, not assumed."""
+    done = subprocess.run(  # noqa: S603 - fixed command
+        ["git", "rev-parse", "--git-dir"], cwd=root, text=True, capture_output=True, check=False
+    )
+    found = Path(done.stdout.strip() or ".git")
+    return found if found.is_absolute() else root / found
+
+
+def marker(root: Path = ROOT) -> Path:
+    """Where `check` records the commit it cleared (inside the git directory, so it is never committed)."""
+    return git_dir(root) / "ship-checked"
+
+
 def python() -> str:
     return sys.executable
 
@@ -278,7 +292,7 @@ def cmd_check(args: argparse.Namespace) -> None:
         die("check", "you are on main. Work on a branch: git checkout -b <type>/<short-name>")
     if git("status", "--porcelain"):
         die("check", "the working tree has uncommitted changes. Commit them first: a check must describe a commit.")
-    MARKER.unlink(missing_ok=True)
+    marker().unlink(missing_ok=True)
     failed = []
     for name, cmd in local_checks(args.skip_web, args.skip_image):
         started = time.monotonic()
@@ -295,7 +309,7 @@ def cmd_check(args: argparse.Namespace) -> None:
             "\n  Every check that ran is green, but some were skipped, so this commit is NOT cleared for a pull request."
         )
         raise SystemExit(2)
-    MARKER.write_text(head(), encoding="utf-8")
+    marker().write_text(head(), encoding="utf-8")
     say(f"\n  All checks green on {head()[:7]}. Cleared for a pull request.")
 
 
@@ -341,7 +355,7 @@ def cmd_pr(_: argparse.Namespace) -> None:
         die("pr", "you are on main")
     if git("status", "--porcelain"):
         die("pr", "the working tree has uncommitted changes")
-    if not MARKER.exists() or MARKER.read_text(encoding="utf-8").strip() != head():
+    if not marker().exists() or marker().read_text(encoding="utf-8").strip() != head():
         die("pr", f"`check` has not passed on {head()[:7]}: run it first (the marker is for this exact commit)")
     run(["git", "fetch", "-q", "origin", "main"], quiet=True)
     behind = git("rev-list", "--count", "HEAD..origin/main")

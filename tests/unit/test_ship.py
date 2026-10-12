@@ -142,3 +142,25 @@ def test_a_branch_named_main_is_refused_by_every_stage_that_changes_something(
         with pytest.raises(SystemExit):
             fn(argparse.Namespace(skip_web=False, skip_image=False))
     assert "main" in capsys.readouterr().out
+
+
+def test_the_cleared_marker_lives_in_the_git_directory_of_a_worktree_too(ship: ModuleType, tmp_path: Path) -> None:
+    """In a linked worktree `.git` is a file, so a path built as `<root>/.git/ship-checked` cannot be written."""
+    import subprocess
+
+    def run(*cmd: str, cwd: Path) -> None:
+        subprocess.run(cmd, cwd=cwd, check=True, capture_output=True)  # noqa: S603
+
+    main = tmp_path / "main"
+    main.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=main)
+    run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "first", cwd=main)
+    linked = tmp_path / "linked"
+    run("git", "worktree", "add", "-q", "-b", "feature", str(linked), cwd=main)
+    assert (linked / ".git").is_file(), "the premise: a worktree's .git is a file"
+    for root in (main, linked):
+        path = ship.marker(root)
+        path.write_text("abc", encoding="utf-8")
+        assert path.read_text(encoding="utf-8") == "abc" and path.name == "ship-checked"
+        assert ".git" in path.parts
+    assert ship.marker(main) != ship.marker(linked), "each checkout keeps its own marker"
