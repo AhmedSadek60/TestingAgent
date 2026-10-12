@@ -12,6 +12,12 @@ services:
         WITH_BROWSER: "1"
     # Replaces, not extends, the base file's 127.0.0.1:8080 mapping.
     ports: !reset []
+    environment:
+      # Caddy is the only thing that can reach the API (no port is published), and it sets X-Forwarded-For to the address
+      # the visitor really has. Without this every visitor is "Caddy" to AgentLab: one person's wrong guesses would slow
+      # everyone down, the limits on sign-in and registration would be shared by everyone, and the audit trail could not
+      # tell people apart. Never set this on an API that can be reached directly: the header could then be forged.
+      FORWARDED_ALLOW_IPS: "*"
     volumes: &config
       - data:/data
       - ./agentlab.vps.yaml:/etc/agentlab/agentlab.yaml:ro

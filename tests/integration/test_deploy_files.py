@@ -76,6 +76,16 @@ def test_only_caddy_is_published_to_the_world_and_every_other_port_is_on_the_loo
     assert "ports" not in services["worker"] and "ports" not in services.get("redis", {})
 
 
+def test_the_api_takes_the_visitors_address_from_the_proxy_and_is_reachable_through_it_alone() -> None:
+    """Behind Caddy every request comes from Caddy's address unless the API reads X-Forwarded-For; that is only safe because
+    nothing but Caddy can reach the API."""
+    api = _compose(COMPOSE_VPS)["services"]["api"]
+    assert api["environment"]["FORWARDED_ALLOW_IPS"] == "*"
+    assert api["ports"] == [], "trusting the header is only safe when the API is not published"
+    caddy = CADDYFILE.read_text(encoding="utf-8")
+    assert "trusted_proxies" not in caddy, "Caddy must replace, not pass on, a forwarded address the visitor sent"
+
+
 def test_the_worker_has_the_chromium_profile_and_keeps_the_rest_of_its_hardening() -> None:
     base = _compose(COMPOSE)["services"]
     vps = _compose(COMPOSE_VPS)["services"]["worker"]

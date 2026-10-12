@@ -109,6 +109,14 @@ docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /roo
 
 The password is typed at a hidden prompt. On a server that anyone can reach, consider `accounts.registration: approval` or `closed`.
 
+## Who is calling
+
+Behind Caddy the API would see every request as coming from Caddy. `docker/compose.vps.yaml` therefore sets
+`FORWARDED_ALLOW_IPS=*` for the API, so it uses the `X-Forwarded-For` address Caddy sets to the visitor's real one (Caddy
+replaces a forwarded address a visitor sent; it passes one on only if `trusted_proxies` lists the sender, which this
+`Caddyfile` does not). The limits on wrong tokens, sign-in and registration are kept per visitor address, and the account audit
+trail records it. This is safe **only because no port of the API is published**; if you publish it, remove the setting.
+
 ## What the web containers can and cannot do
 
 **Browser tests work from the dashboard.** The image is built with Chromium (`WITH_BROWSER=1`, set in `docker/compose.vps.yaml`),
