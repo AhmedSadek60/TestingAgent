@@ -117,6 +117,17 @@ def test_caddy_serves_the_certificate_it_made_for_the_address_even_when_the_clie
     assert "tls internal" in text and "reverse_proxy api:8080" in text and "flush_interval -1" in text
 
 
+def test_caddy_does_not_pass_on_a_request_larger_than_an_upload() -> None:
+    """The application bounds a body itself; the proxy in front of it bounds it first and with a number that is at least
+    what an upload of `server.max_upload_mb` needs."""
+    text = CADDYFILE.read_text(encoding="utf-8")
+    found = re.search(r"request_body\s*\{[^}]*max_size\s+(\d+)\s*MB", text)
+    assert found, "docker/Caddyfile does not bound the request body"
+    assert int(found.group(1)) > AgentLabConfig().server.max_upload_mb, (
+        "an allowed upload would be refused by the proxy"
+    )
+
+
 # ============================================================================== docker/agentlab.vps.yaml, and no secret anywhere
 def test_the_server_configuration_loads_and_judges_with_the_local_model() -> None:
     config = AgentLabConfig.load(VPS_YAML)

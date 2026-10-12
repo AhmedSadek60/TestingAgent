@@ -250,6 +250,13 @@ class ServerConfig(Model):
         "from the API itself and needs none",
     )
     max_upload_mb: int = Field(default=25, ge=1, le=512, description="Largest document or archive an upload may carry")
+    max_body_mb: int = Field(
+        default=4,
+        ge=1,
+        le=256,
+        description="Largest request body the server reads, an upload excepted. A larger one is refused with 413 before "
+        "it is parsed, so one oversized request cannot exhaust the server's memory",
+    )
     allowed_paths: list[str] = Field(
         default_factory=list,
         description="Folders on the server a request may point a target at (a repository path, a document). "
