@@ -25,6 +25,17 @@ TOKEN = "api-" + "Qw7Er5Ty3Ui9Op1As4Df"  # a made-up API token
 SECRET = "sk-" + "proj" + "-" + "Zq81LmN4xW7sR2pK9vB3cD6e"  # looks like a provider key, is not one
 
 PUBLIC = {("GET", "/health")}
+#: The calls a person makes *before* they have any credential, so they cannot ask for one: the sign-in page's options,
+#: registration (which `accounts.registration` can close), the password sign-in itself, and signing out (already being signed
+#: out is not an error). Each is listed by method and path; anything not listed here must still answer 401. What each one can
+#: reach is tested in tests/api/test_accounts_api.py and tests/security/test_accounts_security.py.
+PUBLIC_ACCOUNT_CALLS = {
+    ("GET", "/auth/options"),
+    ("POST", "/auth/register"),
+    ("POST", "/auth/login"),
+    ("POST", "/auth/logout"),
+}
+PUBLIC = PUBLIC | PUBLIC_ACCOUNT_CALLS
 
 
 def concrete(path: str) -> str:
