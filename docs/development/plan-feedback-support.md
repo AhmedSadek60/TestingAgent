@@ -26,14 +26,14 @@ Code. Nothing runs Claude Code or changes the repository automatically.
 | A secret redactor exists and is applied to every persisted JSON and text column. | `src/agentlab/security/redactor.py`, `storage/orm.py` (`RedactedJSON`, `RedactedText`) | `DiagnosticRedactor` extends it (PII, cookies, connection strings, custom rules, a second inspection pass) rather than competing with it. |
 | An artifact store with sensitivity levels, content addressing and run correlation exists. | `src/agentlab/storage/artifacts.py` | Attachments and handoff packages use it (`kind=support_*`, `sensitivity=restricted`), plus a per-attachment access check. |
 | Uploads exist for documents, with a suffix allow-list and `safe_filename`. | `src/agentlab/api/routes/projects.py` | The attachment service generalizes that (signature checks, limits, archives). |
-| One migration (`0001`), SQLAlchemy `Entity` base (id, timestamps, version, status), Alembic. | `src/agentlab/storage/` | New tables follow `Entity`; migration `0002`; SQLite and PostgreSQL both tested. |
+| One migration (`0001`), SQLAlchemy `Entity` base (id, timestamps, version, status), Alembic. | `src/agentlab/storage/` | New tables follow `Entity`; each slice adds its own migration (`0002` accounts, `0003` submissions, then one per later slice); SQLite and PostgreSQL both tested. |
 | Every API field must be documented, and `web/openapi.json` plus the generated TypeScript schema must match the code. | `tests/api/test_openapi.py`, `scripts/export_openapi.py --check`, CI | Each new schema field gets a description; the schema files are regenerated with the tooling. |
 | React web app with pages, a nav, an API client generated from the OpenAPI document; no browser-error capture exists. | `web/src` | New pages in the existing style; a small client-side error buffer for the browser-diagnostics option. |
 | `scripts/ship.py` and CI: lint, format, types, API description, governance, tests, web job, image build. | this repository | Each slice is its own pull request through that process. |
 
 ## Proposed approach
 
-### Data model (migration `0002`, SQLAlchemy `Entity` subclasses, indexed for filter and search)
+### Data model (migration `0003`, SQLAlchemy `Entity` subclasses, indexed for filter and search; accounts are `0002`)
 
 `submissions` (common: human id `FR-2026-00042` / `IR-2026-00042`, type, title, description, category, status, requested
 priority, assigned priority, severity, reporter id, assignee id, visibility `normal|security`, project id, timestamps),
@@ -135,7 +135,7 @@ maintainer queue and triage panel; handoff preview and download. Unsaved-draft c
 
 ## Affected components and files
 
-New: `src/agentlab/feedback/`, `api/routes/feedback.py`, migration `0002`, `web/src/pages/Feedback*`, `web/src/components/feedback/`,
+New: `src/agentlab/feedback/`, `api/routes/feedback.py`, migrations `0002` and `0003`, `web/src/pages/Feedback*`, `web/src/components/feedback/`,
 tests under `tests/unit`, `tests/api`, `tests/security`, `tests/integration`, `tests/e2e`, `docs/feedback-support.md`.
 Changed: `api/app.py` (router, role middleware), `api/security.py` (roles), `core/config.py` (a `feedback` section),
 `storage/orm.py` and `storage/db.py`, `web/openapi.json`, `web/src/api/schema.d.ts`, the navigation. Not touched: the
@@ -152,7 +152,7 @@ handoff (4), end to end (5). The migration is tested on SQLite and PostgreSQL, u
 
 - **Authentication change** (decision 1): additive, and the existing token keeps working unchanged; rollback is removing the
   roles. A mistake here exposes submissions, so it has the most tests.
-- **Migration `0002`** adds tables only. A rollback is `downgrade`, which drops them (data in them is lost); a backup is taken
+- **Migrations `0002` (accounts) and `0003` (submissions)** add tables only. A rollback is `downgrade`, which drops them (data in them is lost); a backup is taken
   before the publish step.
 - **Uploads** are the main new attack surface: strict validation, private storage, no extraction to disk, no execution.
 - **Log capture** adds a small memory cost and must never contain unredacted secrets: it stores only redacted lines, bounded.
@@ -161,7 +161,7 @@ handoff (4), end to end (5). The migration is tested on SQLite and PostgreSQL, u
 
 ## Irreversible steps and human approval point
 
-Approval of decisions 1 to 4 is required before slice 1. Applying migration `0002` to the live database happens only at the
+Approval of decisions 1 to 4 is required before slice 1. Applying a migration to the live database happens only at the
 publish step of the staged process, after a backup, and only after the slice's pull request is green.
 
 ## Open questions / assumptions
