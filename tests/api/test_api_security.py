@@ -239,6 +239,17 @@ async def test_an_origin_the_operator_lists_may_call_the_api_from_a_browser(tmp_
             },
         )
         assert pre.status_code == 200 and "POST" in pre.headers["access-control-allow-methods"]
+        patch = await c.options(
+            "/users/x",
+            headers={
+                "Origin": "https://console.example",
+                "Access-Control-Request-Method": "PATCH",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        assert patch.status_code == 200 and "PATCH" in patch.headers["access-control-allow-methods"], (
+            "accounts and submissions are changed with PATCH"
+        )
         other = await c.post("/projects", json={"name": "no"}, headers={"Origin": "https://evil.example"})
         assert other.status_code == 403
         assert "access-control-allow-origin" not in other.headers

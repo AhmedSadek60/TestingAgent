@@ -209,7 +209,7 @@ def create_app(
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors,
-            allow_methods=["GET", "POST", "DELETE"],
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
             allow_headers=["authorization", "content-type", "x-api-key", "last-event-id", "x-csrf-token"],
             expose_headers=["X-Next-Cursor"],
             allow_credentials=False,
