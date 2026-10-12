@@ -2,7 +2,7 @@
 
 AgentLab began with **one shared API token and no accounts**. Accounts are added beside it. The token keeps working, exactly as
 before, for the command line, CI and automation; a person can also **register, sign in with a password** and have a role.
-Feedback & Support (feature requests and issue reports) is built on them.
+Feedback & Support (feature requests and issue reports, [feedback-support.md](feedback-support.md)) is built on them.
 
 * [Who can do what](#who-can-do-what)
 * [Registering and signing in](#registering-and-signing-in)

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from agentlab.core.errors import UserError
 from agentlab.core.models.base import Model
@@ -292,6 +292,129 @@ class AccountsConfig(Model):
     )
 
 
+class FeedbackConfig(Model):
+    """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
+
+    feature_categories: list[str] = Field(
+        default_factory=lambda: [
+            "User Interface / UX",
+            "AI Agent Testing",
+            "Test Case Generation",
+            "Evaluation Metrics",
+            "Security Testing",
+            "RAG Evaluation",
+            "Browser Automation",
+            "Provider Integration",
+            "Local LLM Support",
+            "Reporting and Analytics",
+            "Performance",
+            "Workflow Automation",
+            "API",
+            "CLI",
+            "Deployment",
+            "Developer Experience",
+            "Other",
+        ],
+        description="The categories a feature request can have",
+    )
+    issue_categories: list[str] = Field(
+        default_factory=lambda: [
+            "Application Bug",
+            "UI / Display Problem",
+            "Test Execution Failure",
+            "Incorrect Evaluation Result",
+            "Test Case Generation Problem",
+            "Browser Automation Problem",
+            "Provider / LLM Integration Problem",
+            "API Error",
+            "Repository Ingestion Problem",
+            "Document Processing Problem",
+            "Incorrect Score or Report",
+            "Performance / Slow Response",
+            "Crash or Application Unavailable",
+            "Installation / Configuration",
+            "Authentication / Permissions",
+            "Data Persistence Problem",
+            "Unexpected Cost or Resource Usage",
+            "Suspected Security Issue",
+            "Other",
+        ],
+        description="The categories an issue report can have",
+    )
+    feature_statuses: list[str] = Field(
+        default_factory=lambda: [
+            "Submitted",
+            "Needs Triage",
+            "Under Review",
+            "Planned",
+            "In Progress",
+            "Completed",
+            "Declined",
+            "Duplicate",
+        ],
+        description="The statuses a feature request moves through; the first is the one it starts with",
+    )
+    issue_statuses: list[str] = Field(
+        default_factory=lambda: [
+            "Submitted",
+            "Needs Triage",
+            "Investigating",
+            "Awaiting User",
+            "Reproducing",
+            "In Progress",
+            "Fix Available",
+            "Resolved",
+            "Closed",
+            "Duplicate",
+            "Cannot Reproduce",
+        ],
+        description="The statuses an issue report moves through; the first is the one it starts with",
+    )
+    resolved_statuses: list[str] = Field(
+        default_factory=lambda: ["Completed", "Fix Available", "Resolved"],
+        description="Statuses that set the resolution time of a submission",
+    )
+    closed_statuses: list[str] = Field(
+        default_factory=lambda: ["Completed", "Declined", "Duplicate", "Closed", "Cannot Reproduce"],
+        description="Statuses that set the closing time of a submission",
+    )
+    security_category: str = Field(
+        default="Suspected Security Issue",
+        description="An issue with this category is security-sensitive: only its reporter and authorised maintainers see it",
+    )
+    service_token_sees_security: bool = Field(
+        default=False,
+        description="Whether the shared API token (a credential many people may hold) may see security-sensitive "
+        "submissions made by other people. Maintainers and admins, and the local machine, always may",
+    )
+    max_submissions_per_day: int = Field(
+        default=20, ge=1, le=10_000, description="Submissions one person with the role reporter may make in 24 hours"
+    )
+    max_comments_per_day: int = Field(
+        default=100, ge=1, le=10_000, description="Comments one person with the role reporter may write in 24 hours"
+    )
+    similar_limit: int = Field(
+        default=5, ge=1, le=20, description="How many possibly similar submissions are suggested"
+    )
+
+    @model_validator(mode="after")
+    def _the_lists_agree(self) -> FeedbackConfig:
+        for name in ("feature_categories", "issue_categories", "feature_statuses", "issue_statuses"):
+            values = getattr(self, name)
+            if not values or len(set(values)) != len(values) or any(not v.strip() or len(v) > 80 for v in values):
+                raise ValueError(
+                    f"feedback.{name} must be a list of different, non-empty names of at most 80 characters"
+                )
+        known = set(self.feature_statuses) | set(self.issue_statuses)
+        for name in ("resolved_statuses", "closed_statuses"):
+            unknown = sorted(set(getattr(self, name)) - known)
+            if unknown:
+                raise ValueError(f"feedback.{name} names statuses no workflow has: {', '.join(unknown)}")
+        if self.security_category not in self.issue_categories:
+            raise ValueError("feedback.security_category must be one of feedback.issue_categories")
+        return self
+
+
 #: A reply read from a web page includes the page's own rendering and, for an assistant, a model's time to write it. A
 #: latency budget written for an API (a few seconds) would score every web chat as slow, so an agent reached only through
 #: a browser gets at least this much unless the owner sets one (evaluation.latency_budget_ms).
@@ -311,6 +434,7 @@ class AgentLabConfig(Model):
     queue: QueueConfig = Field(default_factory=QueueConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     accounts: AccountsConfig = Field(default_factory=AccountsConfig)
+    feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4
     skill_dirs: list[str] = Field(default_factory=list)

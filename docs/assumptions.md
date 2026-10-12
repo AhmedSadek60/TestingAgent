@@ -150,6 +150,10 @@ Where a page describes a decision in full, this one links to it instead of repea
   interpreted.
 - **A server that listens beyond loopback needs an API token** and refuses to start without one; it has optional accounts
   ([accounts.md](accounts.md)) and no TLS ([security.md](security.md#web-interface-and-api)).
+- **Feedback & Support is in-app only and works on what the server can see**: there is no e-mail, so "unread" is a marker the
+  reporter clears by looking; a reporter's suggestions of similar submissions are of their own, because another person's
+  submission is not theirs to see; and the categories, statuses and limits are configuration, not code
+  ([feedback-support.md](feedback-support.md)).
 - **Only Chromium** is driven. Firefox and WebKit were not verified, and a configuration that names them is refused.
 - `agentlab fixtures verify` refuses a defect name the example agent does not have, with the names it does have.
 

@@ -20,6 +20,7 @@ from agentlab.core.errors import (
     UnsupportedCapability,
     UserError,
 )
+from agentlab.feedback.errors import QuotaExceeded, VersionConflict
 from agentlab.security.redactor import redact
 
 log = logging.getLogger(__name__)
@@ -41,8 +42,10 @@ def status_for(exc: AgentLabError) -> tuple[int, str]:
         return 401, "unauthorized"
     if isinstance(exc, AccountLocked):
         return 429, "rate_limited"
-    if isinstance(exc, AccountConflict):
+    if isinstance(exc, AccountConflict | VersionConflict):
         return 409, "conflict"
+    if isinstance(exc, QuotaExceeded):
+        return 429, "rate_limited"
     if isinstance(exc, NotFoundError):
         return 404, "not_found"
     if isinstance(exc, ConflictError):
@@ -68,7 +71,7 @@ def install(app: FastAPI) -> None:
             log.warning("request failed: %s", redact(str(exc)))
         headers = (
             {"Retry-After": str(exc.retry_after_seconds)}
-            if isinstance(exc, AccountLocked) and exc.retry_after_seconds
+            if isinstance(exc, AccountLocked | QuotaExceeded) and exc.retry_after_seconds
             else None
         )
         return JSONResponse(_body(kind, str(exc)), status_code=status, headers=headers)

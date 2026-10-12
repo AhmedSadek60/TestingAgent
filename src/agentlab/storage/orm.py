@@ -375,3 +375,140 @@ class AccountEventRow(Entity):
     subject: Mapped[str] = mapped_column(String(80), default="", index=True)
     client: Mapped[str] = mapped_column(String(64), default="")
     detail: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+
+
+# ================================================================================================= feedback
+class SubmissionRow(Entity):
+    """A feature request or an issue report. ``status`` is one of the configured workflow statuses.
+
+    Free text goes through ``RedactedText``: a secret pasted into a description is masked before it is stored."""
+
+    __tablename__ = "submissions"
+    human_id: Mapped[str] = mapped_column(String(24), unique=True, index=True)
+    type: Mapped[str] = mapped_column(String(10), index=True)  # feature | issue
+    year: Mapped[int] = mapped_column(Integer)
+    seq: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(RedactedText())
+    description: Mapped[str] = mapped_column(RedactedText(), default="")
+    category: Mapped[str] = mapped_column(String(80), index=True)
+    requested_priority: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    assigned_priority: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
+    severity: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
+    visibility: Mapped[str] = mapped_column(String(12), default="normal", index=True)  # normal | security
+    reporter_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    reporter_label: Mapped[str] = mapped_column(String(80), default="")
+    assignee_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    project_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    related_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    related_test_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_report_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_target_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    build: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    last_staff_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reporter_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (UniqueConstraint("type", "year", "seq", name="uq_submission_number"),)
+
+
+class FeatureDetailsRow(Entity):
+    __tablename__ = "feature_request_details"
+    submission_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("submissions.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    problem_statement: Mapped[str] = mapped_column(RedactedText())
+    expected_behavior: Mapped[str] = mapped_column(RedactedText(), default="")
+    primary_use_case: Mapped[str] = mapped_column(RedactedText(), default="")
+    why_important: Mapped[str] = mapped_column(RedactedText(), default="")
+    users_affected: Mapped[str] = mapped_column(RedactedText(), default="")
+    business_impact: Mapped[str] = mapped_column(RedactedText(), default="")
+    use_frequency: Mapped[str] = mapped_column(String(120), default="")
+    current_workaround: Mapped[str] = mapped_column(RedactedText(), default="")
+    proposed_solution: Mapped[str] = mapped_column(RedactedText(), default="")
+    acceptance_criteria: Mapped[str] = mapped_column(RedactedText(), default="")
+    related_area: Mapped[str] = mapped_column(String(200), default="")
+    dependencies: Mapped[str] = mapped_column(RedactedText(), default="")
+
+
+class IssueDetailsRow(Entity):
+    __tablename__ = "issue_report_details"
+    submission_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("submissions.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    impact_summary: Mapped[str] = mapped_column(RedactedText())
+    expected_behavior: Mapped[str] = mapped_column(RedactedText(), default="")
+    actual_behavior: Mapped[str] = mapped_column(RedactedText(), default="")
+    reproduction_steps: Mapped[str] = mapped_column(RedactedText(), default="")
+    not_reproducible: Mapped[bool] = mapped_column(default=False)
+    frequency: Mapped[str] = mapped_column(String(20), default="unknown", index=True)
+    first_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consistent: Mapped[bool | None] = mapped_column(nullable=True)
+    blocks_work: Mapped[bool | None] = mapped_column(nullable=True)
+    workaround: Mapped[str] = mapped_column(RedactedText(), default="")
+    reported_impact: Mapped[str] = mapped_column(String(30), default="other", index=True)
+    ui_screen: Mapped[str] = mapped_column(String(200), default="")
+    worker_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provider_config_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class SubmissionCommentRow(Entity):
+    """A line of the discussion. ``visibility`` is ``public`` (the reporter sees it) or ``internal`` (maintainers only)."""
+
+    __tablename__ = "submission_comments"
+    submission_id: Mapped[str] = _fk("submissions")
+    author_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_label: Mapped[str] = mapped_column(String(80), default="")
+    author_is_staff: Mapped[bool] = mapped_column(default=False)
+    visibility: Mapped[str] = mapped_column(String(10), default="public", index=True)
+    kind: Mapped[str] = mapped_column(String(20), default="comment")  # comment | info_request | system
+    body: Mapped[str] = mapped_column(RedactedText())
+
+
+class SubmissionHistoryRow(Entity):
+    """Every status change, never overwritten."""
+
+    __tablename__ = "submission_status_history"
+    submission_id: Mapped[str] = _fk("submissions")
+    old_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    new_status: Mapped[str] = mapped_column(String(40))
+    changed_by_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    changed_by_label: Mapped[str] = mapped_column(String(80), default="")
+    by_staff: Mapped[bool] = mapped_column(default=False)
+    comment: Mapped[str] = mapped_column(RedactedText(), default="")
+
+
+class SubmissionLabelRow(Entity):
+    __tablename__ = "submission_labels"
+    submission_id: Mapped[str] = _fk("submissions")
+    label: Mapped[str] = mapped_column(String(60), index=True)
+    __table_args__ = (UniqueConstraint("submission_id", "label", name="uq_submission_label"),)
+
+
+class SubmissionRelationRow(Entity):
+    __tablename__ = "submission_relations"
+    from_id: Mapped[str] = _fk("submissions")
+    to_id: Mapped[str] = _fk("submissions")
+    kind: Mapped[str] = mapped_column(String(24))  # duplicate_of | related | caused_by | implements
+    created_by_label: Mapped[str] = mapped_column(String(80), default="")
+    __table_args__ = (UniqueConstraint("from_id", "to_id", "kind", name="uq_submission_relation"),)
+
+
+class SubmissionAuditRow(Entity):
+    """Important actions on submissions. No foreign key: the record outlives the submission it is about."""
+
+    __tablename__ = "submission_audit_events"
+    submission_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    event: Mapped[str] = mapped_column(String(40), index=True)
+    actor_label: Mapped[str] = mapped_column(String(80), default="")
+    actor_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    client: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)

@@ -24,6 +24,17 @@ PUBLIC = {
 }  # logout: already out is not an error
 #: Open to every signed-in person, reporters included.
 FOR_EVERYONE = {"/auth/me", "/auth/logout", "/auth/password"}
+#: What a reporter may do in Feedback & Support, by method and path. Everything else AgentLab has is refused to them.
+REPORTER_MAY = {
+    ("GET", "/submissions/options"),
+    ("GET", "/submissions/summary"),
+    ("GET", "/submissions/similar"),
+    ("POST", "/submissions"),
+    ("GET", "/submissions"),
+    ("GET", "/submissions/{submission_id}"),
+    ("POST", "/submissions/{submission_id}/comments"),
+    ("POST", "/submissions/{submission_id}/seen"),
+}
 ADMIN_ONLY_PREFIX = "/users"
 
 
@@ -49,12 +60,13 @@ async def reporter_session(api: Api, name: str = "walter") -> tuple[httpx.AsyncC
 
 
 async def test_a_reporter_is_refused_by_every_endpoint_that_existed_before_accounts(tmp_path: Path) -> None:
-    """Not a list of the routes someone remembered: every operation the API describes, from its own OpenAPI document."""
+    """Not a list of the routes someone remembered: every operation the API describes, from its own OpenAPI document.
+    A reporter reaches the account calls and the Feedback & Support calls named above, and nothing else."""
     async with server(tmp_path) as api:
         client, headers = await reporter_session(api)
         tested, allowed = 0, []
         for method, path in operations(api):
-            if path in PUBLIC or path in FOR_EVERYONE:
+            if path in PUBLIC or path in FOR_EVERYONE or (method, path) in REPORTER_MAY:
                 continue
             r = await client.request(method, concrete(path), headers=headers, json={} if method != "GET" else None)
             tested += 1

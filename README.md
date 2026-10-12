@@ -111,8 +111,8 @@ providers, other operating systems) is in [docs/development.md](docs/development
   with Chromium: [deployment-vps.md](docs/deployment-vps.md). Changes reach it through
   [the staged release process](docs/development.md#the-staged-release-process).
 
-A server that listens beyond loopback needs an API token and refuses to start without one. It has optional accounts ([accounts.md](docs/accounts.md)) and no TLS
-of its own: read [security.md](docs/security.md#web-interface-and-api) before exposing it.
+A server that listens beyond loopback needs an API token and refuses to start without one. It has optional accounts ([accounts.md](docs/accounts.md)), a feedback channel for them
+([feedback-support.md](docs/feedback-support.md)) and no TLS of its own: read [security.md](docs/security.md#web-interface-and-api) before exposing it.
 
 ## Documentation
 
