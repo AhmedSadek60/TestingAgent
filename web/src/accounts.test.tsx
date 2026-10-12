@@ -135,7 +135,8 @@ describe("registering", () => {
     await userEvent.type(screen.getByLabelText("Password again"), "correct-horse-battery-7");
     await userEvent.click(screen.getByRole("button", { name: "Create account" }));
     expect(await screen.findByRole("heading", { name: "Your account" })).toBeInTheDocument();
-    expect(screen.getByText(/send feature requests and issue reports/)).toBeInTheDocument();
+    expect(screen.getByText(/Feedback & Support: feature requests and issue reports/)).toBeInTheDocument();
+    expect(screen.getByText(/not in this interface yet/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
     expect(server.to("GET /projects"), "a reporter's interface never asks for what a reporter may not read").toHaveLength(0);
     expect(server.to("POST /auth/register")[0]!.body).toMatchObject({ username: "newbie", password: "correct-horse-battery-7" });

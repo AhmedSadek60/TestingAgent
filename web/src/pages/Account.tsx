@@ -5,7 +5,8 @@ import { Badge, Card, Field, Notice, PageHeader, useToast } from "../components/
 import { useSession } from "../session";
 
 const ROLE_TEXT: Record<Role, string> = {
-  reporter: "You can send feature requests and issue reports, and follow your own submissions.",
+  reporter:
+    "Your role is for Feedback & Support: feature requests and issue reports, and following your own submissions. Those pages are not in this interface yet.",
   maintainer: "You can use everything the shared API token can, and triage submissions.",
   admin: "You can use everything a maintainer can, and manage accounts.",
 };
