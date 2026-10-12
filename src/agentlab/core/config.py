@@ -292,6 +292,10 @@ class AccountsConfig(Model):
     )
 
 
+def _all_notifications() -> list[Literal["comment", "information_request", "status_change"]]:
+    return ["comment", "information_request", "status_change"]
+
+
 class FeedbackConfig(Model):
     """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
 
@@ -395,6 +399,11 @@ class FeedbackConfig(Model):
     )
     similar_limit: int = Field(
         default=5, ge=1, le=20, description="How many possibly similar submissions are suggested"
+    )
+    notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
+        default_factory=_all_notifications,
+        description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "
+        "information or a reproduction attempt, or a status change. Remove one to stop that notification",
     )
 
     @model_validator(mode="after")

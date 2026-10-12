@@ -191,6 +191,7 @@ what a submission moves through; changing them changes the forms and the maintai
 | `max_submissions_per_day` | `20` | Submissions one person with the role `reporter` may make in 24 hours. Maintainers have no limit. |
 | `max_comments_per_day` | `100` | Comments one person with the role `reporter` may write in 24 hours. |
 | `similar_limit` | `5` | How many possibly similar submissions are suggested while a title is typed. |
+| `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |
 
 ## `planning`
 

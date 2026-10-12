@@ -29,6 +29,7 @@ from agentlab.feedback.models import (
     CommentOut,
     FeedbackOptions,
     SimilarOut,
+    StatusChangeOut,
     SubmissionCounts,
     SubmissionDetail,
     SubmissionPage,
@@ -154,6 +155,13 @@ def search(
         list[str] | None, Query(max_length=20, description="Only these statuses (repeat the parameter)")
     ] = None,
     category: Annotated[str | None, Query(max_length=80, description="Only this category")] = None,
+    requested_priority: Annotated[
+        Literal["low", "normal", "high", "critical_business_need"] | None,
+        Query(description="Only this priority as the reporter asked for it (feature requests)"),
+    ] = None,
+    project: Annotated[str | None, Query(max_length=64, description="Only this project (id)")] = None,
+    version: Annotated[str | None, Query(max_length=40, description="Only reports of this AgentLab version")] = None,
+    run: Annotated[str | None, Query(max_length=64, description="Only submissions about this evaluation run")] = None,
     priority: Annotated[
         Literal["low", "normal", "high", "critical"] | None,
         Query(description="Only this assigned priority (maintainers)"),
@@ -171,7 +179,13 @@ def search(
     visibility: Annotated[
         Literal["normal", "security"] | None, Query(description="Only this visibility (maintainers)")
     ] = None,
-    q: Annotated[str | None, Query(max_length=200, description="Text to find in the title or description")] = None,
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=200,
+            description="Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id",
+        ),
+    ] = None,
     mine: Annotated[bool, Query(description="Only the submissions the caller made")] = False,
     unread: Annotated[bool, Query(description="Only the caller's own that have an answer they have not seen")] = False,
     created_from: Annotated[datetime | None, Query(description="Made at or after this time")] = None,
@@ -193,6 +207,10 @@ def search(
             type=type_,
             statuses=status or [],
             category=category,
+            requested_priority=requested_priority,
+            project=project,
+            version=version,
+            run=run,
             priority=priority,
             severity=severity,
             assignee=assignee,
@@ -253,6 +271,39 @@ def triage(submission_id: SUBMISSION, body: SubmissionPatch, request: Request) -
 def comment(submission_id: SUBMISSION, body: CommentIn, request: Request) -> CommentOut:
     st = state_of(request)
     return _service(st).comment(_actor(request, st), submission_id, body, client=client_of(request))
+
+
+@router.get(
+    "/submissions/{submission_id}/comments",
+    response_model=list[CommentOut],
+    summary="Read the discussion of a submission",
+    description="The comments, oldest first. A reporter gets the public ones only, and a maintainer who wrote one reads as "
+    '"AgentLab maintainer" to them.',
+    dependencies=[Depends(require_user)],
+)
+def comments(
+    submission_id: SUBMISSION,
+    request: Request,
+    limit: Annotated[int, Query(ge=1, le=500, description="How many comments")] = 200,
+    offset: Annotated[int, Query(ge=0, le=100_000, description="How many to skip")] = 0,
+) -> list[CommentOut]:
+    st = state_of(request)
+    return _service(st).comments(
+        _actor(request, st), submission_id, limit=limit, offset=offset, client=client_of(request)
+    )
+
+
+@router.get(
+    "/submissions/{submission_id}/history",
+    response_model=list[StatusChangeOut],
+    summary="Read the status history of a submission",
+    description="Every status change, oldest first, with who made it, when, and the comment that went with it. Nothing is "
+    "ever overwritten.",
+    dependencies=[Depends(require_user)],
+)
+def history(submission_id: SUBMISSION, request: Request) -> list[StatusChangeOut]:
+    st = state_of(request)
+    return _service(st).history(_actor(request, st), submission_id, client=client_of(request))
 
 
 @router.post(

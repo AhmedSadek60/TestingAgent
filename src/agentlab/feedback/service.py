@@ -110,6 +110,12 @@ SIMILAR_CANDIDATES = 500
 DENIED_NOTE_EVERY = 600.0  # seconds: a denied attempt on one submission by one caller is recorded at most this often
 DAY = timedelta(hours=24)
 PRIORITY_RANK = {"critical": 4, "high": 3, "normal": 2, "low": 1}
+#: Which configured notification a kind of comment belongs to.
+NOTIFICATION_OF_KIND = {
+    "comment": "comment",
+    "info_request": "information_request",
+    "reproduction_request": "information_request",
+}
 
 
 def _aware(moment: datetime | None) -> datetime | None:
@@ -131,6 +137,10 @@ class SubmissionFilter:
     type: str | None = None
     statuses: list[str] = field(default_factory=list)
     category: str | None = None
+    requested_priority: str | None = None  # what the reporter asked for
+    project: str | None = None
+    version: str | None = None  # the AgentLab version the reporter named
+    run: str | None = None  # the evaluation run it concerns
     priority: str | None = None  # (staff) the assigned priority
     severity: str | None = None  # (staff)
     assignee: str | None = None  # (staff) an account id, "me" or "none"
@@ -151,7 +161,20 @@ class SubmissionFilter:
 def _clean_filter(f: SubmissionFilter) -> SubmissionFilter:
     """The text a caller put in a filter, without control characters: what is not text reaches no query."""
     out = replace(f)
-    for name in ("category", "priority", "severity", "assignee", "reporter", "label", "visibility", "q"):
+    for name in (
+        "category",
+        "requested_priority",
+        "project",
+        "version",
+        "run",
+        "priority",
+        "severity",
+        "assignee",
+        "reporter",
+        "label",
+        "visibility",
+        "q",
+    ):
         value = getattr(out, name)
         if isinstance(value, str):
             setattr(out, name, clean_text(value) or None)
@@ -333,17 +356,24 @@ class SubmissionService:
             created_at=_aware(c.created_at),  # type: ignore[arg-type]
         )
 
-    def _detail(self, s: Session, actor: Actor, row: orm.SubmissionRow) -> SubmissionDetail:
-        base = self._summaries(s, actor, [row])[0]
-        Feat, Iss = orm.FeatureDetailsRow, orm.IssueDetailsRow
-        C, H = orm.SubmissionCommentRow, orm.SubmissionHistoryRow
-        feature = s.scalar(select(Feat).where(Feat.submission_id == row.id))
-        issue = s.scalar(select(Iss).where(Iss.submission_id == row.id))
-        comments = select(C).where(C.submission_id == row.id)
+    def _discussion(
+        self, s: Session, actor: Actor, row: orm.SubmissionRow, *, limit: int | None = None, offset: int = 0
+    ) -> list[CommentOut]:
+        """The comments the actor may see, oldest first: a reporter is given the public ones only."""
+        C = orm.SubmissionCommentRow
+        query = select(C).where(C.submission_id == row.id)
         if not actor.is_staff:
-            comments = comments.where(C.visibility == "public")
-        discussion = [self._comment_out(actor, c) for c in s.scalars(comments.order_by(C.created_at, C.id))]
-        history = [
+            query = query.where(C.visibility == "public")
+        query = query.order_by(C.created_at, C.id).offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+        return [self._comment_out(actor, c) for c in s.scalars(query)]
+
+    @staticmethod
+    def _history(s: Session, actor: Actor, row: orm.SubmissionRow) -> list[StatusChangeOut]:
+        """Every status change, oldest first. A reporter is not told which maintainer made one."""
+        H = orm.SubmissionHistoryRow
+        return [
             StatusChangeOut(
                 id=h.id,
                 old_status=h.old_status,
@@ -355,6 +385,14 @@ class SubmissionService:
             )
             for h in s.scalars(select(H).where(H.submission_id == row.id).order_by(H.created_at, H.id))
         ]
+
+    def _detail(self, s: Session, actor: Actor, row: orm.SubmissionRow) -> SubmissionDetail:
+        base = self._summaries(s, actor, [row])[0]
+        Feat, Iss = orm.FeatureDetailsRow, orm.IssueDetailsRow
+        feature = s.scalar(select(Feat).where(Feat.submission_id == row.id))
+        issue = s.scalar(select(Iss).where(Iss.submission_id == row.id))
+        discussion = self._discussion(s, actor, row)
+        history = self._history(s, actor, row)
         relations = self._relations(s, actor, row) if actor.is_staff else []
         return SubmissionDetail(
             **base.model_dump(),
@@ -370,6 +408,7 @@ class SubmissionService:
             related_run_id=row.related_run_id,
             related_test_id=row.related_test_id,
             related_trace_id=row.related_trace_id,
+            related_result_id=row.related_result_id,
             related_report_id=row.related_report_id,
             related_target_id=row.related_target_id,
             app_version=row.app_version,
@@ -480,6 +519,7 @@ class SubmissionService:
             related_run_id=data.related_run_id,
             related_test_id=data.related_test_id,
             related_trace_id=data.related_trace_id,
+            related_result_id=data.related_result_id,
             related_report_id=data.related_report_id,
             related_target_id=data.related_target_id,
             app_version=data.app_version,
@@ -533,6 +573,16 @@ class SubmissionService:
                 self._audit(s, "viewed", actor, row.id, client=client, number=row.human_id)
             return self._detail(s, actor, row)
 
+    def comments(
+        self, actor: Actor, ident: str, *, limit: int = 200, offset: int = 0, client: str = ""
+    ) -> list[CommentOut]:
+        with self._open(actor, ident, client=client) as (s, row):
+            return self._discussion(s, actor, row, limit=limit, offset=offset)
+
+    def history(self, actor: Actor, ident: str, *, client: str = "") -> list[StatusChangeOut]:
+        with self._open(actor, ident, client=client) as (s, row):
+            return self._history(s, actor, row)
+
     def search(self, actor: Actor, f: SubmissionFilter) -> SubmissionPage:
         S, L = orm.SubmissionRow, orm.SubmissionLabelRow
         if not actor.is_staff:
@@ -560,6 +610,14 @@ class SubmissionService:
             stmt = stmt.where(S.status.in_(f.statuses))
         if f.category:
             stmt = stmt.where(S.category == f.category)
+        if f.requested_priority:
+            stmt = stmt.where(S.requested_priority == f.requested_priority)
+        if f.project:
+            stmt = stmt.where(S.project_id == f.project)
+        if f.version:
+            stmt = stmt.where(S.app_version == f.version)
+        if f.run:
+            stmt = stmt.where(S.related_run_id == f.run)
         if f.priority:
             stmt = stmt.where(S.assigned_priority == f.priority)
         if f.severity:
@@ -590,7 +648,26 @@ class SubmissionService:
             stmt = stmt.where(S.created_at <= f.created_to)
         term = (f.q or "").strip()
         if term:
-            terms = [S.title.icontains(term, autoescape=True), S.description.icontains(term, autoescape=True)]
+            Feat, Iss = orm.FeatureDetailsRow, orm.IssueDetailsRow
+            terms = [
+                S.title.icontains(term, autoescape=True),
+                S.description.icontains(term, autoescape=True),
+                S.related_run_id == term,
+                S.related_test_id == term,
+                S.related_trace_id == term,
+                S.related_result_id == term,
+                S.related_report_id == term,
+                S.id.in_(
+                    select(Iss.submission_id).where(
+                        or_(
+                            Iss.actual_behavior.icontains(term, autoescape=True),
+                            Iss.impact_summary.icontains(term, autoescape=True),
+                            Iss.reproduction_steps.icontains(term, autoescape=True),
+                        )
+                    )
+                ),
+                S.id.in_(select(Feat.submission_id).where(Feat.problem_statement.icontains(term, autoescape=True))),
+            ]
             if HUMAN.match(term.upper()):
                 terms.append(S.human_id == term.upper())
             stmt = stmt.where(or_(*terms))
@@ -809,25 +886,34 @@ class SubmissionService:
                         status="recorded",
                     )
                 )
-                if not mine:
+                if not mine and "status_change" in self.config.notify_reporter_on:
                     row.last_staff_activity_at = now  # something the reporter can see changed
             for label in labels_removed:
                 s.execute(delete(L).where(L.submission_id == row.id, L.label == label))
             for label in labels_added:
                 s.add(orm.SubmissionLabelRow(submission_id=row.id, label=label, status="active"))
-            if status_change is not None:  # its own event, so the trail can be filtered for status changes
-                self._audit(
-                    s,
-                    "status_changed",
-                    actor,
-                    row.id,
-                    client=client,
-                    number=row.human_id,
-                    old=status_change[0],
-                    new=status_change[1],
-                )
-            if changed:
-                self._audit(s, "updated", actor, row.id, client=client, number=row.human_id, changes=changed)
+            events: list[tuple[str, dict[str, Any]]] = []
+            if status_change is not None:
+                events.append(("status_changed", {"old": status_change[0], "new": status_change[1]}))
+                if (
+                    status_change[1] in self.config.closed_statuses
+                    and status_change[0] not in self.config.closed_statuses
+                ):
+                    events.append(("closed", {"status": status_change[1]}))
+            names = {
+                "assigned_priority": "priority_changed",
+                "severity": "severity_changed",
+                "assignee": "assigned",
+                "category": "category_changed",
+                "visibility": "visibility_changed",
+            }
+            for key, event in names.items():
+                if key in changed:
+                    events.append((event, {"old": changed[key][0], "new": changed[key][1]}))
+            if "labels" in changed:
+                events.append(("labels_changed", changed["labels"]))
+            for event, detail in events:  # one record for each thing that was done, so the trail can be filtered
+                self._audit(s, event, actor, row.id, client=client, number=row.human_id, **detail)
             s.flush()
             s.expire_all()  # answer with what was stored
             return self._detail(s, actor, row)
@@ -860,7 +946,12 @@ class SubmissionService:
             )
             s.add(comment)
             row.last_activity_at = now
-            if actor.is_staff and data.visibility == "public" and not self._mine(actor, row):
+            if (
+                actor.is_staff
+                and data.visibility == "public"
+                and not self._mine(actor, row)
+                and NOTIFICATION_OF_KIND[data.kind] in self.config.notify_reporter_on
+            ):
                 row.last_staff_activity_at = now
             if self._mine(actor, row):
                 row.reporter_seen_at = now  # whoever wrote it has read the thread

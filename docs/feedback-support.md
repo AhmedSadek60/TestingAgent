@@ -54,14 +54,16 @@ tell them.
 
 `POST /submissions` with a `type`, a `title`, a `category` and the details of that type.
 
-* A **feature request** (`type: feature`) says the problem to solve and may say the expected behaviour, the main use case, who
+* A **feature request** (`type: feature`) needs a title and the problem to solve (`problem_statement`), and may say the expected behaviour, the main use case, who
   is affected, the impact, the current workaround, a proposed solution, acceptance criteria, the area of AgentLab it concerns,
   dependencies, and the priority the person asks for (`low`, `normal`, `high`, `critical_business_need`).
-* An **issue report** (`type: issue`) says how it affects the work, what was expected and what happened, the steps to
-  reproduce (or that they are not known), how often it happens, when it was first seen, a workaround, and how the person says
-  it affects them (`cosmetic`, `slows_work`, `prevents_workflow`, `blocks_project`, `incorrect_results`,
-  `data_loss_or_exposure`, `unavailable`, `other`).
-* Either may name the project, run, test, trace, report or target it concerns, and the AgentLab version.
+* An **issue report** (`type: issue`) needs a title, a description of the problem, a category and a summary of how it affects
+  the work. It may also say what was expected and what happened (kept apart), the steps to reproduce (or that they are not
+  known: nobody is made to invent them), how often it happens, whether it is consistent and blocks work, when it was first
+  seen, a workaround, and how the person says it affects them (`cosmetic`, `slows_work`, `prevents_workflow`,
+  `blocks_project`, `incorrect_results`, `data_loss_or_exposure`, `unavailable`, `other`).
+* Either may name the project, run, test case, test result, trace, report or target it concerns, and the AgentLab version and
+  build. These are references: AgentLab does not attach anything because an id was named.
 
 The server answers `201` **after** the submission has been stored, with its number (`FR-2026-00042` for a feature request,
 `IR-2026-00042` for an issue report, counted per type and year) and its first status. The answer is what a later read
@@ -101,21 +103,27 @@ clears it.
 ## The discussion
 
 `POST /submissions/{id}/comments` adds a line. The reporter may comment on their own submission, publicly. A maintainer may
-also write an **internal note** (`visibility: internal`, never shown to the reporter) or **ask for information**
-(`kind: info_request`, shown to the reporter as a request).
+also write an **internal note** (`visibility: internal`, never shown to the reporter), **ask for information**
+(`kind: info_request`) or **ask for another attempt** (`kind: reproduction_request`); both requests are public.
+`GET /submissions/{id}/comments` and `GET /submissions/{id}/history` read the discussion and the status history on their own
+(they are also in the submission itself), with the same rules.
 
-**In-app notification.** There is no e-mail. A submission is `unread` for its reporter when a maintainer wrote a public comment
-or changed the status after the reporter last looked. `GET /submissions/summary` counts them, `unread=true` lists them, and
+**In-app notification.** There is no e-mail. A submission is `unread` for its reporter when a maintainer wrote a public comment,
+asked for information or another attempt, or changed the status after the reporter last looked. Which of those count is
+`feedback.notify_reporter_on`. `GET /submissions/summary` counts them, `unread=true` lists them, and
 `POST /submissions/{id}/seen` marks them seen (so does writing in the thread). Changes the reporter cannot see (priority, labels,
 internal notes) never make a submission unread.
 
 ## Finding submissions
 
-`GET /submissions` lists what the caller may see, newest activity first, with filters (type, status, category, assigned
-priority, severity, assignee, reporter, label, visibility, creation time), a text search over the title and description (a
-submission number finds that submission; `%` and `_` in a search are ordinary characters), sorting, and paging
-(`limit` up to 200, `offset`). `mine=true` lists the caller's own. `GET /submissions/summary` gives the counts by status and
-type.
+`GET /submissions` lists what the caller may see, newest activity first, with filters (type, status, category, the
+priority the reporter asked for, assigned priority, severity, assignee, reporter, label, visibility, project, AgentLab version,
+run, creation time), a text search, sorting, and paging (`limit` up to 200, `offset`). `mine=true` lists the caller's own.
+`GET /submissions/summary` gives the counts by status and type.
+
+The text search looks at the title, the description, what an issue says happened and its impact and steps, and what a feature
+request says the problem is; a submission number, or an exact run, test, trace, result or report id, finds what names it. `%` and
+`_` in a search are ordinary characters. Comments are not searched, so a search cannot be used to read what a reporter may not.
 
 ## Private submissions
 
@@ -136,8 +144,10 @@ the visibility back explicitly.
   shared token have none.
 * **Size.** Each text field is at most 20,000 characters (a title 200); labels are 60 characters, at most 30 per submission.
 * **Identifiers** in a URL are an id or a number; anything else is refused before it is looked up.
-* **Audit trail.** Made, status changes, edits, comments, links, who opened a private submission, and denied attempts, each with
-  who and when. It records which fields and which statuses, **never the text**.
+* **Audit trail.** One record for each thing that was done, with who and when: `created`, `status_changed`, `closed`,
+  `priority_changed`, `severity_changed`, `assigned`, `category_changed`, `visibility_changed`, `labels_changed`, `commented`,
+  `related`, `unrelated`, `viewed` (a maintainer opened someone else's private submission) and `access_denied`. It records which
+  fields and which statuses, **never the text**.
 * **Changing someone's role or disabling their account** ends their sessions at once ([accounts.md](accounts.md)), so a
   demoted maintainer stops triaging immediately.
 
@@ -160,6 +170,8 @@ requests that change something.
 | `GET /submissions/{id}` | anyone signed in | Read one, by id or number |
 | `PATCH /submissions/{id}` | maintainers | Triage |
 | `POST /submissions/{id}/comments` | anyone signed in | Comment (internal notes and information requests: maintainers) |
+| `GET /submissions/{id}/comments` | anyone signed in | The discussion on its own (a reporter: public lines only) |
+| `GET /submissions/{id}/history` | anyone signed in | The status history on its own |
 | `POST /submissions/{id}/seen` | anyone signed in | Mark the answers seen |
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |

@@ -406,6 +406,7 @@ class SubmissionRow(Entity):
     related_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     related_test_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     related_trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_result_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     related_report_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     related_target_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     app_version: Mapped[str | None] = mapped_column(String(40), nullable=True)

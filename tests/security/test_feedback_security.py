@@ -457,7 +457,38 @@ async def test_the_longest_allowed_text_is_stored_whole(tmp_path: Path, field: s
     async with feedback_server(tmp_path) as api:
         alice, ah = await reporter(api)
         limit = 200 if field == "title" else 20_000
-        body = {**FEATURE, field: "x" * limit}
+        words = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor. "
+        body = {
+            **FEATURE,
+            field: (words * 300)[: limit - 1] + ".",
+        }  # ordinary prose: a repeated character can be a secret
         r = await alice.post("/submissions", json=body, headers=ah)
         assert r.status_code == 201 and len(r.json()[field]) == limit
         await alice.aclose()
+
+
+async def test_an_internal_note_never_reaches_a_reporter_by_any_read(tmp_path: Path) -> None:
+    async with feedback_server(tmp_path) as api:
+        alice, ah = await reporter(api)
+        maria, mh = await maintainer(api)
+        made = await file_one(alice, ah)
+        note = "NOTE-FOR-STAFF-ONLY the customer is on a trial plan"
+        await maria.post(
+            f"/submissions/{made['id']}/comments", json={"body": note, "visibility": "internal"}, headers=mh
+        )
+        await maria.post(f"/submissions/{made['id']}/comments", json={"body": "A public line"}, headers=mh)
+        for path, params in (
+            (f"/submissions/{made['id']}", None),
+            (f"/submissions/{made['id']}/comments", None),
+            (f"/submissions/{made['id']}/history", None),
+            ("/submissions", {"q": "NOTE-FOR-STAFF-ONLY"}),
+            ("/submissions", {"q": "trial plan"}),
+            ("/submissions/summary", None),
+        ):
+            r = await alice.get(path, params=params)
+            assert r.status_code == 200 and "NOTE-FOR-STAFF-ONLY" not in r.text and "trial plan" not in r.text, path
+        assert (await alice.get("/submissions", params={"q": "A public line"})).json()["total"] == 0, (
+            "comments are not searched, so a search cannot be used to read what a reporter may not"
+        )
+        for c in (alice, maria):
+            await c.aclose()

@@ -48,6 +48,7 @@ def upgrade() -> None:
         sa.Column("related_run_id", sa.String(length=64), nullable=True),
         sa.Column("related_test_id", sa.String(length=64), nullable=True),
         sa.Column("related_trace_id", sa.String(length=64), nullable=True),
+        sa.Column("related_result_id", sa.String(length=64), nullable=True),
         sa.Column("related_report_id", sa.String(length=64), nullable=True),
         sa.Column("related_target_id", sa.String(length=64), nullable=True),
         sa.Column("app_version", sa.String(length=40), nullable=True),

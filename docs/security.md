@@ -513,7 +513,8 @@ not have pasted.
 
 * **Isolation between people is applied to the query**, not checked after it: the one definition of "may see" is a clause of
   every read (`src/agentlab/feedback/policy.py`). A submission the caller may not see is answered exactly as one that does not
-  exist (the same status and body), by id and by number, so a number cannot be used to find out what exists.
+  exist (the same status and body), by id and by number, so probing identifiers reveals nothing *about* a submission, not
+  even whether it is private. (Numbers are sequential, so roughly how many there are is no secret: it follows from one's own.)
 * **What a reporter is not told is not sent.** The maintainers' priority, severity, assignee, labels, links and internal notes
   are absent from a reporter's answers, and a maintainer who wrote a comment reads "AgentLab maintainer" to the reporter, so an
   account cannot learn who the maintainers are. Filters and sorts on those fields are refused to a reporter, because their

@@ -142,6 +142,7 @@ class SubmissionIn(_Clean):
     related_run_id: str | None = Field(default=None, pattern=ID, description="The evaluation run it concerns")
     related_test_id: str | None = Field(default=None, pattern=ID, description="The test case it concerns")
     related_trace_id: str | None = Field(default=None, pattern=ID, description="The trace it concerns")
+    related_result_id: str | None = Field(default=None, pattern=ID, description="The test result it concerns")
     related_report_id: str | None = Field(default=None, pattern=ID, description="The report it concerns")
     related_target_id: str | None = Field(default=None, pattern=ID, description="The target it concerns")
     app_version: str | None = Field(
@@ -158,6 +159,8 @@ class SubmissionIn(_Clean):
             raise ValueError("a feature request carries `feature` details and no `issue` details")
         if self.type == "issue" and (self.issue is None or self.feature is not None):
             raise ValueError("an issue report carries `issue` details and no `feature` details")
+        if self.type == "issue" and not self.description:
+            raise ValueError("an issue report needs a description of the problem")
         return self
 
 
@@ -218,15 +221,16 @@ class CommentIn(_Clean):
         default="public",
         description="public: the reporter sees it; internal: maintainers only (a reporter may not write one)",
     )
-    kind: Literal["comment", "info_request"] = Field(
+    kind: Literal["comment", "info_request", "reproduction_request"] = Field(
         default="comment",
-        description="info_request asks the reporter for more information (maintainers only, and always public)",
+        description="info_request asks the reporter for more information; reproduction_request asks them to try again "
+        "and report what happens (both maintainers only, and always public)",
     )
 
     @model_validator(mode="after")
     def _a_request_is_public(self) -> CommentIn:
-        if self.kind == "info_request" and self.visibility != "public":
-            raise ValueError("a request for information is addressed to the reporter, so it is public")
+        if self.kind != "comment" and self.visibility != "public":
+            raise ValueError("a request is addressed to the reporter, so it is public")
         return self
 
 
@@ -298,7 +302,7 @@ class CommentOut(Model):
     visibility: Literal["public", "internal"] = Field(
         description="public: the reporter sees it; internal: maintainers only"
     )
-    kind: Literal["comment", "info_request"] = Field(description="What sort of line it is")
+    kind: Literal["comment", "info_request", "reproduction_request"] = Field(description="What sort of line it is")
     body: str = Field(description="The text")
     created_at: datetime = Field(description="When it was written")
 
@@ -371,6 +375,7 @@ class SubmissionDetail(SubmissionSummary):
     related_run_id: str | None = Field(description="The run it concerns")
     related_test_id: str | None = Field(description="The test it concerns")
     related_trace_id: str | None = Field(description="The trace it concerns")
+    related_result_id: str | None = Field(description="The test result it concerns")
     related_report_id: str | None = Field(description="The report it concerns")
     related_target_id: str | None = Field(description="The target it concerns")
     app_version: str | None = Field(description="The AgentLab version the person was using")

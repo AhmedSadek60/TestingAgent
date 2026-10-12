@@ -5956,6 +5956,87 @@
             "description": "Only this category"
           },
           {
+            "name": "requested_priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "low",
+                    "normal",
+                    "high",
+                    "critical_business_need"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this priority as the reporter asked for it (feature requests)",
+              "title": "Requested Priority"
+            },
+            "description": "Only this priority as the reporter asked for it (feature requests)"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this project (id)",
+              "title": "Project"
+            },
+            "description": "Only this project (id)"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only reports of this AgentLab version",
+              "title": "Version"
+            },
+            "description": "Only reports of this AgentLab version"
+          },
+          {
+            "name": "run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only submissions about this evaluation run",
+              "title": "Run"
+            },
+            "description": "Only submissions about this evaluation run"
+          },
+          {
             "name": "priority",
             "in": "query",
             "required": false,
@@ -6097,10 +6178,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Text to find in the title or description",
+              "description": "Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id",
               "title": "Q"
             },
-            "description": "Text to find in the title or description"
+            "description": "Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id"
           },
           {
             "name": "mine",
@@ -6545,6 +6626,236 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CommentOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read the discussion of a submission",
+        "description": "The comments, oldest first. A reporter gets the public ones only, and a maintainer who wrote one reads as \"AgentLab maintainer\" to them.",
+        "operationId": "comments_submissions__submission_id__comments_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "How many comments",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "How many comments"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "How many to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "How many to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentOut"
+                  },
+                  "title": "Response Comments Submissions  Submission Id  Comments Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/history": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read the status history of a submission",
+        "description": "Every status change, oldest first, with who made it, when, and the comment that went with it. Nothing is ever overwritten.",
+        "operationId": "history_submissions__submission_id__history_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StatusChangeOut"
+                  },
+                  "title": "Response History Submissions  Submission Id  History Get"
                 }
               }
             }
@@ -8661,10 +8972,11 @@
             "type": "string",
             "enum": [
               "comment",
-              "info_request"
+              "info_request",
+              "reproduction_request"
             ],
             "title": "Kind",
-            "description": "info_request asks the reporter for more information (maintainers only, and always public)",
+            "description": "info_request asks the reporter for more information; reproduction_request asks them to try again and report what happens (both maintainers only, and always public)",
             "default": "comment"
           }
         },
@@ -8711,7 +9023,8 @@
             "type": "string",
             "enum": [
               "comment",
-              "info_request"
+              "info_request",
+              "reproduction_request"
             ],
             "title": "Kind",
             "description": "What sort of line it is"
@@ -14843,6 +15156,18 @@
             "title": "Related Trace Id",
             "description": "The trace it concerns"
           },
+          "related_result_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Result Id",
+            "description": "The test result it concerns"
+          },
           "related_report_id": {
             "anyOf": [
               {
@@ -14981,6 +15306,7 @@
           "related_run_id",
           "related_test_id",
           "related_trace_id",
+          "related_result_id",
           "related_report_id",
           "related_target_id",
           "app_version",
@@ -15100,6 +15426,19 @@
             ],
             "title": "Related Trace Id",
             "description": "The trace it concerns"
+          },
+          "related_result_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Result Id",
+            "description": "The test result it concerns"
           },
           "related_report_id": {
             "anyOf": [

@@ -1211,13 +1211,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read the discussion of a submission
+         * @description The comments, oldest first. A reporter gets the public ones only, and a maintainer who wrote one reads as "AgentLab maintainer" to them.
+         */
+        get: operations["comments_submissions__submission_id__comments_get"];
         put?: never;
         /**
          * Comment on a submission
          * @description Adds a line to the discussion. A reporter may comment on their own submission, publicly. A maintainer may also write an internal note (never shown to the reporter) or ask the reporter for information.
          */
         post: operations["comment_submissions__submission_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the status history of a submission
+         * @description Every status change, oldest first, with who made it, when, and the comment that went with it. Nothing is ever overwritten.
+         */
+        get: operations["history_submissions__submission_id__history_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2382,11 +2406,11 @@ export interface components {
             visibility?: "public" | "internal";
             /**
              * Kind
-             * @description info_request asks the reporter for more information (maintainers only, and always public)
+             * @description info_request asks the reporter for more information; reproduction_request asks them to try again and report what happens (both maintainers only, and always public)
              * @default comment
              * @enum {string}
              */
-            kind?: "comment" | "info_request";
+            kind?: "comment" | "info_request" | "reproduction_request";
         };
         /**
          * CommentOut
@@ -2424,7 +2448,7 @@ export interface components {
              * @description What sort of line it is
              * @enum {string}
              */
-            kind: "comment" | "info_request";
+            kind: "comment" | "info_request" | "reproduction_request";
             /**
              * Body
              * @description The text
@@ -6425,6 +6449,11 @@ export interface components {
              */
             related_trace_id: string | null;
             /**
+             * Related Result Id
+             * @description The test result it concerns
+             */
+            related_result_id: string | null;
+            /**
              * Related Report Id
              * @description The report it concerns
              */
@@ -6526,6 +6555,11 @@ export interface components {
              * @description The trace it concerns
              */
             related_trace_id?: string | null;
+            /**
+             * Related Result Id
+             * @description The test result it concerns
+             */
+            related_result_id?: string | null;
             /**
              * Related Report Id
              * @description The report it concerns
@@ -12111,6 +12145,14 @@ export interface operations {
                 status?: string[] | null;
                 /** @description Only this category */
                 category?: string | null;
+                /** @description Only this priority as the reporter asked for it (feature requests) */
+                requested_priority?: ("low" | "normal" | "high" | "critical_business_need") | null;
+                /** @description Only this project (id) */
+                project?: string | null;
+                /** @description Only reports of this AgentLab version */
+                version?: string | null;
+                /** @description Only submissions about this evaluation run */
+                run?: string | null;
                 /** @description Only this assigned priority (maintainers) */
                 priority?: ("low" | "normal" | "high" | "critical") | null;
                 /** @description Only this severity (maintainers) */
@@ -12123,7 +12165,7 @@ export interface operations {
                 label?: string | null;
                 /** @description Only this visibility (maintainers) */
                 visibility?: ("normal" | "security") | null;
-                /** @description Text to find in the title or description */
+                /** @description Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id */
                 q?: string | null;
                 /** @description Only the submissions the caller made */
                 mine?: boolean;
@@ -12449,6 +12491,88 @@ export interface operations {
             };
         };
     };
+    comments_submissions__submission_id__comments_get: {
+        parameters: {
+            query?: {
+                /** @description How many comments */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     comment_submissions__submission_id__comments_post: {
         parameters: {
             query?: never;
@@ -12472,6 +12596,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommentOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    history_submissions__submission_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusChangeOut"][];
                 };
             };
             /** @description The API token is missing or wrong */

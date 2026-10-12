@@ -618,7 +618,13 @@ def test_the_audit_trail_says_what_happened_and_never_holds_the_text(world: Worl
     world.triage(maria, made.id, status="Under Review", assigned_priority="high", labels=["urgent"])
     world.svc.comment(maria, made.id, CommentIn(body="TOP SECRET WORDS", visibility="internal"))
     events = world.svc.audit_trail(maria, made.id)
-    assert sorted(e.event for e in events) == ["commented", "created", "status_changed", "updated"]
+    assert sorted(e.event for e in events) == [
+        "commented",
+        "created",
+        "labels_changed",
+        "priority_changed",
+        "status_changed",
+    ]
     assert all(e.actor in {"alice", "maria"} for e in events)
     blob = json.dumps([e.model_dump(mode="json") for e in events])
     for text_ in ("TOP SECRET WORDS", "555-0100", "Leaky log file", "Zq81LmN4xW7sR2pK9vB3cD6e"):
@@ -710,3 +716,166 @@ def test_the_lists_in_the_configuration_must_agree() -> None:
         issue_statuses=["New", "Done"],
     )
     assert custom.feature_statuses[0] == "New"
+
+
+# ================================================================================ what the specification asked for
+def test_an_issue_report_needs_a_description_of_the_problem_and_a_feature_request_does_not() -> None:
+    with pytest.raises(ValidationError, match="description of the problem"):
+        SubmissionIn(**{**ISSUE, "description": ""})
+    with pytest.raises(ValidationError, match="description of the problem"):
+        SubmissionIn(**{**ISSUE, "description": "   "})
+    assert SubmissionIn(**{**FEATURE, "description": ""}).title, "a feature request needs a title and the problem only"
+
+
+def test_the_ids_a_report_names_are_kept_and_found(world: World) -> None:
+    alice, maria = world.person("alice"), world.maintainer()
+    ids = {
+        "project_id": "proj-1",
+        "related_run_id": "run-2026-10-12-abc",
+        "related_test_id": "SEC-INJ-007",
+        "related_trace_id": "trace-55",
+        "related_result_id": "result-77",
+        "related_report_id": "report-9",
+        "related_target_id": "target-3",
+    }
+    made = world.file(alice, ISSUE, **ids)
+    assert {k: getattr(made, k) for k in ids} == ids
+    for ident in ("run-2026-10-12-abc", "SEC-INJ-007", "trace-55", "result-77", "report-9"):
+        assert world.svc.search(maria, SubmissionFilter(q=ident)).total == 1, ident
+    assert world.svc.search(maria, SubmissionFilter(q="run-2026")).total == 0, (
+        "an id is matched whole, not by a fragment"
+    )
+    assert world.svc.search(maria, SubmissionFilter(run="run-2026-10-12-abc", project="proj-1")).total == 1
+    assert world.svc.search(maria, SubmissionFilter(run="other")).total == 0
+
+
+def test_search_finds_what_an_issue_says_happened_and_what_a_feature_request_describes(world: World) -> None:
+    alice, maria = world.person("alice"), world.maintainer()
+    issue = world.file(
+        alice, ISSUE, issue={**ISSUE["issue"], "actual_behavior": "TimeoutError: the worker did not answer in 30s"}
+    )
+    feature = world.file(
+        alice,
+        FEATURE,
+        title="Spreadsheet output",
+        feature={**FEATURE["feature"], "problem_statement": "Analysts need pivot tables"},
+    )
+    find = lambda q: {s.id for s in world.svc.search(maria, SubmissionFilter(q=q)).items}  # noqa: E731
+    assert find("TimeoutError") == {issue.id} and find("did not answer in 30s") == {issue.id}
+    assert find("pivot tables") == {feature.id}
+    assert find("blocks my work") == {issue.id}, "the impact summary is searched too"
+    assert world.svc.search(alice, SubmissionFilter(q="pivot")).total == 1
+    bob = world.person("bob")
+    assert world.svc.search(bob, SubmissionFilter(q="pivot")).total == 0, "what bob may not see is not searched"
+
+
+def test_the_queue_filters_on_what_was_asked_for_and_where_it_happened(world: World) -> None:
+    alice, maria = world.person("alice"), world.maintainer()
+    a = world.file(alice, project_id="proj-a", app_version="0.4.0")
+    world.file(
+        alice,
+        title="Low importance idea",
+        category="Other",
+        project_id="proj-b",
+        app_version="0.5.0",
+        feature={**FEATURE["feature"], "requested_priority": "low"},
+    )
+    count = lambda **f: world.svc.search(maria, SubmissionFilter(**f)).total  # noqa: E731
+    assert count(requested_priority="high") == 1 and count(requested_priority="low") == 1
+    assert (count(project="proj-a"), count(version="0.5.0"), count(version="9.9")) == (1, 1, 0)
+    assert world.svc.search(maria, SubmissionFilter(requested_priority="high")).items[0].id == a.id
+    # what a reporter supplied about their own is theirs to filter on
+    assert world.svc.search(alice, SubmissionFilter(project="proj-b")).total == 1
+
+
+def test_a_maintainer_may_ask_for_more_information_or_for_another_attempt_and_the_reporter_may_not(
+    world: World,
+) -> None:
+    alice, maria = world.person("alice"), world.maintainer()
+    made = world.file(alice, ISSUE)
+    for kind in ("info_request", "reproduction_request"):
+        with pytest.raises(PolicyBlocked):
+            world.svc.comment(alice, made.id, CommentIn(body="please", kind=kind))
+    with pytest.raises(ValidationError):
+        CommentIn(body="private", kind="reproduction_request", visibility="internal")
+    world.clock.advance(minutes=1)
+    c = world.svc.comment(maria, made.id, CommentIn(body="Please try again on 0.5.1", kind="reproduction_request"))
+    assert c.kind == "reproduction_request" and c.visibility == "public"
+    assert world.svc.get(alice, made.id).unread is True
+
+
+def test_what_makes_a_submission_unread_is_configurable(make: Callable[..., World]) -> None:
+    w = make(notify_reporter_on=["information_request"])
+    alice, maria = w.person("alice"), w.maintainer()
+    made = w.file(alice)
+    w.clock.advance(minutes=1)
+    w.svc.comment(maria, made.id, CommentIn(body="A plain remark"))
+    w.triage(maria, made.id, status="Under Review")
+    assert w.svc.get(alice, made.id).unread is False, "comments and status changes were switched off"
+    w.clock.advance(minutes=1)
+    w.svc.comment(maria, made.id, CommentIn(body="What is the sample?", kind="info_request"))
+    assert w.svc.get(alice, made.id).unread is True
+    with pytest.raises(ValidationError):
+        FeedbackConfig(notify_reporter_on=["sms"])
+    assert FeedbackConfig(notify_reporter_on=[]).notify_reporter_on == [], "an owner may switch every one off"
+
+
+def test_the_audit_trail_has_a_record_for_each_thing_that_was_done(world: World) -> None:
+    alice, maria, nina = world.person("alice"), world.maintainer("maria"), world.maintainer("nina")
+    made = world.file(alice, ISSUE)
+    world.triage(
+        maria,
+        made.id,
+        severity="high",
+        assignee_id=nina.user_id,
+        category="Application Bug",
+        visibility="security",
+        labels=["urgent"],
+    )
+    world.triage(maria, made.id, status="Closed", status_comment="Cannot be fixed")
+    world.triage(maria, made.id, status="Investigating")
+    world.triage(maria, made.id, status="Resolved")
+    events = world.svc.audit_trail(maria, made.id)
+    names = [e.event for e in events]
+    for expected in (
+        "created",
+        "severity_changed",
+        "assigned",
+        "category_changed",
+        "visibility_changed",
+        "labels_changed",
+        "status_changed",
+        "closed",
+    ):
+        assert expected in names, (expected, names)
+    assert names.count("status_changed") == 3 and names.count("closed") == 1, "closing is recorded when it happens"
+    severity = next(e for e in events if e.event == "severity_changed")
+    assert severity.detail["old"] is None and severity.detail["new"] == "high" and severity.actor == "maria"
+    assigned = next(e for e in events if e.event == "assigned")
+    assert assigned.detail["old"] is None and assigned.detail["new"] == nina.user_id
+    assert "updated" not in names
+
+
+def test_the_discussion_and_the_history_can_be_read_on_their_own(world: World) -> None:
+    alice, bob, maria = world.person("alice"), world.person("bob"), world.maintainer()
+    made = world.file(alice)
+    for i in range(5):
+        world.clock.advance(seconds=1)
+        world.svc.comment(maria if i % 2 else alice, made.id, CommentIn(body=f"line {i}"))
+    world.clock.advance(seconds=1)
+    world.svc.comment(maria, made.id, CommentIn(body="internal", visibility="internal"))
+    world.clock.advance(seconds=1)
+    world.triage(maria, made.id, status="Under Review", status_comment="On it")
+    assert [c.body for c in world.svc.comments(alice, made.id)] == [f"line {i}" for i in range(5)]
+    assert [c.body for c in world.svc.comments(maria, made.id)][-1] == "internal"
+    assert [c.body for c in world.svc.comments(alice, made.id, limit=2, offset=1)] == ["line 1", "line 2"]
+    assert {c.author for c in world.svc.comments(alice, made.id)} == {"alice", "AgentLab maintainer"}
+    history = world.svc.history(alice, made.id)
+    assert [(h.old_status, h.new_status, h.changed_by) for h in history] == [
+        (None, "Submitted", "alice"),
+        ("Submitted", "Under Review", "AgentLab maintainer"),
+    ]
+    assert world.svc.history(maria, made.id)[-1].changed_by == "maria"
+    for read in (world.svc.comments, world.svc.history):
+        with pytest.raises(NotFoundError):
+            read(bob, made.id)

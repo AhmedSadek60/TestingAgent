@@ -349,10 +349,92 @@ async def test_the_api_description_lists_every_feedback_operation_with_its_error
             if path.startswith("/submissions")
             for method, op in methods.items()
         }
-        assert len(found) == 13, sorted(found)
+        assert len(found) == 15, sorted(found)
         for (method, path), op in found.items():
             assert op["tags"] == ["Feedback & Support"], (method, path)
             assert op["summary"] and len(op["description"]) > 40, (method, path)
             assert {"401", "403"} <= set(op["responses"]), (method, path)
         assert "409" in found[("PATCH", "/submissions/{submission_id}")]["responses"]
         assert any(t["name"] == "Feedback & Support" for t in doc["tags"])
+
+
+# ===================================================================== what the specification asked for
+async def test_an_issue_report_without_a_description_is_refused_and_a_feature_request_without_one_is_not(
+    tmp_path: Path,
+) -> None:
+    async with feedback_server(tmp_path) as api:
+        alice, ah = await reporter(api)
+        refused = await alice.post("/submissions", json={**ISSUE, "description": ""}, headers=ah)
+        assert refused.status_code == 422 and "description of the problem" in refused.json()["error"]["message"]
+        assert (await alice.post("/submissions", json={**FEATURE, "description": ""}, headers=ah)).status_code == 201
+        await alice.aclose()
+
+
+async def test_the_discussion_and_the_history_are_read_on_their_own_with_the_same_rules(tmp_path: Path) -> None:
+    async with feedback_server(tmp_path) as api:
+        alice, ah = await reporter(api)
+        bob, bh = await reporter(api, "bob")
+        maria, mh = await maintainer(api)
+        made = (await alice.post("/submissions", json=ISSUE, headers=ah)).json()
+        sid = made["id"]
+        await maria.post(
+            f"/submissions/{sid}/comments",
+            json={"body": "Try again please", "kind": "reproduction_request"},
+            headers=mh,
+        )
+        await maria.post(
+            f"/submissions/{sid}/comments", json={"body": "internal only", "visibility": "internal"}, headers=mh
+        )
+        await maria.patch(
+            f"/submissions/{sid}",
+            json={"version": made["version"], "status": "Investigating", "status_comment": "Looking"},
+            headers=mh,
+        )
+
+        mine = (await alice.get(f"/submissions/{sid}/comments")).json()
+        assert [(c["author"], c["kind"]) for c in mine] == [("AgentLab maintainer", "reproduction_request")]
+        theirs = (await maria.get(f"/submissions/{sid}/comments")).json()
+        assert [c["visibility"] for c in theirs] == ["public", "internal"] and theirs[0]["author"] == "maria"
+        page = (await maria.get(f"/submissions/{sid}/comments", params={"limit": 1, "offset": 1})).json()
+        assert [c["body"] for c in page] == ["internal only"]
+
+        history = (await alice.get(f"/submissions/{sid}/history")).json()
+        assert [(h["new_status"], h["changed_by"]) for h in history] == [
+            ("Submitted", "alice"),
+            ("Investigating", "AgentLab maintainer"),
+        ]
+        assert history[-1]["comment"] == "Looking"
+        for who, h in ((bob, bh), (api.client, {})):
+            for tail in ("comments", "history"):
+                r = await who.get(f"/submissions/{sid}/{tail}", headers=h)
+                if who is api.client:  # the shared token sees an ordinary submission
+                    assert r.status_code == 200
+                else:
+                    assert r.status_code == 404 and r.json()["error"]["message"] == "no such submission"
+        assert (await alice.get(f"/submissions/{sid}/comments", params={"limit": 0})).status_code == 422
+        for c in (alice, bob, maria):
+            await c.aclose()
+
+
+async def test_the_queue_filters_on_requested_priority_project_version_and_run(tmp_path: Path) -> None:
+    async with feedback_server(tmp_path) as api:
+        alice, ah = await reporter(api)
+        await alice.post("/submissions", json={**ISSUE, "project_id": "proj-a", "app_version": "0.4.0"}, headers=ah)
+        await alice.post(
+            "/submissions",
+            json={
+                **FEATURE,
+                "project_id": "proj-b",
+                "app_version": "0.5.0",
+                "feature": {**FEATURE["feature"], "requested_priority": "low"},
+            },
+            headers=ah,
+        )
+        get = lambda **p: api.client.get("/submissions", params=p)  # noqa: E731
+        assert (await get(requested_priority="low")).json()["total"] == 1
+        assert (await get(project="proj-a")).json()["items"][0]["type"] == "issue"
+        assert (await get(version="0.5.0")).json()["items"][0]["type"] == "feature"
+        assert (await get(run=ISSUE["related_run_id"])).json()["total"] == 1
+        assert (await get(q=ISSUE["related_run_id"])).json()["total"] == 1
+        assert (await get(requested_priority="urgent")).status_code == 422
+        await alice.aclose()
