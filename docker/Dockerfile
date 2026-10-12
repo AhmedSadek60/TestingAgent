@@ -56,6 +56,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN if [ "$WITH_BROWSER" = "1" ]; then /opt/venv/bin/playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*; fi
 COPY docker/agentlab.yaml /etc/agentlab/agentlab.yaml
+# Which build this is, so that the environment of an issue report can name it (`unknown` when it is not given).
+ARG AGENTLAB_BUILD=unknown
+ENV AGENTLAB_BUILD=$AGENTLAB_BUILD
 USER agentlab
 WORKDIR /data
 EXPOSE 8080

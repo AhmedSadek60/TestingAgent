@@ -1416,6 +1416,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/diagnostics/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What diagnostic information can be collected
+         * @description Every category AgentLab knows about, whether it can be collected here and now, and why not when it cannot (a log that is switched off, evaluation data that only maintainers may see, a screenshot AgentLab cannot take). Also the time windows, the limits, and the text the person agrees to before attaching anything.
+         */
+        get: operations["available_diagnostics_available_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview what would be collected
+         * @description Collects the chosen categories, masks them and shows the result, item by item, with what was masked and where, and keeps nothing. A category that cannot be collected is listed with the reason; it never stops the others.
+         */
+        post: operations["preview_diagnostics_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Collect diagnostic information
+         * @description Collects and masks the chosen categories and keeps the masked result as a draft for a limited time, so it can be reviewed and then attached to a submission. Only the masked text is kept. What is collected is limited to the caller's own requests, system-level warnings and, for a maintainer, the named run.
+         */
+        post: operations["collect_diagnostics_collect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/redact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * See text masked before pasting it
+         * @description Masks the text the way a collection would and says what was masked and where, without keeping anything. Use it on a snippet before including it in a report.
+         */
+        post: operations["redact_preview_diagnostics_redact_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/{collection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a collection
+         * @description A draft the caller collected, or a collection attached to a submission the caller may see.
+         */
+        get: operations["read_diagnostics__collection_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/{collection_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a collection as an archive
+         * @description A ZIP of the included items under the names of the specification, with a manifest that says what was collected, what was not available, what was left out and what was masked, and a README. Every file is a generated, masked copy. Downloads of an attached collection are recorded.
+         */
+        get: operations["download_diagnostics__collection_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The diagnostics attached to a submission
+         * @description The collections attached to the submission, with what each holds and what was masked. A reporter sees what they attached; a maintainer sees what was attached to any submission they may see.
+         */
+        get: operations["attached_submissions__submission_id__diagnostics_get"];
+        put?: never;
+        /**
+         * Attach diagnostics to a submission
+         * @description Attaches a draft collection to a submission the caller may see, with their explicit consent (`consent` must be true). Items left out of `include` are deleted, not kept. It is refused when the collection is not the caller's, or has expired.
+         */
+        post: operations["attach_submissions__submission_id__diagnostics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1994,6 +2138,27 @@ export interface components {
             name: string;
         };
         /**
+         * AttachDiagnosticsIn
+         * @description Attach a collection to a submission, with the person's consent.
+         */
+        AttachDiagnosticsIn: {
+            /**
+             * Collection Id
+             * @description The draft collection to attach
+             */
+            collection_id: string;
+            /**
+             * Include
+             * @description The ids of the items to attach; omitted means every item that was collected. Items left out are deleted
+             */
+            include?: string[] | null;
+            /**
+             * Consent
+             * @description Must be the JSON value true (not a string or a number): the person has read the consent text and agrees to share what is attached
+             */
+            consent: boolean;
+        };
+        /**
          * AttachmentOut
          * @description A file attached to a submission.
          */
@@ -2275,6 +2440,97 @@ export interface components {
              * @default default
              */
             project?: string;
+        };
+        /**
+         * BrowserConsoleEntry
+         * @description One error or warning the browser logged to its console.
+         */
+        BrowserConsoleEntry: {
+            /**
+             * Time
+             * @description When it was logged
+             */
+            time?: string | null;
+            /**
+             * Level
+             * @description Its level
+             * @default error
+             * @enum {string}
+             */
+            level?: "error" | "warn" | "warning" | "info" | "log" | "debug";
+            /**
+             * Message
+             * @description What was logged
+             */
+            message: string;
+            /**
+             * Source
+             * @description The script it came from
+             */
+            source?: string | null;
+            /**
+             * Line
+             * @description The line in that script
+             */
+            line?: number | null;
+        };
+        /**
+         * BrowserDiagnostics
+         * @description What the web interface has seen go wrong in this browser tab. Only the web interface can supply it.
+         */
+        BrowserDiagnostics: {
+            /**
+             * Console
+             * @description Console errors
+             */
+            console?: components["schemas"]["BrowserConsoleEntry"][];
+            /**
+             * Network
+             * @description Failed requests
+             */
+            network?: components["schemas"]["BrowserNetworkEntry"][];
+        };
+        /**
+         * BrowserNetworkEntry
+         * @description One request the browser made that failed or came back with an error.
+         */
+        BrowserNetworkEntry: {
+            /**
+             * Time
+             * @description When it was made
+             */
+            time?: string | null;
+            /**
+             * Method
+             * @description The HTTP method
+             * @default GET
+             */
+            method?: string;
+            /**
+             * Url
+             * @description The address. Secrets in a query string are masked
+             */
+            url: string;
+            /**
+             * Status
+             * @description The status, or null when there was no response
+             */
+            status?: number | null;
+            /**
+             * Error
+             * @description What the browser said went wrong
+             */
+            error?: string | null;
+            /**
+             * Request Id
+             * @description The X-Request-Id of the response, which names it in the server's log
+             */
+            request_id?: string | null;
+            /**
+             * Duration Ms
+             * @description How long it took
+             */
+            duration_ms?: number | null;
         };
         /**
          * BrowserStep
@@ -3083,6 +3339,266 @@ export interface components {
             details?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * DiagnosticCollectionOut
+         * @description What was collected for a report, as the person can review it before attaching it.
+         */
+        DiagnosticCollectionOut: {
+            /**
+             * Id
+             * @description Its id, or null for a preview that was not kept
+             */
+            id: string | null;
+            /**
+             * Status
+             * @description preview: not kept; draft: kept until it is attached or expires; attached: part of a submission
+             * @enum {string}
+             */
+            status: "preview" | "draft" | "attached" | "expired";
+            /**
+             * Created At
+             * @description When it was collected
+             */
+            created_at: string | null;
+            /**
+             * Expires At
+             * @description When a draft is deleted if it was not attached
+             */
+            expires_at: string | null;
+            /**
+             * Window From
+             * @description The start of the period looked at
+             */
+            window_from: string | null;
+            /**
+             * Window To
+             * @description The end of the period looked at
+             */
+            window_to: string | null;
+            /**
+             * Items
+             * @description Every category asked for, collected or not
+             */
+            items: components["schemas"]["DiagnosticItemOut"][];
+            /**
+             * Warnings
+             * @description What could not be collected, and what needs a person's attention
+             */
+            warnings: string[];
+            /**
+             * Total Bytes
+             * @description The size of everything included
+             */
+            total_bytes: number;
+            /**
+             * Any Needs Review
+             * @description True when something must be reviewed before it is shared outside AgentLab
+             */
+            any_needs_review: boolean;
+            /**
+             * Submission Id
+             * @description The submission it is attached to
+             */
+            submission_id: string | null;
+            /**
+             * Consent At
+             * @description When the person agreed to share it
+             */
+            consent_at: string | null;
+        };
+        /**
+         * DiagnosticItemOut
+         * @description One thing that was collected, or that could not be.
+         */
+        DiagnosticItemOut: {
+            /**
+             * Id
+             * @description The item's id; pass it back in `include` to attach it
+             */
+            id: string;
+            /**
+             * Category
+             * @description Its category
+             */
+            category: string;
+            /**
+             * Path
+             * @description Where it sits in the downloadable bundle
+             */
+            path: string;
+            /**
+             * Source
+             * @description Where it came from
+             */
+            source: string;
+            /**
+             * Outcome
+             * @description collected; unavailable (nothing to collect, with the reason); failed (it could not be read); excluded (the person left it out)
+             * @enum {string}
+             */
+            outcome: "collected" | "unavailable" | "failed" | "excluded";
+            /**
+             * Detail
+             * @description Why, for anything but collected
+             */
+            detail: string;
+            /**
+             * Time From
+             * @description The start of the period it covers
+             */
+            time_from: string | null;
+            /**
+             * Time To
+             * @description The end of the period it covers
+             */
+            time_to: string | null;
+            /**
+             * Size
+             * @description Its size in bytes after masking
+             */
+            size: number;
+            /**
+             * Truncated
+             * @description True when it was cut to the size limit
+             */
+            truncated: boolean;
+            /**
+             * Included
+             * @description True when it will be attached
+             */
+            included: boolean;
+            /** @description What masking did to it */
+            redaction: components["schemas"]["RedactionSummary"];
+            /**
+             * Preview
+             * @description Its masked text, up to a limit, for review before anything is shared
+             */
+            preview: string | null;
+        };
+        /**
+         * DiagnosticSource
+         * @description One kind of diagnostic information, and whether AgentLab can supply it here.
+         */
+        DiagnosticSource: {
+            /**
+             * Id
+             * @description The category id to ask for
+             */
+            id: string;
+            /**
+             * Label
+             * @description What it is called
+             */
+            label: string;
+            /**
+             * Description
+             * @description What it contains and where it comes from
+             */
+            description: string;
+            /**
+             * Available
+             * @description True when it can be collected now with the details given
+             */
+            available: boolean;
+            /**
+             * Manual
+             * @description True when the person has to supply it themselves (a screenshot)
+             */
+            manual: boolean;
+            /**
+             * Reason
+             * @description Why it is not available, and what to do instead
+             */
+            reason: string | null;
+            /**
+             * Needs
+             * @description What has to be given for it to be available, such as run_id
+             */
+            needs: string[];
+        };
+        /**
+         * DiagnosticsAvailable
+         * @description What can be collected, how far back, and what the person is agreeing to.
+         */
+        DiagnosticsAvailable: {
+            /**
+             * Sources
+             * @description Every category, with whether it is available
+             */
+            sources: components["schemas"]["DiagnosticSource"][];
+            /**
+             * Windows
+             * @description The windows offered: last_5_minutes ... custom
+             */
+            windows: string[];
+            /**
+             * Max Window Minutes
+             * @description The longest custom window
+             */
+            max_window_minutes: number;
+            /**
+             * Consent Text
+             * @description What attaching diagnostics means; shown before the person agrees
+             */
+            consent_text: string;
+            /**
+             * Limits
+             * @description Sizes and counts that bound a collection
+             */
+            limits: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * DiagnosticsRequest
+         * @description What to collect, around which moment, and for which run.
+         */
+        DiagnosticsRequest: {
+            /**
+             * Categories
+             * @description The categories to collect, from `GET /diagnostics/available`
+             */
+            categories: ("environment" | "application_logs" | "backend_logs" | "errors" | "trace" | "run_metadata" | "test_summary" | "browser" | "screenshot")[];
+            /**
+             * Window
+             * @description How far back from the reference time to look
+             * @default last_15_minutes
+             * @enum {string}
+             */
+            window?: "last_5_minutes" | "last_15_minutes" | "last_30_minutes" | "custom";
+            /**
+             * Window From
+             * @description For a custom window: where it starts
+             */
+            window_from?: string | null;
+            /**
+             * Window To
+             * @description For a custom window: where it ends
+             */
+            window_to?: string | null;
+            /**
+             * Reference Time
+             * @description The moment the problem happened; the window ends here. Defaults to now
+             */
+            reference_time?: string | null;
+            /**
+             * Run Id
+             * @description The evaluation run it concerns (maintainers)
+             */
+            run_id?: string | null;
+            /**
+             * Test Id
+             * @description The test case it concerns (maintainers)
+             */
+            test_id?: string | null;
+            /**
+             * Trace Id
+             * @description The trace it concerns (maintainers)
+             */
+            trace_id?: string | null;
+            /** @description What the browser saw go wrong */
+            browser?: components["schemas"]["BrowserDiagnostics"] | null;
         };
         /**
          * DiscoverRequest
@@ -5083,6 +5599,69 @@ export interface components {
              * @description Why the adapter cannot be built, if it cannot
              */
             configured_error?: string | null;
+        };
+        /**
+         * RedactPreviewIn
+         * @description Text to see masked before it is pasted into a report.
+         */
+        RedactPreviewIn: {
+            /**
+             * Text
+             * @description The text to look at
+             */
+            text: string;
+        };
+        /**
+         * RedactPreviewOut
+         * @description The text as it would be kept, and what changed.
+         */
+        RedactPreviewOut: {
+            /**
+             * Text
+             * @description The masked text
+             */
+            text: string;
+            /** @description What was masked and where, without the values */
+            redaction: components["schemas"]["RedactionSummary"];
+            /**
+             * Mechanisms
+             * @description Which kinds of detection ran
+             */
+            mechanisms: string[];
+            /**
+             * Note
+             * @description What this does and does not tell you
+             */
+            note: string;
+        };
+        /**
+         * RedactionSummary
+         * @description What masking did to an item, without any value.
+         */
+        RedactionSummary: {
+            /**
+             * Status
+             * @description clean: nothing found; redacted: patterns matched and were masked; needs_review: the second inspection found more, so the item is not to leave AgentLab until a person has looked
+             * @enum {string}
+             */
+            status: "clean" | "redacted" | "needs_review";
+            /**
+             * Counts
+             * @description How many of each kind were masked
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Locations
+             * @description Where, as line numbers or JSON paths (at most 20)
+             */
+            locations: string[];
+            /**
+             * External Sharing Blocked
+             * @description True when it may not be shared outside AgentLab yet
+             */
+            external_sharing_blocked: boolean;
         };
         /**
          * RegisterRequest
@@ -13767,6 +14346,561 @@ export interface operations {
             };
             /** @description The submission was changed by someone else since it was read */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    available_diagnostics_available_get: {
+        parameters: {
+            query?: {
+                /** @description The evaluation run it concerns */
+                run_id?: string | null;
+                /** @description The test case it concerns */
+                test_id?: string | null;
+                /** @description The trace it concerns */
+                trace_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticsAvailable"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_diagnostics_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    collect_diagnostics_collect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    redact_preview_diagnostics_redact_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedactPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedactPreviewOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_diagnostics__collection_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a collection */
+                collection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_diagnostics__collection_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a collection */
+                collection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attached_submissions__submission_id__diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attach_submissions__submission_id__diagnostics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachDiagnosticsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

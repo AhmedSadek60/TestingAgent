@@ -423,6 +423,41 @@ class RedactionConfig(Model):
     )
 
 
+class DiagnosticsConfig(Model):
+    """What a person may attach to an issue report from AgentLab itself, and the log AgentLab keeps for it."""
+
+    capture_logs: bool = Field(
+        default=True,
+        description="Keep a bounded, redacted copy of what the server logs (warnings, errors and the requests that failed or "
+        "were slow), correlated with runs and requests, so it can be attached to an issue report",
+    )
+    log_level: Literal["WARNING", "INFO"] = Field(
+        default="WARNING",
+        description="The least important thing that is kept. INFO also raises the level of AgentLab's own logger, so it "
+        "shows on the server's standard error too",
+    )
+    log_retention_hours: int = Field(default=48, ge=1, le=24 * 30, description="How long captured log lines are kept")
+    log_max_rows: int = Field(default=50_000, ge=1_000, le=5_000_000, description="The most captured log lines kept")
+    max_window_minutes: int = Field(
+        default=360, ge=1, le=24 * 60, description="The longest custom time window a collection may ask for"
+    )
+    max_item_kb: int = Field(
+        default=512, ge=16, le=16_384, description="The most one collected item may hold; more is cut"
+    )
+    max_browser_entries: int = Field(
+        default=200,
+        ge=1,
+        le=2_000,
+        description="The most console and network entries a browser may report in one collection",
+    )
+    draft_hours: int = Field(
+        default=24, ge=1, le=24 * 14, description="How long a collection that was not attached to a report is kept"
+    )
+    max_collections_per_hour: int = Field(
+        default=30, ge=1, le=1_000, description="Collections one person may make in an hour"
+    )
+
+
 class FeedbackConfig(Model):
     """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
 
@@ -529,6 +564,7 @@ class FeedbackConfig(Model):
     )
     attachments: AttachmentsConfig = Field(default_factory=AttachmentsConfig)
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
+    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
         default_factory=_all_notifications,
         description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "

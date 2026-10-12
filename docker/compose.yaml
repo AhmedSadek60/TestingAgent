@@ -13,6 +13,8 @@ x-agentlab: &agentlab
   build:
     context: ..
     dockerfile: docker/Dockerfile
+    args:
+      AGENTLAB_BUILD: ${AGENTLAB_BUILD:-unknown}
   image: agentlab:local
   environment:
     AGENTLAB_API_TOKEN: ${AGENTLAB_API_TOKEN:?set AGENTLAB_API_TOKEN to a secret of at least 16 characters}

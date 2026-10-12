@@ -545,3 +545,64 @@ class SubmissionAttachmentRow(Entity):
     archive_summary: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     removed_by_label: Mapped[str] = mapped_column(String(80), default="")
+
+
+# ===================================================================================================== diagnostics
+class LogEventRow(Base):
+    """One line AgentLab logged, kept briefly and already redacted, so it can be attached to an issue report.
+
+    Not an ``Entity``: there are many, they are never updated, and an integer key is what a bounded table needs."""
+
+    __tablename__ = "log_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    level: Mapped[str] = mapped_column(String(10))
+    logger: Mapped[str] = mapped_column(String(120))
+    process: Mapped[str] = mapped_column(String(12), index=True)  # api | worker
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    principal: Mapped[str] = mapped_column(String(80), default="", index=True)
+    message: Mapped[str] = mapped_column(Text)
+    exception: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DiagnosticCollectionRow(Entity):
+    """What one person chose to collect for a report, kept sanitized, until it is attached to a submission or expires.
+
+    ``status`` is ``draft``, ``attached`` or ``expired``."""
+
+    __tablename__ = "diagnostic_collections"
+    owner_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    owner_label: Mapped[str] = mapped_column(String(80), default="")
+    submission_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("submissions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    requested: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)  # categories, window, ids
+    window_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    window_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consent_by: Mapped[str] = mapped_column(String(80), default="")
+
+
+class DiagnosticItemRow(Entity):
+    """One thing collected: a log extract, an environment record, a trace. Only the sanitized text is kept."""
+
+    __tablename__ = "diagnostic_items"
+    collection_id: Mapped[str] = _fk("diagnostic_collections")
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    path: Mapped[str] = mapped_column(String(120), default="")  # where it sits in the bundle
+    source: Mapped[str] = mapped_column(String(120), default="")
+    media_type: Mapped[str] = mapped_column(String(60), default="text/plain")
+    time_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    time_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(16), default="collected")  # collected | unavailable | failed
+    detail: Mapped[str] = mapped_column(String(300), default="")
+    artifact_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    truncated: Mapped[bool] = mapped_column(default=False)
+    included: Mapped[bool] = mapped_column(default=True)
+    redaction_status: Mapped[str] = mapped_column(String(16), default="clean")
+    redaction_report: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)

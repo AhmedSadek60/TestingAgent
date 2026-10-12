@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException, Request
 
 from agentlab.accounts import Principal
+from agentlab.api.requestlog import note
 from agentlab.api.schemas import ErrorResponse, RunDetail, RunProgress, RunSummary
 from agentlab.api.security import presented_token
 from agentlab.api.state import ApiState, state_of
@@ -82,6 +83,7 @@ def current_principal(request: Request) -> Principal:
             )
     assert principal is not None
     request.state.principal = principal
+    note(request.scope, principal=str(principal.user_id or principal.kind))
     return principal
 
 

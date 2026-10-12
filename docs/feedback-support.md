@@ -12,6 +12,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [The discussion](#the-discussion)
 * [Finding submissions](#finding-submissions)
 * [Attachments](#attachments)
+* [Diagnostics](#diagnostics)
 * [Private submissions](#private-submissions)
 * [Limits and protections](#limits-and-protections)
 * [The API](#the-api)
@@ -24,7 +25,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 | Feature requests and issue reports, numbers, workflow, status history, comments and internal notes, labels, priority, severity, assignment, links between submissions, unread marker, duplicate suggestions, audit trail, allowances, private security reports | **Built** (this page) |
 | The web pages (request and report forms, My Submissions, the maintainer queue) | **Not yet built.** Everything is reachable through the API; the web interface comes in a later slice |
 | File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
-| Diagnostics collected from AgentLab (environment, run and trace summaries, logs) | Not yet built |
+| Diagnostics collected from AgentLab: environment, application and backend logs, errors, the run's metadata, a test's result and trace, and what the browser saw; preview, masking, consent, a downloadable bundle | **Built** ([Diagnostics](#diagnostics)) |
 | An engineering handoff package (`CLAUDE_CODE_TASK.md` and a ZIP) | Not yet built |
 | Publishing to GitHub, retention and purging | Not yet built |
 
@@ -173,6 +174,58 @@ Every download is recorded in the submission's audit trail. A download is always
 **Removal.** `DELETE` makes a file unavailable at once and deletes its stored bytes unless another attachment uses them. A
 reporter removes what they attached; a maintainer anything. The record stays, for the audit trail.
 
+## Diagnostics
+
+An issue report is much easier to act on with the evidence next to it, and much riskier to share with it. Diagnostics are
+therefore collected only when asked for, from what AgentLab really keeps, shown **masked** for review, and attached only with
+the person's **consent**. Nothing leaves the server.
+
+`GET /diagnostics/available` lists every category and says, for each, whether it can be collected here and now, and why not:
+
+| Category | What it holds | Available to |
+|---|---|---|
+| `environment` | AgentLab's version and build, the kind of deployment, what is switched on. Never host names, addresses, paths or environment variables | everyone |
+| `application_logs` | What the web server logged at `WARNING` or above (`INFO` if you set it), including each request that failed or took 2 seconds or more, with its request id | everyone, for their own requests (see below); a maintainer also gets a named run's lines |
+| `backend_logs` | The same for the background worker | the same, and only once a worker has logged something |
+| `errors` | The errors recorded for a named run or test, and exceptions logged during the person's own requests | a maintainer for a run; everyone for their own requests |
+| `run_metadata` | A run's status, times and totals | maintainers |
+| `test_summary` | One test's status, attempts, failed checks and (cut) outputs | maintainers |
+| `trace` | The recorded events of one test attempt | maintainers |
+| `browser` | Console errors and failed requests the web interface saw in the person's tab, sent by the web interface | everyone, from the web interface |
+| `screenshot` | **Not collected.** AgentLab cannot take one; it says so and the person attaches a file | manual |
+
+A custom time window may be up to `diagnostics.max_window_minutes`; the fixed ones are 5, 15 and 30 minutes back from the
+moment the problem happened (`reference_time`, default now).
+
+**Whose lines.** The server tags what it logs with the run and the request it belongs to, and each request with who made it.
+A collection takes: the lines of the **caller's own requests**, **system-level** lines (no person and no run attached: a
+startup message, a lost database connection), and, for a maintainer who names a run, that run's. It never takes another
+person's requests because they happened in the same minutes, and a request id a browser reports is only data: it does not
+select anyone's lines. Every response carries an `X-Request-Id` made by the server (an id a client sends is ignored), which
+is how a person can name what failed.
+
+**Preview, then keep.** `POST /diagnostics/preview` collects and masks and keeps nothing; `POST /diagnostics/collect` keeps
+the *masked* result as a draft for `diagnostics.draft_hours`. Each item shows its source, period, size, whether it was
+truncated, **what was masked and where (kinds and locations, never values)**, and a masked preview. `POST
+/diagnostics/redact-preview` does the same for a snippet before it is pasted anywhere. A category that cannot be collected is
+listed with the reason and never stops the others; no empty file stands in for it.
+
+**Consent, then attach.** `POST /submissions/{id}/diagnostics` attaches a draft to a submission the person may see. It needs
+`consent: true` as the JSON value (the text is `consent_text` of `GET /diagnostics/available`: maintainers will see it, masking
+is not a guarantee, nothing leaves the server). `include` lists the items to keep; **items left out are deleted, not kept**.
+A draft that is never attached is deleted when it expires.
+
+**The bundle.** `GET /diagnostics/{id}/download` is a ZIP with the files of the specification (`manifest.json`,
+`environment.json`, `application/relevant.log`, `backend/relevant.log`, `errors/stack-trace.txt`,
+`traces/selected-trace.json`, `browser/console-errors.json`, `browser/network-errors.json`,
+`evaluation/run-summary.json`, `evaluation/test-summary.json`, `README.txt`) of the items that were included. The manifest
+says what was collected, what was **not available**, what was **left out**, what was masked, a SHA-256 of each file, and that
+every file is a *generated, masked copy*. An item the second inspection doubted is marked `needs_review`, and the manifest
+says external sharing is blocked until a person has looked. Downloads of an attached collection are recorded.
+
+A collection is its owner's until it is attached; then it is visible to the people who may see the submission, and to no one
+else (the same rule as the submission: a private submission's diagnostics are private).
+
 ## Private submissions
 
 An issue report in the **security category** (`feedback.security_category`), or one the reporter marks
@@ -226,6 +279,14 @@ requests that change something.
 | `GET /submissions/{id}/attachments/{attachment_id}/preview` | anyone signed in | A sanitized preview of a text file |
 | `GET /submissions/{id}/attachments/{attachment_id}/download` | anyone signed in | The file (`version=sanitized` for the masked copy) |
 | `DELETE /submissions/{id}/attachments/{attachment_id}` | anyone signed in | Remove an attachment |
+| `GET /diagnostics/available` | anyone signed in | What can be collected, and why not |
+| `POST /diagnostics/preview` | anyone signed in | Collect and mask, keep nothing |
+| `POST /diagnostics/collect` | anyone signed in | Collect and keep the masked result as a draft |
+| `POST /diagnostics/redact-preview` | anyone signed in | See a snippet masked |
+| `GET /diagnostics/{collection_id}` | owner, or those who may see its submission | A collection |
+| `GET /diagnostics/{collection_id}/download` | the same | The bundle as a ZIP |
+| `POST /submissions/{id}/diagnostics` | anyone signed in | Attach a draft, with consent |
+| `GET /submissions/{id}/diagnostics` | anyone who may see the submission | What is attached |
 | `POST /submissions/{id}/seen` | anyone signed in | Mark the answers seen |
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |

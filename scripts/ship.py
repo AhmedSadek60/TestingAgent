@@ -522,7 +522,7 @@ def cmd_publish(args: argparse.Namespace) -> None:
     previous = run(["docker", "image", "inspect", IMAGE, "--format", "{{.Id}}"], quiet=True).stdout.strip()
     if previous:
         run(["docker", "tag", previous, "agentlab:previous"], quiet=True)
-    built = run([*COMPOSE, "build", "api"], quiet=True)
+    built = run([*COMPOSE, "build", "api"], env={"AGENTLAB_BUILD": head()[:12]}, quiet=True)
     if built.returncode != 0:
         die("publish", "the image did not build; the running system is untouched:\n" + built.stderr.strip()[-500:])
     say("  image built")

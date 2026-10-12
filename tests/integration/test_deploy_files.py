@@ -44,6 +44,14 @@ def test_the_dockerfile_installs_git_because_a_repository_given_by_url_is_cloned
     assert re.search(r"apt-get install\b[^\n]*(\\\n[^\n]*)*\bgit\b", runtime), "git is missing from the runtime image"
 
 
+def test_the_build_is_named_in_the_image_so_a_report_can_say_which_one_it_is() -> None:
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8").split("AS runtime", 1)[1]
+    assert "ARG AGENTLAB_BUILD=unknown" in dockerfile and "ENV AGENTLAB_BUILD=$AGENTLAB_BUILD" in dockerfile
+    args = _compose(COMPOSE)["x-agentlab"]["build"]["args"]
+    assert args["AGENTLAB_BUILD"] == "${AGENTLAB_BUILD:-unknown}"
+    assert _compose(COMPOSE_VPS)["services"]["api"]["build"]["args"]["WITH_BROWSER"] == "1", "the arguments merge"
+
+
 def test_the_image_starts_agentlab_as_an_unprivileged_user_and_builds_chromium_only_when_asked() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     assert 'ENTRYPOINT ["agentlab"]' in dockerfile and 'CMD ["serve"]' in dockerfile

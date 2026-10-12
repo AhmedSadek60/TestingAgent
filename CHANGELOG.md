@@ -11,6 +11,12 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Diagnostics for issue reports** ([feedback-support.md](docs/feedback-support.md#diagnostics)): what AgentLab can really
+  supply (environment, application and backend logs, errors, a run's metadata, a test's result and trace, what the browser
+  saw), collected only when asked for, from the person's own requests and, for a maintainer, a named run; masked, previewed,
+  attached with consent as the JSON value `true`, downloadable as a ZIP with a manifest. A bounded, masked log of warnings,
+  errors and failed or slow requests is kept for it, tied to runs and requests; every response carries an `X-Request-Id`.
+  Migration `0005`.
 * **Attachments and the DiagnosticRedactor** ([feedback-support.md](docs/feedback-support.md#attachments)): files on a submission,
   checked by content, archives refused when hostile, kept privately under a hash, text files given a sanitized copy with the
   secrets masked and a record of what was masked and where, a malware scan when a scanner is configured and an honest
