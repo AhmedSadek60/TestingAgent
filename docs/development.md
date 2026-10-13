@@ -24,11 +24,11 @@ Everything in the repository's rules for people and agents applies: [AGENTS.md](
 | `src/agentlab/api/static/` | The built web interface. It is a build product, ignored by git, and written by `npm run build`. |
 | `tests/` | `unit/`, `api/`, `integration/`, `security/` and `e2e/`, and `support/` (helpers, fake providers and servers). |
 | `web/` | The web interface (React, TypeScript, Vite). `web/openapi.json` is the API's description; its TypeScript types are generated from it. |
-| `docker/` | The image, the Compose file, the container's configuration, and what Railway uses ([deployment-railway.md](deployment-railway.md)). |
+| `docker/` | The image, the Compose files (`compose.yaml`, and `compose.vps.yaml` for one server), Caddy's configuration, the worker's seccomp profile and the containers' configuration ([deployment-vps.md](deployment-vps.md)). |
 | `docs/` | These pages. `docs/decisions/` holds the architecture decision records. |
 | `fixtures/` | Small sample repositories for the repository-analysis tests. |
 | `scripts/` | `export_openapi.py`, and `ai/`, the validator of the governance files. |
-| `railway.json` | Railway's configuration as code. |
+| `evaluations/` | Target files and tests for the agents AgentLab itself is used to test. |
 | `.github/workflows/` | `ci.yml` (the checks below) and `ai-governance.yml`. Both only read the repository. |
 
 ## Setting up
@@ -164,6 +164,30 @@ fields of `web/package-lock.json`). Nobody has reviewed them beyond that, and a 
 It does not check the prose, and the outputs shown in the pages (a run's summary, a report's excerpt) were copied from
 real runs and shortened: they are not generated again.
 
+## The staged release process
+
+Every change reaches the running system through the same nine steps, one command each (`python3 scripts/ship.py <command>`;
+`all` runs them in order and stops at the first problem):
+
+| Step | What | Command |
+|---|---|---|
+| 1-2 | Test locally and verify. It runs what CI runs: `ruff check`, `ruff format --check`, `mypy src`, the OpenAPI description check, the governance validator, the tests CI selects, the web job (schema, tests, build, in a Node container) and the image build. The commit is then "cleared". | `check` |
+| 3 | Open the pull request: push the branch (never `main`) and open it, or find the open one and update it. Refused unless `check` passed on this exact commit and the branch is not behind `main`. | `pr` |
+| 4-5 | Wait until every check of the pull request has finished, then verify that each one is green, that nobody requested changes and that the pull request is mergeable. A pull request with no check reported is not green. | `wait` |
+| 6 | If something is red: the end of its log is printed. Reproduce it with `check`, fix it, commit. | (a person or an agent) |
+| 7 | Loop: `check`, `pr`, `wait` again, until `wait` passes. A failed check is never skipped, disabled or re-run to see if it passes. | |
+| 8 | Merge to `main`, with a merge commit, only if everything above holds on the exact head ([the rule](../.ai/policies/git.md#merging)). | `merge` |
+| 9 | Publish to the system link: fast-forward the server's checkout to `main`, take a backup, build the image, replace the API and worker, and run the smoke test (`/health` 200; an API route 401 without the token and 200 with it; the web interface 200). If the smoke test fails the previous image is put back. It refuses while runs are in progress unless `--force`. | `publish` |
+
+**Credentials.** The script reads a GitHub token from `~/.config/agentlab-ship/github-token` (or `$AGENTLAB_SHIP_TOKEN_FILE`):
+a fine-grained token for this one repository, with *Pull requests* and *Contents* read and write and *Actions* read, a short expiry,
+mode `600`, outside the repository. It is never printed, logged or written into a git configuration; git gets it through a
+temporary credential helper that is deleted afterwards.
+
+**What the process does not do.** It does not change branch protection, CI permissions or secrets (the owner's settings; requiring
+the four checks on `main` in the repository settings is recommended, so that the rule holds even for a push that does not use
+this script). Publishing is the only step that touches the running system, and it runs on the server that hosts it.
+
 ## Verification status
 
 The words used in these pages are *implemented* (the code exists and a test in this repository exercises it) and *verified*
@@ -186,7 +210,7 @@ of pretending.
 | Plug-ins | Verified | The tests install plug-ins by entry point, by module and by code, for every kind, and check what a failing plug-in does. |
 | Authorization, redaction and egress controls | Verified | `tests/security/`. These are controls of a testing tool; nobody outside the project has audited them. |
 | Docker image and Compose | Partly verified | The image builds and runs (the web interface, a run, the data surviving a replaced container, an orderly stop, PostgreSQL as the database). The Compose stack, started from the built image, took a run through Redis to the worker, kept its data across a stop and a start, ran read-only without capabilities as an unprivileged user, and stopped with exit code 0 in about two seconds. GitHub's runner built the Dockerfile as written; here it was built through a wrapper that adds the CA certificate of the proxy this work was done behind, and `docker compose up --build` as written was not run: the stack was started from the built image. |
-| Railway | Not verified on Railway | `railway.json` validates against Railway's published schema, the start script and the image were run the way [deployment-railway.md](deployment-railway.md) says Railway runs them, with stand-ins for the volume, the port and the PostgreSQL service. It was never deployed: no Railway account was used. |
-| `CI` workflow | Verified on GitHub | It ran on the pull request that added it and passed there: lint, formatting, types, the OpenAPI document and the standard tests (1,512 passed and 3 skipped, in about eight minutes on GitHub's runner), the web interface's types, tests and build, and the build of the image. The runs before it found three problems. Two were tests that held only on the machine they were written on (a build product that a clean checkout lacks, and colour codes that Typer adds in CI). The third was in the product: a worker that was told to stop waited up to six seconds before it asked its runs to stop, so a test that stops a worker during a run failed whenever the run had got past its tests by then. It was fixed in `src/agentlab/jobs/worker.py`, with a test that fails without the fix. The three tests that start the Railway script as root skip on GitHub's runner, which is not root; they passed here, as root. The Docker, browser, PostgreSQL, Redis, Ollama and matrix tests do not run there. |
+| One server (VPS) | Verified on the server | The Compose stack behind Caddy, the local judge, Chromium in the worker with its sandbox on, a run started from the dashboard, and the restart of the stack; what was not checked (a reboot, access from outside) is listed in [deployment-vps.md](deployment-vps.md#what-was-verified-and-what-was-not). |
+| `CI` workflow | Verified on GitHub | It ran on the pull request that added it and passed there: lint, formatting, types, the OpenAPI document and the standard tests (1,512 passed and 3 skipped, in about eight minutes on GitHub's runner), the web interface's types, tests and build, and the build of the image. The runs before it found three problems. Two were tests that held only on the machine they were written on (a build product that a clean checkout lacks, and colour codes that Typer adds in CI). The third was in the product: a worker that was told to stop waited up to six seconds before it asked its runs to stop, so a test that stops a worker during a run failed whenever the run had got past its tests by then. It was fixed in `src/agentlab/jobs/worker.py`, with a test that fails without the fix. The Docker, browser, PostgreSQL, Redis, Ollama and matrix tests do not run there. |
 | Other systems | Not verified | Only Linux. Windows and macOS were not tried (the sandbox, the start script and the shell examples assume Linux). |
 | Client certificates, WebSocket agent protocols, object stores | Unsupported | Asked for, they are refused with a message. |

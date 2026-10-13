@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from agentlab.core.errors import UserError
 from agentlab.core.models.base import Model
@@ -250,12 +250,343 @@ class ServerConfig(Model):
         "from the API itself and needs none",
     )
     max_upload_mb: int = Field(default=25, ge=1, le=512, description="Largest document or archive an upload may carry")
+    max_body_mb: int = Field(
+        default=4,
+        ge=1,
+        le=256,
+        description="Largest request body the server reads, an upload excepted. A larger one is refused with 413 before "
+        "it is parsed, so one oversized request cannot exhaust the server's memory",
+    )
     allowed_paths: list[str] = Field(
         default_factory=list,
         description="Folders on the server a request may point a target at (a repository path, a document). "
         "Uploads are always allowed. Empty means API clients cannot name server paths at all",
     )
     serve_ui: bool = Field(default=True, description="Serve the web interface at / when it has been built")
+
+
+class AccountsConfig(Model):
+    """People who sign in to the web interface: who may register, how long a session lasts, how passwords are held to account."""
+
+    registration: Literal["open", "approval", "closed"] = Field(
+        default="open",
+        description="Who may create an account: `open` (anyone who reaches the server, as a reporter), `approval` (anyone may "
+        "ask; an admin activates the account) or `closed` (an admin creates every account)",
+    )
+    default_role: Literal["reporter", "maintainer"] = Field(
+        default="reporter",
+        description="The role of an account made by registration. A reporter may use Feedback & Support only; a maintainer "
+        "has everything the shared API token has. Keep `reporter` on a server that anyone can reach",
+    )
+    session_idle_minutes: int = Field(
+        default=60, ge=5, le=10_080, description="A session ends after this long without a request"
+    )
+    session_absolute_hours: int = Field(
+        default=12, ge=1, le=720, description="A session ends this long after sign-in, whatever it does"
+    )
+    min_password_length: int = Field(default=12, ge=8, le=128, description="The shortest password accepted")
+    max_failed_attempts: int = Field(
+        default=5, ge=3, le=20, description="Wrong passwords in a row before an account is locked"
+    )
+    lock_minutes: int = Field(default=15, ge=1, le=1_440, description="How long a locked account stays locked")
+    registrations_per_hour: int = Field(
+        default=5, ge=1, le=1_000, description="Registrations accepted per client address per hour"
+    )
+    cookie_secure: Literal["auto", "always", "never"] = Field(
+        default="auto",
+        description="Whether the session cookie is marked Secure: `auto` when the request came over HTTPS (or a proxy said "
+        "so with X-Forwarded-Proto), `always`, or `never` (a plain-HTTP deployment on a trusted network)",
+    )
+
+
+def _all_notifications() -> list[Literal["comment", "information_request", "status_change"]]:
+    return ["comment", "information_request", "status_change"]
+
+
+#: The file types an attachment may be. An owner can only switch these on or off: each has a signature check behind it.
+ATTACHMENT_TYPES = (
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "pdf",
+    "docx",
+    "txt",
+    "md",
+    "csv",
+    "json",
+    "jsonl",
+    "yaml",
+    "yml",
+    "log",
+    "zip",
+)
+
+
+def _default_attachment_types() -> list[str]:
+    return list(ATTACHMENT_TYPES)
+
+
+class AttachmentsConfig(Model):
+    """What may be attached to a submission, and how it is checked."""
+
+    allowed_extensions: list[str] = Field(
+        default_factory=_default_attachment_types,
+        description="The file types that may be attached, by extension. Each is checked against its file signature or its "
+        "text; a type outside this list cannot be enabled",
+    )
+    max_files: int = Field(default=10, ge=1, le=100, description="Attachments one submission may have")
+    max_file_mb: int = Field(default=25, ge=1, le=512, description="The largest single attachment")
+    max_total_mb: int = Field(
+        default=100, ge=1, le=4096, description="The most attachments of one submission may add up to"
+    )
+    max_uploads_per_day: int = Field(
+        default=50, ge=1, le=10_000, description="Attachments one person with the role reporter may add in 24 hours"
+    )
+    zip_max_entries: int = Field(default=200, ge=1, le=10_000, description="The most entries an archive may list")
+    zip_max_expanded_mb: int = Field(
+        default=200,
+        ge=1,
+        le=8192,
+        description="The most an archive may expand to, by what it declares (it is never extracted)",
+    )
+    zip_max_ratio: int = Field(
+        default=100,
+        ge=2,
+        le=10_000,
+        description="The largest ratio of expanded size to stored size, for the archive or an entry",
+    )
+    sanitize_max_mb: int = Field(
+        default=10,
+        ge=1,
+        le=256,
+        description="The largest text attachment that is scanned for secrets and given a sanitized copy",
+    )
+    scanner_command: list[str] = Field(
+        default_factory=list,
+        description="A command that scans a file for malware: its arguments, with {path} where the file goes (the path is "
+        "appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and "
+        "attachments are recorded as not scanned",
+    )
+    scanner_timeout_seconds: int = Field(
+        default=60, ge=1, le=3600, description="How long the scanner may take for one file"
+    )
+    scanner_required: bool = Field(
+        default=False,
+        description="Refuse an attachment when the scanner is configured but fails or times out (otherwise it is kept and "
+        "recorded as not scanned)",
+    )
+
+    @model_validator(mode="after")
+    def _known_types(self) -> AttachmentsConfig:
+        unknown = sorted({e.lower().lstrip(".") for e in self.allowed_extensions} - set(ATTACHMENT_TYPES))
+        if unknown:
+            raise ValueError(
+                f"feedback.attachments.allowed_extensions names types AgentLab cannot check: {', '.join(unknown)} "
+                f"(it can check: {', '.join(ATTACHMENT_TYPES)})"
+            )
+        self.allowed_extensions = sorted({e.lower().lstrip(".") for e in self.allowed_extensions})
+        if self.max_file_mb > self.max_total_mb:
+            raise ValueError("feedback.attachments.max_file_mb cannot be more than max_total_mb")
+        return self
+
+
+class RedactionRule(Model):
+    """A pattern of the owner's own that diagnostic text is masked by."""
+
+    name: str = Field(
+        pattern=r"^[A-Za-z0-9_\-]{1,40}$", description="What the masked value is called in a report: custom:<name>"
+    )
+    pattern: str = Field(min_length=1, max_length=500, description="A regular expression; every match is masked")
+
+    @field_validator("pattern")
+    @classmethod
+    def _compiles(cls, value: str) -> str:
+        import re
+
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"not a valid regular expression: {exc}") from exc
+        return value
+
+
+class RedactionConfig(Model):
+    """How attached and collected text is masked before it is shown, kept or shared (the DiagnosticRedactor)."""
+
+    rules: list[RedactionRule] = Field(
+        default_factory=list, max_length=50, description="Patterns of your own to mask, beyond the built-in ones"
+    )
+    redact_ip_addresses: bool = Field(
+        default=False,
+        description="Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on",
+    )
+
+
+class DiagnosticsConfig(Model):
+    """What a person may attach to an issue report from AgentLab itself, and the log AgentLab keeps for it."""
+
+    capture_logs: bool = Field(
+        default=True,
+        description="Keep a bounded, redacted copy of what the server logs (warnings, errors and the requests that failed or "
+        "were slow), correlated with runs and requests, so it can be attached to an issue report",
+    )
+    log_level: Literal["WARNING", "INFO"] = Field(
+        default="WARNING",
+        description="The least important thing that is kept. INFO also raises the level of AgentLab's own logger, so it "
+        "shows on the server's standard error too",
+    )
+    log_retention_hours: int = Field(default=48, ge=1, le=24 * 30, description="How long captured log lines are kept")
+    log_max_rows: int = Field(default=50_000, ge=1_000, le=5_000_000, description="The most captured log lines kept")
+    max_window_minutes: int = Field(
+        default=360, ge=1, le=24 * 60, description="The longest custom time window a collection may ask for"
+    )
+    max_item_kb: int = Field(
+        default=512, ge=16, le=16_384, description="The most one collected item may hold; more is cut"
+    )
+    max_browser_entries: int = Field(
+        default=200,
+        ge=1,
+        le=2_000,
+        description="The most console and network entries a browser may report in one collection",
+    )
+    draft_hours: int = Field(
+        default=24, ge=1, le=24 * 14, description="How long a collection that was not attached to a report is kept"
+    )
+    max_collections_per_hour: int = Field(
+        default=30, ge=1, le=1_000, description="Collections one person may make in an hour"
+    )
+
+
+class FeedbackConfig(Model):
+    """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
+
+    feature_categories: list[str] = Field(
+        default_factory=lambda: [
+            "User Interface / UX",
+            "AI Agent Testing",
+            "Test Case Generation",
+            "Evaluation Metrics",
+            "Security Testing",
+            "RAG Evaluation",
+            "Browser Automation",
+            "Provider Integration",
+            "Local LLM Support",
+            "Reporting and Analytics",
+            "Performance",
+            "Workflow Automation",
+            "API",
+            "CLI",
+            "Deployment",
+            "Developer Experience",
+            "Other",
+        ],
+        description="The categories a feature request can have",
+    )
+    issue_categories: list[str] = Field(
+        default_factory=lambda: [
+            "Application Bug",
+            "UI / Display Problem",
+            "Test Execution Failure",
+            "Incorrect Evaluation Result",
+            "Test Case Generation Problem",
+            "Browser Automation Problem",
+            "Provider / LLM Integration Problem",
+            "API Error",
+            "Repository Ingestion Problem",
+            "Document Processing Problem",
+            "Incorrect Score or Report",
+            "Performance / Slow Response",
+            "Crash or Application Unavailable",
+            "Installation / Configuration",
+            "Authentication / Permissions",
+            "Data Persistence Problem",
+            "Unexpected Cost or Resource Usage",
+            "Suspected Security Issue",
+            "Other",
+        ],
+        description="The categories an issue report can have",
+    )
+    feature_statuses: list[str] = Field(
+        default_factory=lambda: [
+            "Submitted",
+            "Needs Triage",
+            "Under Review",
+            "Planned",
+            "In Progress",
+            "Completed",
+            "Declined",
+            "Duplicate",
+        ],
+        description="The statuses a feature request moves through; the first is the one it starts with",
+    )
+    issue_statuses: list[str] = Field(
+        default_factory=lambda: [
+            "Submitted",
+            "Needs Triage",
+            "Investigating",
+            "Awaiting User",
+            "Reproducing",
+            "In Progress",
+            "Fix Available",
+            "Resolved",
+            "Closed",
+            "Duplicate",
+            "Cannot Reproduce",
+        ],
+        description="The statuses an issue report moves through; the first is the one it starts with",
+    )
+    resolved_statuses: list[str] = Field(
+        default_factory=lambda: ["Completed", "Fix Available", "Resolved"],
+        description="Statuses that set the resolution time of a submission",
+    )
+    closed_statuses: list[str] = Field(
+        default_factory=lambda: ["Completed", "Declined", "Duplicate", "Closed", "Cannot Reproduce"],
+        description="Statuses that set the closing time of a submission",
+    )
+    security_category: str = Field(
+        default="Suspected Security Issue",
+        description="An issue with this category is security-sensitive: only its reporter and authorised maintainers see it",
+    )
+    service_token_sees_security: bool = Field(
+        default=False,
+        description="Whether the shared API token (a credential many people may hold) may see security-sensitive "
+        "submissions made by other people. Maintainers and admins, and the local machine, always may",
+    )
+    max_submissions_per_day: int = Field(
+        default=20, ge=1, le=10_000, description="Submissions one person with the role reporter may make in 24 hours"
+    )
+    max_comments_per_day: int = Field(
+        default=100, ge=1, le=10_000, description="Comments one person with the role reporter may write in 24 hours"
+    )
+    similar_limit: int = Field(
+        default=5, ge=1, le=20, description="How many possibly similar submissions are suggested"
+    )
+    attachments: AttachmentsConfig = Field(default_factory=AttachmentsConfig)
+    redaction: RedactionConfig = Field(default_factory=RedactionConfig)
+    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
+        default_factory=_all_notifications,
+        description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "
+        "information or a reproduction attempt, or a status change. Remove one to stop that notification",
+    )
+
+    @model_validator(mode="after")
+    def _the_lists_agree(self) -> FeedbackConfig:
+        for name in ("feature_categories", "issue_categories", "feature_statuses", "issue_statuses"):
+            values = getattr(self, name)
+            if not values or len(set(values)) != len(values) or any(not v.strip() or len(v) > 80 for v in values):
+                raise ValueError(
+                    f"feedback.{name} must be a list of different, non-empty names of at most 80 characters"
+                )
+        known = set(self.feature_statuses) | set(self.issue_statuses)
+        for name in ("resolved_statuses", "closed_statuses"):
+            unknown = sorted(set(getattr(self, name)) - known)
+            if unknown:
+                raise ValueError(f"feedback.{name} names statuses no workflow has: {', '.join(unknown)}")
+        if self.security_category not in self.issue_categories:
+            raise ValueError("feedback.security_category must be one of feedback.issue_categories")
+        return self
 
 
 #: A reply read from a web page includes the page's own rendering and, for an assistant, a model's time to write it. A
@@ -276,6 +607,8 @@ class AgentLabConfig(Model):
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     queue: QueueConfig = Field(default_factory=QueueConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+    accounts: AccountsConfig = Field(default_factory=AccountsConfig)
+    feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     max_parallel: int = 4
     skill_dirs: list[str] = Field(default_factory=list)

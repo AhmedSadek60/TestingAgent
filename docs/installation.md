@@ -183,10 +183,8 @@ What the containers are, and are not:
 
 To build the image alone: `docker build -f docker/Dockerfile -t agentlab .` (it builds the interface in a Node stage and
 installs the package in a Python stage; the base images are the `NODE_IMAGE` and `PYTHON_IMAGE` build arguments). The
-image declares no `VOLUME` (Railway's builder refuses one), so `docker run` keeps nothing unless you mount something at
+image declares no `VOLUME` (Compose names the volume it mounts), so `docker run` keeps nothing unless you mount something at
 `/data`: `docker run -v agentlab-data:/data ...`.
-
-**On Railway** the same image runs as one service with PostgreSQL and a volume: [deployment-railway.md](deployment-railway.md).
 
 **On a single VPS** with no domain, the Compose stack runs behind Caddy: [deployment-vps.md](deployment-vps.md). The image can also be built with Chromium (`--build-arg WITH_BROWSER=1`) for browser tests: see that page for the seccomp profile it needs.
 

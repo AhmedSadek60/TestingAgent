@@ -19,8 +19,7 @@ browser exploit from a page under test would then reach the worker's database pa
 
 ## Decision
 
-* Build the image with Chromium only when asked (`--build-arg WITH_BROWSER=1`; the VPS overlay does, the default build and the
-  Railway build do not).
+* Build the image with Chromium only when asked (`--build-arg WITH_BROWSER=1`; the VPS overlay does, the default build does not).
 * Give the worker `docker/seccomp-chromium.json`: Docker's default profile with the rules that restrict `clone`, `clone3` (the
   `ENOSYS` rule) and the `CAP_SYS_ADMIN`-gated namespace calls replaced by one rule that allows `clone`, `clone3`, `unshare`
   and `setns`. Everything else in the default profile is unchanged.

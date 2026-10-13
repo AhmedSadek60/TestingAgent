@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 
 from fastapi import HTTPException, Request
 
+from agentlab.accounts import Principal
+from agentlab.api.requestlog import note
 from agentlab.api.schemas import ErrorResponse, RunDetail, RunProgress, RunSummary
+from agentlab.api.security import presented_token
 from agentlab.api.state import ApiState, state_of
 from agentlab.core.enums import EventType, RunStatus, TestStatus
 
@@ -19,22 +23,108 @@ RESPONSES: dict[int | str, dict[str, Any]] = {
 }
 
 
-def require_auth(request: Request) -> None:
-    """Dependency of every endpoint that needs the token."""
-    st = state_of(request)
-    if not st.guard.required:
-        return
-    client = request.client.host if request.client else "unknown"
-    if st.guard.throttled(client):
-        raise HTTPException(status_code=429, detail="too many failed attempts; wait a minute")
-    from agentlab.api.security import presented_token
+SESSION_COOKIE = "agentlab_session"
+CSRF_HEADER = "x-csrf-token"
+UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+LOCAL = Principal(kind="local", role="admin")
+SERVICE = Principal(kind="service", role="maintainer")
 
-    if not st.guard.check(client, presented_token(request.headers)):
+
+def client_of(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def current_principal(request: Request) -> Principal:
+    """Who is calling, or 401. Worked out once per request.
+
+    1. An API token (``Authorization: Bearer`` or ``X-API-Key``) is the shared service credential, exactly as before accounts.
+    2. Otherwise the session cookie of a signed-in person. A request authenticated by cookie that changes something must also
+       carry the session's CSRF token, because a browser attaches cookies to requests that another site causes it to send.
+    3. Otherwise, on a server that needs no token (loopback only), the local machine.
+    """
+    cached: Principal | None = getattr(request.state, "principal", None)
+    if cached is not None:
+        return cached
+    st = state_of(request)
+    client = client_of(request)
+    presented = presented_token(request.headers)
+    principal: Principal | None = None
+    if presented is not None:
+        if not st.guard.required:
+            principal = LOCAL
+        else:
+            if st.guard.throttled(client):
+                raise HTTPException(status_code=429, detail="too many failed attempts; wait a minute")
+            if st.guard.check(client, presented):
+                principal = SERVICE
+            else:
+                raise HTTPException(
+                    status_code=401,
+                    detail="missing or wrong API token (send Authorization: Bearer <token>)",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+    else:
+        cookie = request.cookies.get(SESSION_COOKIE)
+        if cookie and st.accounts is not None:
+            principal = st.accounts.principal_for_session(cookie)
+            if principal is None:
+                raise HTTPException(status_code=401, detail="the session has ended: sign in again")
+            if request.method in UNSAFE_METHODS:
+                sent = request.headers.get(CSRF_HEADER, "")
+                if not principal.csrf_token or not hmac.compare_digest(sent.encode(), principal.csrf_token.encode()):
+                    raise HTTPException(status_code=403, detail="the request did not carry this session's CSRF token")
+        elif not st.guard.required:
+            principal = LOCAL
+        else:
+            raise HTTPException(
+                status_code=401,
+                detail="missing or wrong API token (send Authorization: Bearer <token>)",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    assert principal is not None
+    request.state.principal = principal
+    note(request.scope, principal=str(principal.user_id or principal.kind))
+    return principal
+
+
+def require_signed_in(request: Request) -> Principal:
+    """Any caller that is who it says it is, even one that still has to change a temporary password."""
+    return current_principal(request)
+
+
+def require_user(request: Request) -> Principal:
+    """A caller that may use Feedback & Support: any signed-in person, the shared token or the local machine."""
+    principal = current_principal(request)
+    if principal.must_change_password:
+        raise HTTPException(status_code=403, detail="change your temporary password first (POST /auth/password)")
+    return principal
+
+
+def require_auth(request: Request) -> Principal:
+    """Dependency of every endpoint AgentLab had before accounts (runs, targets, credentials, reports...): operators only."""
+    principal = require_user(request)
+    if not principal.is_operator:
         raise HTTPException(
-            status_code=401,
-            detail="missing or wrong API token (send Authorization: Bearer <token>)",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=403,
+            detail="this account may use Feedback & Support only; ask an administrator for the maintainer role",
         )
+    return principal
+
+
+def require_staff(request: Request) -> Principal:
+    """A caller that may triage submissions: an operator (a maintainer, an admin, the shared token, the local machine)."""
+    principal = require_user(request)
+    if not principal.is_operator:
+        raise HTTPException(status_code=403, detail="only maintainers may do this")
+    return principal
+
+
+def require_admin(request: Request) -> Principal:
+    """A caller that may manage accounts."""
+    principal = require_user(request)
+    if not principal.is_admin:
+        raise HTTPException(status_code=403, detail="only an administrator may manage accounts")
+    return principal
 
 
 def run_row(st: ApiState, ident: str) -> dict[str, Any]:

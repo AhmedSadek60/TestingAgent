@@ -1,4 +1,7 @@
 import { HashRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import { Account } from "./pages/Account";
+import { Accounts } from "./pages/Accounts";
+import { ReporterLayout } from "./components/ReporterLayout";
 import { Layout } from "./components/Layout";
 import { Empty, ToastProvider } from "./components/ui";
 import { Gate } from "./pages/SignIn";
@@ -20,7 +23,7 @@ import { Skills } from "./pages/Skills";
 import { TargetDetail } from "./pages/TargetDetail";
 import { Targets } from "./pages/Targets";
 import { Traces } from "./pages/Traces";
-import { SessionProvider } from "./session";
+import { SessionProvider, useSession } from "./session";
 
 function NotFound() {
   return (
@@ -57,10 +60,31 @@ export function AppRoutes() {
         <Route path="providers" element={<Providers />} />
         <Route path="credentials" element={<Credentials />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="account" element={<Account />} />
+        <Route path="accounts" element={<Accounts />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );
+}
+
+/** A person whose role reaches only Feedback & Support (or who has still to change a temporary password) gets a small interface
+ * of their own: the rest of AgentLab would answer every call with a refusal. */
+function ReporterRoutes() {
+  return (
+    <Routes>
+      <Route element={<ReporterLayout />}>
+        <Route index element={<Account />} />
+        <Route path="account" element={<Account />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+export function Shell() {
+  const { me } = useSession();
+  return me && !me.operator ? <ReporterRoutes /> : <AppRoutes />;
 }
 
 export function App() {
@@ -72,7 +96,7 @@ export function App() {
             Skip to the content
           </a>
           <Gate>
-            <AppRoutes />
+            <Shell />
           </Gate>
         </SessionProvider>
       </ToastProvider>

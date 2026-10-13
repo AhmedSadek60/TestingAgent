@@ -9,8 +9,7 @@
 # run untrusted code are BLOCKED with that reason (they are never run in the container itself); without a browser,
 # browser tests are BLOCKED. See docs/installation.md#docker.
 #
-# Railway builds this file too (railway.json, docs/deployment-railway.md). Its builder refuses the VOLUME instruction, so
-# there is none: Compose and Railway both mount their own volume at /data.
+# The image declares no VOLUME: Compose (docker/compose.yaml) names the volume it mounts at /data.
 ARG NODE_IMAGE=node:22-slim
 ARG PYTHON_IMAGE=python:3.12-slim
 
@@ -57,12 +56,13 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN if [ "$WITH_BROWSER" = "1" ]; then /opt/venv/bin/playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*; fi
 COPY docker/agentlab.yaml /etc/agentlab/agentlab.yaml
-COPY docker/agentlab.railway.yaml /etc/agentlab/railway.yaml
-COPY --chmod=0755 docker/railway-start.sh /usr/local/bin/agentlab-railway-start
+# Which build this is, so that the environment of an issue report can name it (`unknown` when it is not given).
+ARG AGENTLAB_BUILD=unknown
+ENV AGENTLAB_BUILD=$AGENTLAB_BUILD
 USER agentlab
 WORKDIR /data
 EXPOSE 8080
-# The port is 8080 unless a platform injects PORT, which docker/railway-start.sh then listens on.
+# The health check asks the port the server listens on: 8080, or $PORT when the platform sets one.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "-c", "import os, urllib.request as u; u.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8080'), timeout=4)"]
 ENTRYPOINT ["agentlab"]

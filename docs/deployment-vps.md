@@ -18,6 +18,9 @@ flowchart LR
   worker --- vol
 ```
 
+Changes reach this server through [the staged release process](development.md#the-staged-release-process), whose last step
+(`scripts/ship.py publish`) rebuilds and replaces the API and worker and rolls back if the smoke test fails.
+
 ## Set up
 
 ```bash
@@ -65,27 +68,54 @@ verdicts and some judge errors, and move to a larger model when the server has t
 
 ## The host command line
 
-Tests that run a repository's code need Docker, which the containers do not have. The command line is installed on the host as
-well, in `/opt/agentlab-host`, with Chromium in `/opt/playwright`:
+The command line is installed on the host as well, in `/opt/agentlab-host`, with Chromium in `/opt/playwright`. Two commands
+share the dashboard's database and files, so their runs appear in the dashboard:
+
+| Command | Runs as | Can | Cannot |
+|---|---|---|---|
+| `agentlab-host` | the unprivileged user `agentlab` (uid 10001, the same as the containers) | web targets (Chromium keeps its own sandbox), API targets, stored credentials | tests that need Docker |
+| `agentlab-host-docker` | root | tests that run a repository's code in Docker sandboxes | drive a browser (`browser.enabled: false`, because AgentLab starts Chromium without its sandbox as root) |
 
 ```bash
-agentlab-host doctor
-agentlab-host test --repo https://github.com/<you>/<repo>.git --command "<how the agent starts>"
+cd /var/lib/agentlab-host/evaluations/free-ai-test        # the evaluations, read-only, where the user can reach them
+agentlab-host test --target target.yaml --tests tests.yaml --skills agent-fingerprinting --suite functional
+agentlab-host-docker test --repo https://github.com/<you>/<repo>.git --command "<how the agent starts>"
 ```
 
-`agentlab-host` (`/usr/local/bin`) uses `/root/agentlab/agentlab.host.yaml` and **shares the web interface's database and
-files**, so its runs appear in the dashboard:
+* **Set up** by `sh /root/agentlab/switch-to-unprivileged.sh` (kept on the server, not in the repository): it creates the user,
+  installs both commands and their configurations in `/etc/agentlab-host/`, and replaces the symbolic link `/data` with a bind mount.
+* **The database** is the stack's PostgreSQL, published on the server's loopback (`127.0.0.1:5432`) only; the wrapper builds the URL
+  from `/root/agentlab/.env`, which only root can read, and drops privileges before AgentLab starts.
+* **`/data` on the host** is a bind mount of the `agentlab_data` Docker volume (in `/etc/fstab`), which the containers mount at
+  `/data`, so paths stored in the database mean the same thing on both sides, and an unprivileged user can reach it.
+* **Files under `/root` are not readable** by the unprivileged user. The repository's `evaluations/` folder is exposed read-only at
+  `/var/lib/agentlab-host/evaluations` (a bind mount in `/etc/fstab`). `agentlab-host` keeps the folder you are in when the user can
+  use it and otherwise starts in `/var/lib/agentlab-host`.
+* **Credentials** stay on the host (`/var/lib/agentlab-host`), owned by `agentlab`: the web containers cannot use them.
 
-* the database is the stack's PostgreSQL, published on the server's loopback (`127.0.0.1:5432`) only; the wrapper builds
-  the URL from `/root/agentlab/.env`;
-* `/data` on the host is a symbolic link to the `agentlab_data` Docker volume, which the containers mount at `/data`, so
-  paths stored in the database mean the same thing on both sides;
-* the host command runs as root and the containers as uid 10001, so the wrapper gives `/data` to uid 10001 after each
-  command; without that the API cannot read the evidence and the report downloads fail with HTTP 500;
-* stored credentials stay on the host (`/var/lib/agentlab-host`): the web containers cannot use them.
+Repository code runs only inside Docker sandboxes (no network, read-only file system, non-root, limited), never on the host; the
+Docker socket is never given to any container. A sandbox has no network, so an agent that downloads models or packages at
+start-up cannot run in one.
 
-Repository code runs only inside Docker sandboxes (no network, read-only file system, non-root, limited), never on the
-host; the Docker socket is still not given to any container. A sandbox has no network, so an agent that downloads models or packages at start-up cannot run in one.
+## People and accounts
+
+Anyone with the shared API token is a maintainer. People can also have accounts ([accounts.md](accounts.md)); open registration makes
+them *reporters*, who reach nothing but Feedback & Support. Make the first administrator on the server, once:
+
+```bash
+docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /root/agentlab/.env \
+  exec api agentlab users create YOUR-NAME --role admin
+```
+
+The password is typed at a hidden prompt. On a server that anyone can reach, consider `accounts.registration: approval` or `closed`.
+
+## Who is calling
+
+Behind Caddy the API would see every request as coming from Caddy. `docker/compose.vps.yaml` therefore sets
+`FORWARDED_ALLOW_IPS=*` for the API, so it uses the `X-Forwarded-For` address Caddy sets to the visitor's real one (Caddy
+replaces a forwarded address a visitor sent; it passes one on only if `trusted_proxies` lists the sender, which this
+`Caddyfile` does not). The limits on wrong tokens, sign-in and registration are kept per visitor address, and the account audit
+trail records it. This is safe **only because no port of the API is published**; if you publish it, remove the setting.
 
 ## What the web containers can and cannot do
 

@@ -29,7 +29,7 @@ API on `127.0.0.1` only and says to put TLS in front of it before publishing it 
 
 - **Plain HTTP on a public port:** rejected; the token would be readable on the path.
 - **Loopback only plus an SSH tunnel:** safest and needs no certificate, but is awkward for daily use. Remains the fallback.
-- **The Railway layout (one service, jobs inside):** exists because of Railway's volume limits; not needed here.
+- **One service with the jobs inside it:** needed only on a platform that allows one volume per service; not needed here.
 - **Hostinger's Docker Manager API:** takes a compose file without this repository as a build context.
 - **Mounting the Docker socket for sandbox tests:** rejected; it gives every tested repository root on the host.
 

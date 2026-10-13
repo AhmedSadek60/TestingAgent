@@ -17,6 +17,7 @@ from agentlab.cli.cmd_plugins import plugins_app
 from agentlab.cli.cmd_providers import models_app, providers_app
 from agentlab.cli.cmd_runs import runs_app
 from agentlab.cli.cmd_skills import skills_app
+from agentlab.cli.cmd_users import users_app
 from agentlab.cli.common import AgentLabGroup, CliState
 from agentlab.security.redactor import RedactingLogFilter
 
@@ -79,6 +80,7 @@ app.command("worker")(cmd_serve.work)
 app.add_typer(cmd_report.review_app, name="review")
 app.add_typer(runs_app, name="runs")
 app.add_typer(skills_app, name="skills")
+app.add_typer(users_app, name="users")
 app.add_typer(providers_app, name="providers")
 app.add_typer(models_app, name="models")
 app.add_typer(credentials_app, name="credentials")

@@ -9,6 +9,11 @@
 
 {$AGENTLAB_PUBLIC_HOST} {
 	tls internal
+	# The largest request AgentLab itself accepts is an upload of server.max_upload_mb (25) plus its envelope: nothing
+	# bigger is passed on. AgentLab enforces its own, smaller limit for everything that is not an upload.
+	request_body {
+		max_size 27MB
+	}
 	# The event stream (server-sent events) must not be buffered.
 	reverse_proxy api:8080 {
 		flush_interval -1

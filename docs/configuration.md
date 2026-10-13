@@ -19,6 +19,7 @@ Environment variables:
 | `AGENTLAB_CONFIG` | The configuration file (same as `--config`). |
 | `AGENTLAB_DATABASE_URL` | Replaces `storage.database_url`. |
 | `AGENTLAB_REDIS_URL` | Replaces `queue.redis_url`. |
+| `AGENTLAB_BUILD` | Which build this is (a commit): the image is built with it (`docker build --build-arg AGENTLAB_BUILD=...`, which `scripts/ship.py publish` does) and the environment of an issue report states it. `unknown` when unset. |
 | `AGENTLAB_API_TOKEN` | Conventional name for the API token; it is used only when `server.token_ref` is `env:AGENTLAB_API_TOKEN`. |
 | `AGENTLAB_MASTER_KEY` | The Fernet key that encrypts stored credentials. Without it a key file (`secrets.key`, owner-only) sits next to the credential file. |
 | `AGENTLAB_WEB_DIR` | A built web interface to serve instead of the one inside the package. |
@@ -154,8 +155,68 @@ databases as `UTF8` where you can: `SQL_ASCII` does not check that its text is v
 | `token_ref` | none | `env:NAME` or `secret:NAME`: the API token (16 or more characters) every request must present. |
 | `cors_origins` | `[]` | Origins that may call the API from a page of their own. The bundled interface needs none. |
 | `max_upload_mb` | `25` | The largest document or archive an upload may carry. |
+| `max_body_mb` | `4` | The largest request body the server reads, an upload excepted. A larger one is refused with `413` before it is parsed, so one oversized request cannot use up the server's memory. |
 | `allowed_paths` | `[]` | Folders on the server that a request may point a target at. Empty means API clients cannot name server paths at all (uploads are always allowed). |
 | `serve_ui` | `true` | Serve the web interface at `/` when it has been built. |
+
+## `accounts`
+
+People who sign in to the web interface: [accounts.md](accounts.md). The shared API token (`server.token_ref`) is unchanged.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `registration` | `open` | Who may create an account: `open` (anyone who reaches the server, with the `default_role`), `approval` (anyone may ask; an admin activates the account) or `closed` (an admin creates every account). |
+| `default_role` | `reporter` | The role of an account made by registration. A reporter may use Feedback & Support only; a maintainer has everything the shared token has. Keep `reporter` on a server that anyone can reach. |
+| `session_idle_minutes` | `60` | A session ends after this long without a request. |
+| `session_absolute_hours` | `12` | A session ends this long after sign-in, whatever it does. |
+| `min_password_length` | `12` | The shortest password accepted. |
+| `max_failed_attempts` | `5` | Wrong passwords in a row before an account is locked. |
+| `lock_minutes` | `15` | How long a locked account stays locked. |
+| `registrations_per_hour` | `5` | Registrations accepted per client address per hour. |
+| `cookie_secure` | `auto` | Whether the session cookie is marked Secure: `auto` when the request came over HTTPS (or a proxy said so with `X-Forwarded-Proto`), `always`, or `never`. |
+
+## `feedback`
+
+Feature requests and issue reports: [feedback-support.md](feedback-support.md). The lists below are what the forms offer and
+what a submission moves through; changing them changes the forms and the maintainer queue, not the stored data.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `feature_categories` | 17 categories, ending in `Other` | The categories a feature request can have. |
+| `issue_categories` | 19 categories, ending in `Other` | The categories an issue report can have. |
+| `feature_statuses` | `Submitted`, `Needs Triage`, `Under Review`, `Planned`, `In Progress`, `Completed`, `Declined`, `Duplicate` | The workflow of a feature request. The first status is the one it starts with. |
+| `issue_statuses` | `Submitted`, `Needs Triage`, `Investigating`, `Awaiting User`, `Reproducing`, `In Progress`, `Fix Available`, `Resolved`, `Closed`, `Duplicate`, `Cannot Reproduce` | The workflow of an issue report. The first status is the one it starts with. |
+| `resolved_statuses` | `Completed`, `Fix Available`, `Resolved` | Statuses that set a submission's resolution time. Each must be in a workflow. |
+| `closed_statuses` | `Completed`, `Declined`, `Duplicate`, `Closed`, `Cannot Reproduce` | Statuses that close a submission: they set its closing time and take it out of the open count. Each must be in a workflow. |
+| `security_category` | `Suspected Security Issue` | An issue report in this category is private: only its reporter, maintainers and admins see it. Must be one of `issue_categories`. |
+| `service_token_sees_security` | `false` | Whether the shared API token, a credential many people may hold, may see private submissions made by other people. Maintainers, admins and the local machine always may. |
+| `max_submissions_per_day` | `20` | Submissions one person with the role `reporter` may make in 24 hours. Maintainers have no limit. |
+| `max_comments_per_day` | `100` | Comments one person with the role `reporter` may write in 24 hours. |
+| `similar_limit` | `5` | How many possibly similar submissions are suggested while a title is typed. |
+| `attachments.allowed_extensions` | `png`, `jpg`, `jpeg`, `webp`, `pdf`, `docx`, `txt`, `md`, `csv`, `json`, `jsonl`, `yaml`, `yml`, `log`, `zip` | The file types that may be attached. Each is checked against its signature or its text; a type outside this list cannot be enabled. |
+| `attachments.max_files` | `10` | Attachments one submission may have. |
+| `attachments.max_file_mb` | `25` | The largest single attachment. The server's upload ceiling follows it when it is larger than `server.max_upload_mb`. |
+| `attachments.max_total_mb` | `100` | What the attachments of one submission may add up to. |
+| `attachments.max_uploads_per_day` | `50` | Attachments one person with the role `reporter` may add in 24 hours (removing one does not give it back). |
+| `attachments.zip_max_entries` | `200` | The most entries an archive may list. |
+| `attachments.zip_max_expanded_mb` | `200` | The most an archive may expand to, by what it declares. It is never extracted. |
+| `attachments.zip_max_ratio` | `100` | The largest ratio of expanded to stored size, for the archive or for an entry of 1 MB or more. |
+| `attachments.sanitize_max_mb` | `10` | The largest text attachment that is checked for secrets and given a sanitized copy. A larger one is kept and marked `not_inspected`. |
+| `attachments.scanner_command` | `[]` | A command that scans a file for malware: its arguments, with `{path}` where the file goes (it is appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and attachments are recorded as not scanned. |
+| `attachments.scanner_timeout_seconds` | `60` | How long the scanner may take for one file. |
+| `attachments.scanner_required` | `false` | Refuse an attachment when the scanner is configured but fails or times out. Otherwise it is kept and recorded as a scan error. |
+| `diagnostics.capture_logs` | `true` | Keep a bounded, masked copy of what the server logs (warnings, errors, and the requests that failed or were slow), tied to runs and requests, so it can be attached to an issue report. Off: the log categories are reported as unavailable. |
+| `diagnostics.log_level` | `WARNING` | The least important thing that is kept: `WARNING` or `INFO`. `INFO` also lowers the level of AgentLab's own logger, so it shows on the server's standard error too. |
+| `diagnostics.log_retention_hours` | `48` | How long captured lines are kept. |
+| `diagnostics.log_max_rows` | `50000` | The most captured lines kept; the oldest go first. |
+| `diagnostics.max_window_minutes` | `360` | The longest custom time window a collection may ask for. |
+| `diagnostics.max_item_kb` | `512` | The most one collected item may hold; more is cut (a log keeps its newest lines). |
+| `diagnostics.max_browser_entries` | `200` | The most console and network entries a browser may report in one collection. |
+| `diagnostics.draft_hours` | `24` | How long a collection that was not attached to a report is kept. |
+| `diagnostics.max_collections_per_hour` | `30` | Collections one person may make in an hour. |
+| `redaction.rules` | `[]` | Patterns of your own, each `{name, pattern}`, that attached and collected text is masked by, beyond the built-in ones. They appear in reports as `custom:<name>`. |
+| `redaction.redact_ip_addresses` | `false` | Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on. |
+| `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |
 
 ## `planning`
 

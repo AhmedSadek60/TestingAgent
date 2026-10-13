@@ -16,6 +16,7 @@ promise. To report a vulnerability *in AgentLab*, see [SECURITY.md](../SECURITY.
 * [Sandbox](#sandbox)
 * [Web interface and API](#web-interface-and-api)
 * [Evidence and restricted artifacts](#evidence-and-restricted-artifacts)
+* [Feedback and support](#feedback-and-support)
 * [What this does not promise](#what-this-does-not-promise)
 
 ## What is protected from what
@@ -460,6 +461,10 @@ in layers.
   inside the folders listed in `server.allowed_paths`, after following links. With the default empty list a client cannot
   name a server path at all and uploads instead (`server.max_upload_mb`, 25 MB), whose file names are reduced to a harmless
   last component.
+* **Request size.** A request body larger than `server.max_body_mb` (4 MB; an upload may be `server.max_upload_mb` plus a
+  little) is refused with `413` before it is read. The framework parses a body before it asks who is calling, so without this
+  limit any client that can reach the server, signed in or not, could use up its memory with one request. A body with no
+  declared length is counted as it arrives.
 * **No secrets inline.** A target sent to the API cannot carry a secret: a header or an environment value that is named like
   a secret, or that matches a [secret pattern](#redaction), is refused with the instruction to store it with
   `POST /credentials` and name it in `auth_credential`. Header names must be valid and a value cannot contain a line break.
@@ -481,8 +486,9 @@ in layers.
 * **The interface keeps the token only in memory and in the tab's session storage**, and writes secrets once: stored
   credentials show their field names and never their values.
 
-AgentLab has **one shared token and no accounts**: whoever holds it can do everything the API can. Reviews are signed with a
-reviewer name that is typed in and is not verified ([reports.md](reports.md#human-review)). It does not terminate TLS: put a
+AgentLab has **one shared token**: whoever holds it can do everything the API can. People can also have **accounts** with a role
+([accounts.md](accounts.md)): a *reporter* reaches only Feedback & Support, a *maintainer* has what the token has, an *admin* also manages
+accounts. Reviews are signed with a reviewer name that is typed in and is not verified ([reports.md](reports.md#human-review)). It does not terminate TLS: put a
 reverse proxy that does in front of a team server, one that keeps a single origin for the interface and the API.
 
 Tested by `tests/api/test_api_security.py` (token, throttling, host and origin checks, headers, paths, uploads),
@@ -503,6 +509,87 @@ downloaded only with `include_restricted=true`, which writes a warning to the lo
 AgentLab keeps its records until you remove them. There is **no retention policy and no command to delete a run**: the
 runs are rows in the database and the artifacts are files, and removing them is the operator's job.
 
+## Feedback and support
+
+[Feedback & Support](feedback-support.md) takes free text from people, some of whom registered themselves, and keeps it for
+maintainers. Opening registration to everyone makes that text hostile by default, and it can contain things a person should
+not have pasted.
+
+* **Isolation between people is applied to the query**, not checked after it: the one definition of "may see" is a clause of
+  every read (`src/agentlab/feedback/policy.py`). A submission the caller may not see is answered exactly as one that does not
+  exist (the same status and body), by id and by number, so probing identifiers reveals nothing *about* a submission, not
+  even whether it is private. (Numbers are sequential, so roughly how many there are is no secret: it follows from one's own.)
+* **What a reporter is not told is not sent.** The maintainers' priority, severity, assignee, labels, links and internal notes
+  are absent from a reporter's answers, and a maintainer who wrote a comment reads "AgentLab maintainer" to the reporter, so an
+  account cannot learn who the maintainers are. Filters and sorts on those fields are refused to a reporter, because their
+  answer would tell them.
+* **Private submissions** (the security category, or marked by the reporter) are visible to their reporter, maintainers and
+  admins, and **not to the shared API token** unless the owner allows it, because the token is a credential many people may
+  hold. Opening one that is not yours, and being refused one, are written to its audit trail.
+* **Free text** is stripped of control characters (a NUL byte makes PostgreSQL refuse a row), is run through the redactor before
+  it is stored, and is returned as JSON that the interface shows as text, never as markup. The audit trail records fields and
+  statuses and never text.
+* **Abuse.** A reporter has a daily allowance of submissions and comments; text fields have a fixed size limit; identifiers in a
+  URL are checked against what an id or a number looks like before they reach a query; filters are bound parameters and a search
+  treats `%` and `_` as ordinary characters.
+* **Concurrent triage** cannot overwrite itself: one statement checks the version the caller read and raises it.
+* **A demoted or disabled maintainer** loses their sessions at once, so they stop triaging at once.
+
+Tested by `tests/unit/test_feedback_service.py` (the rules, with ten deliberate breakages of them confirmed to be caught),
+`tests/api/test_feedback_api.py` and `tests/security/test_feedback_security.py` (every operation classified, another person's
+submission by every spelling of its identifier, going through the numbers, hostile text, injection in every filter, secrets in the
+store, the responses and the log, and credentials that may not act).
+
+### Attachments and the DiagnosticRedactor
+
+Attachments are files from people the server does not know, and the text in them is searched for secrets, so both the file and
+the searching are treated as hostile.
+
+* **A file is what its content says.** The signature, the text or the archive directory is checked; the browser's claim and
+  the name are not believed; programs, scripts, `.html` and `.svg` cannot be attached. An archive is never extracted: entry
+  names, declared sizes, ratios, links, encryption and nested archives are read from its directory.
+* **The bytes are private.** They are kept as *restricted* artifacts (a `0700` folder, `0600` files) under a name made from
+  their hash, so no name a person chose is ever a path, and they are reachable only through an endpoint that applies the
+  submission's visibility rule first. Every download is audited. Downloads are sent as an opaque type, as an attachment, with
+  `nosniff` and a sandboxing CSP.
+* **The original is never changed.** A text file also gets a sanitized copy; the two are kept apart and the report says,
+  without values, what was masked and where. A file the second inspection doubts is marked `needs_review` and is not to be
+  shared outside AgentLab until a person has looked.
+* **Scanning is honest.** A scanner runs only if one is configured, on a copy in a private folder with a fixed name, and a file
+  it flags is not kept. With none, the record says `not_scanned`.
+* **Hostile text cannot hold the server.** Every pattern is held to linear time by a test that runs it against adversarial
+  input (long runs of name characters, repeated markers with no end, ...), the private-key scanner pairs markers once, and the
+  work happens outside the database transaction. Text above `attachments.sanitize_max_mb` is kept without being inspected.
+
+Tested by `tests/unit/test_diagnostic_redactor.py`, `tests/unit/test_feedback_files.py`,
+`tests/unit/test_feedback_attachments.py`, `tests/api/test_feedback_attachments_api.py` and
+`tests/security/test_feedback_attachments_security.py`.
+
+### Diagnostics and the log that is kept for them
+
+AgentLab wrote its log to standard error and kept none. To attach "what the server said around 10:42" to a report it now keeps
+a small one, and that is a new store of data about people's activity, so it is built to say little, to the right people.
+
+* **It keeps little.** `WARNING` and above of AgentLab's own logger, and one line for each request that failed (other than
+  `401`, which anyone can send a thousand of) or took 2 seconds or more: method, the route as declared, status, time, a request
+  id and who. Never a request or response body. Every line is masked and cut before it is queued, the table is bounded by age
+  and by count, and the writer is a background thread that drops lines rather than ever blocking or failing the server.
+* **It is findable only by what it belongs to.** Lines carry a run id (set by the worker for the run's length) and a request id
+  (made by the server; one a client sends is ignored, because a client could name someone else's). A collection takes the
+  caller's own requests, system-level lines, and for a maintainer the named run's. A request id a browser reports does not
+  select anyone's lines, and a reporter who names a run gets the same answer whether it exists or not.
+* **Only masked text is kept.** The raw text of a collection is never stored; drafts expire and are deleted with their files;
+  items the person leaves out are deleted at once; consent is the JSON value `true`.
+* **Nothing is faked.** A source that is unavailable, off or failed is listed with the reason and has no file.
+
+Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
+`tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
+
+What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
+every other person's non-private submission and, with the role, every private one; an image or a PDF can show a secret that
+nothing can mask; no scanner ships with AgentLab; the server's log is the server's own (a line another library wrote is not
+in it); and there is no e-mail.
+
 ## What this does not promise
 
 * **Isolation is not absolute.** A container sandbox reduces the risk of running hostile code; it does not remove it.
@@ -512,7 +599,9 @@ runs are rows in the database and the artifacts are files, and removing them is 
 * **The attestation is a statement.** AgentLab refuses to proceed without it and cannot check that it is true.
 * **The network `allowlist` mode, WebSocket agent endpoints, client certificates and browsers other than Chromium are not
   supported.** AgentLab says so where you ask for them instead of ignoring the request.
-* **No accounts, roles or TLS** in the server, and no data-retention controls.
+* **No TLS in the server** (put a reverse proxy in front), **no multi-factor authentication or single sign-on**, no e-mail channel, and no
+  data-retention controls. Accounts have three roles only; inside the rest of AgentLab a maintainer has everything the token has
+  ([accounts.md](accounts.md#limits)).
 * **Hosted model providers were verified only against local stand-ins** of their APIs (Ollama was also exercised live); see
   [development.md](development.md#verification-status).
 * **A passing run is not a certificate.** It says the tests that ran passed, and the report says what was not tested.
