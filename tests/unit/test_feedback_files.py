@@ -83,6 +83,53 @@ def test_a_file_that_is_not_what_its_name_says_is_refused_with_the_reason(name: 
         inspect_upload(name, data, CFG)
 
 
+HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic" + b"\x00" * 32
+GIF = b"GIF89a\x01\x00\x01\x00" + b"\x00" * 16
+
+
+@pytest.mark.parametrize(
+    ("name", "data", "says", "advises"),
+    [
+        # another type AgentLab accepts: name it as what it is
+        ("photo.jpg", PNG, "its content is a PNG image, whatever its name says", "Rename it to '.png'"),
+        ("photo.jpeg", WEBP, "its content is a WebP image", "Rename it to '.webp'"),
+        ("photo.png", JPEG, "its content is a JPEG image", "Rename it to '.jpg'"),
+        ("photo.jpg", PDF, "its content is a PDF document", "Rename it to '.pdf'"),
+        # a kind of image AgentLab does not take: say what it is, and what to save it as
+        (
+            "photo.jpg",
+            HEIC,
+            "its content is a HEIC image (the format many phones keep photos in)",
+            "Save it again as a JPEG or PNG",
+        ),
+        ("photo.jpg", GIF, "its content is a GIF image", "Save it again as a JPEG or PNG"),
+        ("photo.jpg", b"BM" + b"\x00" * 40, "its content is a BMP image", "Save it again as a JPEG or PNG"),
+        # nothing worth naming
+        (
+            "photo.jpg",
+            b"<html><body>hi</body></html>",
+            "does not look like an image at all",
+            "Open it in an image viewer",
+        ),
+        ("photo.jpg", b"\x00\x01\x02\x03" * 8, "does not look like an image at all", "save it again as a JPEG or PNG"),
+    ],
+)
+def test_a_refused_image_says_what_it_really_is_and_what_to_do(name: str, data: bytes, says: str, advises: str) -> None:
+    with pytest.raises(UserError) as refused:
+        inspect_upload(name, data, CFG)
+    message = str(refused.value)
+    assert message.startswith("the file is not a "), message
+    assert says in message and advises in message, message
+
+
+def test_a_refused_image_is_not_told_to_use_a_type_the_server_does_not_take() -> None:
+    narrow = AttachmentsConfig(allowed_extensions=["jpg", "png", "txt"])
+    with pytest.raises(UserError) as refused:
+        inspect_upload("photo.jpg", WEBP, narrow)
+    assert "WebP image" in str(refused.value) and "Rename it" not in str(refused.value)
+    assert "Save it again as a JPEG or PNG" in str(refused.value)
+
+
 @pytest.mark.parametrize(
     "name", ["tool.exe", "page.html", "image.svg", "script.js", "macro.docm", "noextension", "x.PHP"]
 )
