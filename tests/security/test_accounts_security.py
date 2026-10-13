@@ -42,6 +42,14 @@ REPORTER_MAY = {
     ("GET", "/submissions/{submission_id}/attachments/{attachment_id}/preview"),
     ("GET", "/submissions/{submission_id}/attachments/{attachment_id}/download"),
     ("DELETE", "/submissions/{submission_id}/attachments/{attachment_id}"),
+    ("POST", "/submissions/{submission_id}/diagnostics"),
+    ("GET", "/submissions/{submission_id}/diagnostics"),
+    ("GET", "/diagnostics/available"),
+    ("POST", "/diagnostics/preview"),
+    ("POST", "/diagnostics/collect"),
+    ("POST", "/diagnostics/redact-preview"),
+    ("GET", "/diagnostics/{collection_id}"),
+    ("GET", "/diagnostics/{collection_id}/download"),
 }
 ADMIN_ONLY_PREFIX = "/users"
 

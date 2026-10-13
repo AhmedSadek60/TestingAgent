@@ -8007,6 +8007,743 @@
           }
         }
       }
+    },
+    "/diagnostics/available": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "What diagnostic information can be collected",
+        "description": "Every category AgentLab knows about, whether it can be collected here and now, and why not when it cannot (a log that is switched off, evaluation data that only maintainers may see, a screenshot AgentLab cannot take). Also the time windows, the limits, and the text the person agrees to before attaching anything.",
+        "operationId": "available_diagnostics_available_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The evaluation run it concerns",
+              "title": "Run Id"
+            },
+            "description": "The evaluation run it concerns"
+          },
+          {
+            "name": "test_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The test case it concerns",
+              "title": "Test Id"
+            },
+            "description": "The test case it concerns"
+          },
+          {
+            "name": "trace_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The trace it concerns",
+              "title": "Trace Id"
+            },
+            "description": "The trace it concerns"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsAvailable"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics/preview": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Preview what would be collected",
+        "description": "Collects the chosen categories, masks them and shows the result, item by item, with what was masked and where, and keeps nothing. A category that cannot be collected is listed with the reason; it never stops the others.",
+        "operationId": "preview_diagnostics_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnosticsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCollectionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics/collect": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Collect diagnostic information",
+        "description": "Collects and masks the chosen categories and keeps the masked result as a draft for a limited time, so it can be reviewed and then attached to a submission. Only the masked text is kept. What is collected is limited to the caller's own requests, system-level warnings and, for a maintainer, the named run.",
+        "operationId": "collect_diagnostics_collect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnosticsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCollectionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics/redact-preview": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "See text masked before pasting it",
+        "description": "Masks the text the way a collection would and says what was masked and where, without keeping anything. Use it on a snippet before including it in a report.",
+        "operationId": "redact_preview_diagnostics_redact_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedactPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedactPreviewOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics/{collection_id}": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read a collection",
+        "description": "A draft the caller collected, or a collection attached to a submission the caller may see.",
+        "operationId": "read_diagnostics__collection_id__get",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of a collection",
+              "title": "Collection Id"
+            },
+            "description": "Id of a collection"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCollectionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics/{collection_id}/download": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Download a collection as an archive",
+        "description": "A ZIP of the included items under the names of the specification, with a manifest that says what was collected, what was not available, what was left out and what was masked, and a README. Every file is a generated, masked copy. Downloads of an attached collection are recorded.",
+        "operationId": "download_diagnostics__collection_id__download_get",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of a collection",
+              "title": "Collection Id"
+            },
+            "description": "Id of a collection"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archive",
+            "content": {
+              "application/zip": {}
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/diagnostics": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Attach diagnostics to a submission",
+        "description": "Attaches a draft collection to a submission the caller may see, with their explicit consent (`consent` must be true). Items left out of `include` are deleted, not kept. It is refused when the collection is not the caller's, or has expired.",
+        "operationId": "attach_submissions__submission_id__diagnostics_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachDiagnosticsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCollectionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "The diagnostics attached to a submission",
+        "description": "The collections attached to the submission, with what each holds and what was masked. A reporter sees what they attached; a maintainer sees what was attached to any submission they may see.",
+        "operationId": "attached_submissions__submission_id__diagnostics_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiagnosticCollectionOut"
+                  },
+                  "title": "Response Attached Submissions  Submission Id  Diagnostics Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8880,6 +9617,46 @@
         "title": "AssigneeOut",
         "description": "A person a submission is assigned to."
       },
+      "AttachDiagnosticsIn": {
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 8,
+            "title": "Collection Id",
+            "description": "The draft collection to attach"
+          },
+          "include": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include",
+            "description": "The ids of the items to attach; omitted means every item that was collected. Items left out are deleted"
+          },
+          "consent": {
+            "type": "boolean",
+            "title": "Consent",
+            "description": "Must be the JSON value true (not a string or a number): the person has read the consent text and agrees to share what is attached"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "collection_id",
+          "consent"
+        ],
+        "title": "AttachDiagnosticsIn",
+        "description": "Attach a collection to a submission, with the person's consent."
+      },
       "AttachmentOut": {
         "properties": {
           "id": {
@@ -9287,6 +10064,194 @@
         ],
         "title": "Body_upload_document_documents_post",
         "description": "The multipart form of a document upload"
+      },
+      "BrowserConsoleEntry": {
+        "properties": {
+          "time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time",
+            "description": "When it was logged"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warn",
+              "warning",
+              "info",
+              "log",
+              "debug"
+            ],
+            "title": "Level",
+            "description": "Its level",
+            "default": "error"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Message",
+            "description": "What was logged"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "The script it came from"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line",
+            "description": "The line in that script"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "BrowserConsoleEntry",
+        "description": "One error or warning the browser logged to its console."
+      },
+      "BrowserDiagnostics": {
+        "properties": {
+          "console": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserConsoleEntry"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Console",
+            "description": "Console errors"
+          },
+          "network": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserNetworkEntry"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Network",
+            "description": "Failed requests"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BrowserDiagnostics",
+        "description": "What the web interface has seen go wrong in this browser tab. Only the web interface can supply it."
+      },
+      "BrowserNetworkEntry": {
+        "properties": {
+          "time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time",
+            "description": "When it was made"
+          },
+          "method": {
+            "type": "string",
+            "maxLength": 10,
+            "title": "Method",
+            "description": "The HTTP method",
+            "default": "GET"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Url",
+            "description": "The address. Secrets in a query string are masked"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "The status, or null when there was no response"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "What the browser said went wrong"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9]{8,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "The X-Request-Id of the response, which names it in the server's log"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3600000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "How long it took"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "BrowserNetworkEntry",
+        "description": "One request the browser made that failed or came back with an error."
       },
       "BrowserStep": {
         "properties": {
@@ -10486,6 +11451,514 @@
         ],
         "title": "DataSource",
         "description": "Somewhere the target gets data from"
+      },
+      "DiagnosticCollectionOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Its id, or null for a preview that was not kept"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "draft",
+              "attached",
+              "expired"
+            ],
+            "title": "Status",
+            "description": "preview: not kept; draft: kept until it is attached or expires; attached: part of a submission"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "When it was collected"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "When a draft is deleted if it was not attached"
+          },
+          "window_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window From",
+            "description": "The start of the period looked at"
+          },
+          "window_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window To",
+            "description": "The end of the period looked at"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticItemOut"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Every category asked for, collected or not"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "What could not be collected, and what needs a person's attention"
+          },
+          "total_bytes": {
+            "type": "integer",
+            "title": "Total Bytes",
+            "description": "The size of everything included"
+          },
+          "any_needs_review": {
+            "type": "boolean",
+            "title": "Any Needs Review",
+            "description": "True when something must be reviewed before it is shared outside AgentLab"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id",
+            "description": "The submission it is attached to"
+          },
+          "consent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent At",
+            "description": "When the person agreed to share it"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at",
+          "expires_at",
+          "window_from",
+          "window_to",
+          "items",
+          "warnings",
+          "total_bytes",
+          "any_needs_review",
+          "submission_id",
+          "consent_at"
+        ],
+        "title": "DiagnosticCollectionOut",
+        "description": "What was collected for a report, as the person can review it before attaching it."
+      },
+      "DiagnosticItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The item's id; pass it back in `include` to attach it"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Its category"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Where it sits in the downloadable bundle"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Where it came from"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "collected",
+              "unavailable",
+              "failed",
+              "excluded"
+            ],
+            "title": "Outcome",
+            "description": "collected; unavailable (nothing to collect, with the reason); failed (it could not be read); excluded (the person left it out)"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Why, for anything but collected"
+          },
+          "time_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time From",
+            "description": "The start of the period it covers"
+          },
+          "time_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To",
+            "description": "The end of the period it covers"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "Its size in bytes after masking"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when it was cut to the size limit"
+          },
+          "included": {
+            "type": "boolean",
+            "title": "Included",
+            "description": "True when it will be attached"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/RedactionSummary",
+            "description": "What masking did to it"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview",
+            "description": "Its masked text, up to a limit, for review before anything is shared"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "path",
+          "source",
+          "outcome",
+          "detail",
+          "time_from",
+          "time_to",
+          "size",
+          "truncated",
+          "included",
+          "redaction",
+          "preview"
+        ],
+        "title": "DiagnosticItemOut",
+        "description": "One thing that was collected, or that could not be."
+      },
+      "DiagnosticSource": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The category id to ask for"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "What it is called"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What it contains and where it comes from"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "True when it can be collected now with the details given"
+          },
+          "manual": {
+            "type": "boolean",
+            "title": "Manual",
+            "description": "True when the person has to supply it themselves (a screenshot)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it is not available, and what to do instead"
+          },
+          "needs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Needs",
+            "description": "What has to be given for it to be available, such as run_id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "description",
+          "available",
+          "manual",
+          "reason",
+          "needs"
+        ],
+        "title": "DiagnosticSource",
+        "description": "One kind of diagnostic information, and whether AgentLab can supply it here."
+      },
+      "DiagnosticsAvailable": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticSource"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Every category, with whether it is available"
+          },
+          "windows": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Windows",
+            "description": "The windows offered: last_5_minutes ... custom"
+          },
+          "max_window_minutes": {
+            "type": "integer",
+            "title": "Max Window Minutes",
+            "description": "The longest custom window"
+          },
+          "consent_text": {
+            "type": "string",
+            "title": "Consent Text",
+            "description": "What attaching diagnostics means; shown before the person agrees"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits",
+            "description": "Sizes and counts that bound a collection"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sources",
+          "windows",
+          "max_window_minutes",
+          "consent_text",
+          "limits"
+        ],
+        "title": "DiagnosticsAvailable",
+        "description": "What can be collected, how far back, and what the person is agreeing to."
+      },
+      "DiagnosticsRequest": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "environment",
+                "application_logs",
+                "backend_logs",
+                "errors",
+                "trace",
+                "run_metadata",
+                "test_summary",
+                "browser",
+                "screenshot"
+              ]
+            },
+            "type": "array",
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Categories",
+            "description": "The categories to collect, from `GET /diagnostics/available`"
+          },
+          "window": {
+            "type": "string",
+            "enum": [
+              "last_5_minutes",
+              "last_15_minutes",
+              "last_30_minutes",
+              "custom"
+            ],
+            "title": "Window",
+            "description": "How far back from the reference time to look",
+            "default": "last_15_minutes"
+          },
+          "window_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window From",
+            "description": "For a custom window: where it starts"
+          },
+          "window_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window To",
+            "description": "For a custom window: where it ends"
+          },
+          "reference_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Time",
+            "description": "The moment the problem happened; the window ends here. Defaults to now"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "The evaluation run it concerns (maintainers)"
+          },
+          "test_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Id",
+            "description": "The test case it concerns (maintainers)"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "The trace it concerns (maintainers)"
+          },
+          "browser": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserDiagnostics"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the browser saw go wrong"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "categories"
+        ],
+        "title": "DiagnosticsRequest",
+        "description": "What to collect, around which moment, and for which run."
       },
       "DiscoverRequest": {
         "properties": {
@@ -13563,6 +15036,105 @@
         ],
         "title": "ProviderOut",
         "description": "A configured LLM provider"
+      },
+      "RedactPreviewIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Text",
+            "description": "The text to look at"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "RedactPreviewIn",
+        "description": "Text to see masked before it is pasted into a report."
+      },
+      "RedactPreviewOut": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The masked text"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/RedactionSummary",
+            "description": "What was masked and where, without the values"
+          },
+          "mechanisms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mechanisms",
+            "description": "Which kinds of detection ran"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "What this does and does not tell you"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "redaction",
+          "mechanisms",
+          "note"
+        ],
+        "title": "RedactPreviewOut",
+        "description": "The text as it would be kept, and what changed."
+      },
+      "RedactionSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "redacted",
+              "needs_review"
+            ],
+            "title": "Status",
+            "description": "clean: nothing found; redacted: patterns matched and were masked; needs_review: the second inspection found more, so the item is not to leave AgentLab until a person has looked"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "How many of each kind were masked"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations",
+            "description": "Where, as line numbers or JSON paths (at most 20)"
+          },
+          "external_sharing_blocked": {
+            "type": "boolean",
+            "title": "External Sharing Blocked",
+            "description": "True when it may not be shared outside AgentLab yet"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "counts",
+          "locations",
+          "external_sharing_blocked"
+        ],
+        "title": "RedactionSummary",
+        "description": "What masking did to an item, without any value."
       },
       "RegisterRequest": {
         "properties": {

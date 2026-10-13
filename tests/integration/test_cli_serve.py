@@ -201,6 +201,13 @@ SLOW = {
 }
 
 
+# A server that is stopped lets a run finish by itself for 5 seconds and then asks it to wind down, so for the run to be
+# wound down and not finished it has to outlast that, whatever the machine: the quick plan has about nine seconds of waiting
+# left after its third test, a margin a stall of a busy CI runner can eat (it did, once, on GitHub); the thorough plan has
+# about fourteen. The waiting is the agent's own latency, so a faster machine does not shorten it.
+LONG_RUN = {**SLOW, "options": {"intensity": "thorough", "second_wave": False}}
+
+
 def test_a_server_that_is_stopped_in_the_middle_of_a_run_winds_it_down_and_reports_it(tmp_path: Path) -> None:
     """What a platform does on every deployment: it sends SIGTERM. The run is not lost and not left running."""
     port = free_port()
@@ -211,7 +218,7 @@ def test_a_server_that_is_stopped_in_the_middle_of_a_run_winds_it_down_and_repor
     try:
         wait_until_up(f"{base}/health", server)
         with httpx.Client(base_url=base, timeout=60) as c:
-            run_id = c.post("/test-runs", json=SLOW).json()["run_id"]
+            run_id = c.post("/test-runs", json=LONG_RUN).json()["run_id"]
             poll(
                 lambda: sum(e["type"] == "TestCompleted" for e in c.get(f"/test-runs/{run_id}/events").json()) >= 3,
                 what="three tests",

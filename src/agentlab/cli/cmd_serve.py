@@ -21,6 +21,7 @@ from agentlab.cli.common import EXIT_NOT_TESTED, console, err, fail, load_config
 from agentlab.cli.markup import esc
 from agentlab.core.config import AgentLabConfig
 from agentlab.core.errors import InfrastructureError
+from agentlab.feedback.logcapture import install_log_capture, uninstall_log_capture
 from agentlab.jobs.queue import RedisQueue, create_queue
 from agentlab.jobs.worker import Worker
 
@@ -161,6 +162,7 @@ def work(
     async def main() -> None:
         queue = create_queue(services.config.queue, redis_url=os.environ.get("AGENTLAB_REDIS_URL"))
         runner = Worker(services, queue, concurrency=concurrency)
+        log_capture = install_log_capture(services.store.db, services.config.feedback.diagnostics, process="worker")
         try:
             if isinstance(queue, RedisQueue):
                 try:
@@ -181,6 +183,7 @@ def work(
             err.print("stopping: no new runs are taken; the ones in progress may finish...")
             await runner.stop(drain_seconds=drain_seconds)
         finally:
+            uninstall_log_capture(log_capture)
             await queue.close()
             await services.aclose()
 

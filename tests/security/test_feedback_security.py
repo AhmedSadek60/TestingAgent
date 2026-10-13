@@ -50,8 +50,9 @@ async def test_every_feedback_operation_is_classified_and_a_reporter_gets_exactl
     """Not a list of the routes someone remembered: every `/submissions` operation in the API's own description."""
     async with feedback_server(tmp_path) as api:
         found = {(m, p) for m, p in operations(api) if p.startswith("/submissions")}
-        assert found == REPORTER_MAY | STAFF_ONLY, (
-            f"a feedback operation is not classified as reporter-allowed or staff-only: {found ^ (REPORTER_MAY | STAFF_ONLY)}"
+        classified = {op for op in REPORTER_MAY if op[1].startswith("/submissions")} | STAFF_ONLY
+        assert found == classified, (
+            f"a feedback operation is not classified as reporter-allowed or staff-only: {found ^ classified}"
         )
         alice, ah = await reporter(api)
         own = await file_one(alice, ah)

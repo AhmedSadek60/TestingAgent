@@ -565,9 +565,30 @@ Tested by `tests/unit/test_diagnostic_redactor.py`, `tests/unit/test_feedback_fi
 `tests/unit/test_feedback_attachments.py`, `tests/api/test_feedback_attachments_api.py` and
 `tests/security/test_feedback_attachments_security.py`.
 
+### Diagnostics and the log that is kept for them
+
+AgentLab wrote its log to standard error and kept none. To attach "what the server said around 10:42" to a report it now keeps
+a small one, and that is a new store of data about people's activity, so it is built to say little, to the right people.
+
+* **It keeps little.** `WARNING` and above of AgentLab's own logger, and one line for each request that failed (other than
+  `401`, which anyone can send a thousand of) or took 2 seconds or more: method, the route as declared, status, time, a request
+  id and who. Never a request or response body. Every line is masked and cut before it is queued, the table is bounded by age
+  and by count, and the writer is a background thread that drops lines rather than ever blocking or failing the server.
+* **It is findable only by what it belongs to.** Lines carry a run id (set by the worker for the run's length) and a request id
+  (made by the server; one a client sends is ignored, because a client could name someone else's). A collection takes the
+  caller's own requests, system-level lines, and for a maintainer the named run's. A request id a browser reports does not
+  select anyone's lines, and a reporter who names a run gets the same answer whether it exists or not.
+* **Only masked text is kept.** The raw text of a collection is never stored; drafts expire and are deleted with their files;
+  items the person leaves out are deleted at once; consent is the JSON value `true`.
+* **Nothing is faked.** A source that is unavailable, off or failed is listed with the reason and has no file.
+
+Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
+`tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
+
 What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
 every other person's non-private submission and, with the role, every private one; an image or a PDF can show a secret that
-nothing can mask; no scanner ships with AgentLab; and there is no e-mail.
+nothing can mask; no scanner ships with AgentLab; the server's log is the server's own (a line another library wrote is not
+in it); and there is no e-mail.
 
 ## What this does not promise
 

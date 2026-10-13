@@ -19,6 +19,7 @@ Environment variables:
 | `AGENTLAB_CONFIG` | The configuration file (same as `--config`). |
 | `AGENTLAB_DATABASE_URL` | Replaces `storage.database_url`. |
 | `AGENTLAB_REDIS_URL` | Replaces `queue.redis_url`. |
+| `AGENTLAB_BUILD` | Which build this is (a commit): the image is built with it (`docker build --build-arg AGENTLAB_BUILD=...`, which `scripts/ship.py publish` does) and the environment of an issue report states it. `unknown` when unset. |
 | `AGENTLAB_API_TOKEN` | Conventional name for the API token; it is used only when `server.token_ref` is `env:AGENTLAB_API_TOKEN`. |
 | `AGENTLAB_MASTER_KEY` | The Fernet key that encrypts stored credentials. Without it a key file (`secrets.key`, owner-only) sits next to the credential file. |
 | `AGENTLAB_WEB_DIR` | A built web interface to serve instead of the one inside the package. |
@@ -204,6 +205,15 @@ what a submission moves through; changing them changes the forms and the maintai
 | `attachments.scanner_command` | `[]` | A command that scans a file for malware: its arguments, with `{path}` where the file goes (it is appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and attachments are recorded as not scanned. |
 | `attachments.scanner_timeout_seconds` | `60` | How long the scanner may take for one file. |
 | `attachments.scanner_required` | `false` | Refuse an attachment when the scanner is configured but fails or times out. Otherwise it is kept and recorded as a scan error. |
+| `diagnostics.capture_logs` | `true` | Keep a bounded, masked copy of what the server logs (warnings, errors, and the requests that failed or were slow), tied to runs and requests, so it can be attached to an issue report. Off: the log categories are reported as unavailable. |
+| `diagnostics.log_level` | `WARNING` | The least important thing that is kept: `WARNING` or `INFO`. `INFO` also lowers the level of AgentLab's own logger, so it shows on the server's standard error too. |
+| `diagnostics.log_retention_hours` | `48` | How long captured lines are kept. |
+| `diagnostics.log_max_rows` | `50000` | The most captured lines kept; the oldest go first. |
+| `diagnostics.max_window_minutes` | `360` | The longest custom time window a collection may ask for. |
+| `diagnostics.max_item_kb` | `512` | The most one collected item may hold; more is cut (a log keeps its newest lines). |
+| `diagnostics.max_browser_entries` | `200` | The most console and network entries a browser may report in one collection. |
+| `diagnostics.draft_hours` | `24` | How long a collection that was not attached to a report is kept. |
+| `diagnostics.max_collections_per_hour` | `30` | Collections one person may make in an hour. |
 | `redaction.rules` | `[]` | Patterns of your own, each `{name, pattern}`, that attached and collected text is masked by, beyond the built-in ones. They appear in reports as `custom:<name>`. |
 | `redaction.redact_ip_addresses` | `false` | Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on. |
 | `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |
