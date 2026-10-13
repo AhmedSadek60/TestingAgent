@@ -303,6 +303,126 @@ def _all_notifications() -> list[Literal["comment", "information_request", "stat
     return ["comment", "information_request", "status_change"]
 
 
+#: The file types an attachment may be. An owner can only switch these on or off: each has a signature check behind it.
+ATTACHMENT_TYPES = (
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "pdf",
+    "docx",
+    "txt",
+    "md",
+    "csv",
+    "json",
+    "jsonl",
+    "yaml",
+    "yml",
+    "log",
+    "zip",
+)
+
+
+def _default_attachment_types() -> list[str]:
+    return list(ATTACHMENT_TYPES)
+
+
+class AttachmentsConfig(Model):
+    """What may be attached to a submission, and how it is checked."""
+
+    allowed_extensions: list[str] = Field(
+        default_factory=_default_attachment_types,
+        description="The file types that may be attached, by extension. Each is checked against its file signature or its "
+        "text; a type outside this list cannot be enabled",
+    )
+    max_files: int = Field(default=10, ge=1, le=100, description="Attachments one submission may have")
+    max_file_mb: int = Field(default=25, ge=1, le=512, description="The largest single attachment")
+    max_total_mb: int = Field(
+        default=100, ge=1, le=4096, description="The most attachments of one submission may add up to"
+    )
+    max_uploads_per_day: int = Field(
+        default=50, ge=1, le=10_000, description="Attachments one person with the role reporter may add in 24 hours"
+    )
+    zip_max_entries: int = Field(default=200, ge=1, le=10_000, description="The most entries an archive may list")
+    zip_max_expanded_mb: int = Field(
+        default=200,
+        ge=1,
+        le=8192,
+        description="The most an archive may expand to, by what it declares (it is never extracted)",
+    )
+    zip_max_ratio: int = Field(
+        default=100,
+        ge=2,
+        le=10_000,
+        description="The largest ratio of expanded size to stored size, for the archive or an entry",
+    )
+    sanitize_max_mb: int = Field(
+        default=10,
+        ge=1,
+        le=256,
+        description="The largest text attachment that is scanned for secrets and given a sanitized copy",
+    )
+    scanner_command: list[str] = Field(
+        default_factory=list,
+        description="A command that scans a file for malware: its arguments, with {path} where the file goes (the path is "
+        "appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and "
+        "attachments are recorded as not scanned",
+    )
+    scanner_timeout_seconds: int = Field(
+        default=60, ge=1, le=3600, description="How long the scanner may take for one file"
+    )
+    scanner_required: bool = Field(
+        default=False,
+        description="Refuse an attachment when the scanner is configured but fails or times out (otherwise it is kept and "
+        "recorded as not scanned)",
+    )
+
+    @model_validator(mode="after")
+    def _known_types(self) -> AttachmentsConfig:
+        unknown = sorted({e.lower().lstrip(".") for e in self.allowed_extensions} - set(ATTACHMENT_TYPES))
+        if unknown:
+            raise ValueError(
+                f"feedback.attachments.allowed_extensions names types AgentLab cannot check: {', '.join(unknown)} "
+                f"(it can check: {', '.join(ATTACHMENT_TYPES)})"
+            )
+        self.allowed_extensions = sorted({e.lower().lstrip(".") for e in self.allowed_extensions})
+        if self.max_file_mb > self.max_total_mb:
+            raise ValueError("feedback.attachments.max_file_mb cannot be more than max_total_mb")
+        return self
+
+
+class RedactionRule(Model):
+    """A pattern of the owner's own that diagnostic text is masked by."""
+
+    name: str = Field(
+        pattern=r"^[A-Za-z0-9_\-]{1,40}$", description="What the masked value is called in a report: custom:<name>"
+    )
+    pattern: str = Field(min_length=1, max_length=500, description="A regular expression; every match is masked")
+
+    @field_validator("pattern")
+    @classmethod
+    def _compiles(cls, value: str) -> str:
+        import re
+
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"not a valid regular expression: {exc}") from exc
+        return value
+
+
+class RedactionConfig(Model):
+    """How attached and collected text is masked before it is shown, kept or shared (the DiagnosticRedactor)."""
+
+    rules: list[RedactionRule] = Field(
+        default_factory=list, max_length=50, description="Patterns of your own to mask, beyond the built-in ones"
+    )
+    redact_ip_addresses: bool = Field(
+        default=False,
+        description="Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on",
+    )
+
+
 class FeedbackConfig(Model):
     """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
 
@@ -407,6 +527,8 @@ class FeedbackConfig(Model):
     similar_limit: int = Field(
         default=5, ge=1, le=20, description="How many possibly similar submissions are suggested"
     )
+    attachments: AttachmentsConfig = Field(default_factory=AttachmentsConfig)
+    redaction: RedactionConfig = Field(default_factory=RedactionConfig)
     notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
         default_factory=_all_notifications,
         description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "

@@ -267,6 +267,24 @@ class SubmissionService:
         self._note_denied(actor, ident, hidden, client)
         raise NotFoundError("no such submission")
 
+    @contextmanager
+    def visible_submission(
+        self, actor: Actor, ident: str, *, client: str = ""
+    ) -> Iterator[tuple[Session, orm.SubmissionRow]]:
+        """A transaction and a submission the actor may see, or "not found". For the parts of Feedback & Support that keep
+        their own rows about a submission (attachments): they get the same rule, and the same recording of a denial."""
+        with self._open(actor, ident, client=client) as pair:
+            yield pair
+
+    def audit(
+        self, s: Session, event: str, actor: Actor, submission_id: str | None, *, client: str = "", **detail: Any
+    ) -> None:
+        """Write one audit record in the caller's transaction."""
+        self._audit(s, event, actor, submission_id, client=client, **detail)
+
+    def mine(self, actor: Actor, row: orm.SubmissionRow) -> bool:
+        return self._mine(actor, row)
+
     def _note_denied(self, actor: Actor, ident: str, hidden: str | None, client: str) -> None:
         if hidden is None:
             return

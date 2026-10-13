@@ -540,9 +540,34 @@ Tested by `tests/unit/test_feedback_service.py` (the rules, with ten deliberate 
 submission by every spelling of its identifier, going through the numbers, hostile text, injection in every filter, secrets in the
 store, the responses and the log, and credentials that may not act).
 
+### Attachments and the DiagnosticRedactor
+
+Attachments are files from people the server does not know, and the text in them is searched for secrets, so both the file and
+the searching are treated as hostile.
+
+* **A file is what its content says.** The signature, the text or the archive directory is checked; the browser's claim and
+  the name are not believed; programs, scripts, `.html` and `.svg` cannot be attached. An archive is never extracted: entry
+  names, declared sizes, ratios, links, encryption and nested archives are read from its directory.
+* **The bytes are private.** They are kept as *restricted* artifacts (a `0700` folder, `0600` files) under a name made from
+  their hash, so no name a person chose is ever a path, and they are reachable only through an endpoint that applies the
+  submission's visibility rule first. Every download is audited. Downloads are sent as an opaque type, as an attachment, with
+  `nosniff` and a sandboxing CSP.
+* **The original is never changed.** A text file also gets a sanitized copy; the two are kept apart and the report says,
+  without values, what was masked and where. A file the second inspection doubts is marked `needs_review` and is not to be
+  shared outside AgentLab until a person has looked.
+* **Scanning is honest.** A scanner runs only if one is configured, on a copy in a private folder with a fixed name, and a file
+  it flags is not kept. With none, the record says `not_scanned`.
+* **Hostile text cannot hold the server.** Every pattern is held to linear time by a test that runs it against adversarial
+  input (long runs of name characters, repeated markers with no end, ...), the private-key scanner pairs markers once, and the
+  work happens outside the database transaction. Text above `attachments.sanitize_max_mb` is kept without being inspected.
+
+Tested by `tests/unit/test_diagnostic_redactor.py`, `tests/unit/test_feedback_files.py`,
+`tests/unit/test_feedback_attachments.py`, `tests/api/test_feedback_attachments_api.py` and
+`tests/security/test_feedback_attachments_security.py`.
+
 What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
-every other person's non-private submission and, with the role, every private one; there are no attachments yet, so nothing is
-scanned; and there is no e-mail.
+every other person's non-private submission and, with the role, every private one; an image or a PDF can show a secret that
+nothing can mask; no scanner ships with AgentLab; and there is no e-mail.
 
 ## What this does not promise
 

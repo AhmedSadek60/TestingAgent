@@ -25,6 +25,7 @@ from agentlab.api.state import ApiState
 from agentlab.core.config import AgentLabConfig, ServerConfig
 from agentlab.core.errors import PolicyBlocked
 from agentlab.feedback import SubmissionService
+from agentlab.feedback.attachments import AttachmentService
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
 from agentlab.jobs.runner import reap_forever
 from agentlab.jobs.worker import Worker
@@ -154,12 +155,14 @@ def create_app(
         uploads = svc.uploads_dir
         uploads.mkdir(parents=True, exist_ok=True)
         resolved_ui = (ui_dir or default_ui_dir()) if (serve_ui if serve_ui is not None else scfg.serve_ui) else None
+        feedback_service = SubmissionService(svc.store.db, svc.config.feedback)
         app.state.agentlab = ApiState(
             services=svc,
             queue=q,
             guard=TokenGuard(api_token),
             accounts=AccountService(svc.store.db, svc.config.accounts),
-            feedback=SubmissionService(svc.store.db, svc.config.feedback),
+            feedback=feedback_service,
+            attachments=AttachmentService(feedback_service, svc.artifacts, svc.config.feedback),
             worker=worker,
             uploads_dir=uploads,
             allowed_roots=[Path(p if Path(p).is_absolute() else svc.base_dir / p) for p in scfg.allowed_paths],
@@ -216,7 +219,9 @@ def create_app(
         allowed_hosts=hosts,
         allowed_origins=cors,
         max_body_bytes=server_config.max_body_mb * 1024 * 1024,
-        max_upload_bytes=server_config.max_upload_mb * 1024 * 1024,
+        max_upload_bytes=max(server_config.max_upload_mb, cfg_hint.feedback.attachments.max_file_mb if cfg_hint else 0)
+        * 1024
+        * 1024,
     )
     if cors:
         app.add_middleware(

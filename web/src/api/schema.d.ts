@@ -1328,6 +1328,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/submissions/{submission_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the attachments of a submission
+         * @description What is attached, with what each file was found to be, whether it was scanned, and what the check for secrets found. A reporter does not see files that maintainers attached for their own use.
+         */
+        get: operations["attachments_submissions__submission_id__attachments_get"];
+        put?: never;
+        /**
+         * Attach a file to a submission
+         * @description One file per request, as `multipart/form-data`. The type is decided by looking at the file (its signature, its text, an archive's directory), not by its name or by what the browser says; the file is kept privately under a name made from its hash; a text file is also given a sanitized copy with secrets masked, and the original is kept as it was. A malware scan runs only if the owner configured a scanner, and the answer says which. Limits are in `feedback.attachments`.
+         */
+        post: operations["attach_submissions__submission_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the details of an attachment
+         * @description The same record the list gives, for one file.
+         */
+        get: operations["attachment_submissions__submission_id__attachments__attachment_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Remove an attachment
+         * @description Takes the file away: it can no longer be listed or downloaded, and its stored bytes are deleted when nothing else uses them. The record stays in the audit trail. A reporter may remove what they attached; a maintainer anything.
+         */
+        delete: operations["remove_attachment_submissions__submission_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/attachments/{attachment_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview an attachment
+         * @description For a text file, its first characters with secrets masked. For an image, say so (download it to look at it). Nothing is rendered by the server.
+         */
+        get: operations["preview_submissions__submission_id__attachments__attachment_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/attachments/{attachment_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an attachment
+         * @description The file as it was uploaded, or with `version=sanitized` (a text file) the copy with secrets masked. It is always sent as a download of unknown type, never to be shown by the browser, and every download is recorded.
+         */
+        get: operations["download_submissions__submission_id__attachments__attachment_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1906,6 +1994,127 @@ export interface components {
             name: string;
         };
         /**
+         * AttachmentOut
+         * @description A file attached to a submission.
+         */
+        AttachmentOut: {
+            /**
+             * Id
+             * @description The attachment's id
+             */
+            id: string;
+            /**
+             * Name
+             * @description The file name the person gave it, made safe to show
+             */
+            name: string;
+            /**
+             * Extension
+             * @description Its type by extension
+             */
+            extension: string;
+            /**
+             * Type
+             * @description What it was found to be by looking at its content
+             */
+            type: string;
+            /**
+             * Declared Type
+             * @description What the browser said it was; not trusted
+             */
+            declared_type: string;
+            /**
+             * Size
+             * @description Its size in bytes
+             */
+            size: number;
+            /**
+             * Sha256
+             * @description The SHA-256 of the file as it was uploaded
+             */
+            sha256: string;
+            /**
+             * Visibility
+             * @description internal: maintainers only
+             * @enum {string}
+             */
+            visibility: "public" | "internal";
+            /**
+             * Uploader
+             * @description Who attached it (a reporter is not told which maintainer)
+             */
+            uploader: string;
+            /**
+             * Uploader Is Staff
+             * @description True when a maintainer or the shared token attached it
+             */
+            uploader_is_staff: boolean;
+            /**
+             * Mine
+             * @description True when the caller attached it
+             */
+            mine: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When it was attached
+             */
+            created_at: string;
+            /**
+             * Text Like
+             * @description True for text files, which can be previewed and have a sanitized copy
+             */
+            text_like: boolean;
+            /** @description The check for secrets in a text file */
+            secrets: components["schemas"]["SecretsSummary"];
+            /** @description The malware scan */
+            scan: components["schemas"]["ScanSummary"];
+            /**
+             * Archive
+             * @description For a ZIP archive or a Word document: what its directory lists
+             */
+            archive: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Sanitized Available
+             * @description True when a sanitized copy can be downloaded with version=sanitized
+             */
+            sanitized_available: boolean;
+        };
+        /**
+         * AttachmentPreview
+         * @description A preview of an attachment, as the caller may see it.
+         */
+        AttachmentPreview: {
+            /**
+             * Kind
+             * @description text: the sanitized text is in `text`; image: download it and show it; none: no preview exists
+             * @enum {string}
+             */
+            kind: "text" | "image" | "none";
+            /**
+             * Text
+             * @description The sanitized text, up to a limit
+             */
+            text: string | null;
+            /**
+             * Truncated
+             * @description True when the text was cut at the limit
+             */
+            truncated: boolean;
+            /**
+             * Sanitized
+             * @description True when secrets were masked in the text shown
+             */
+            sanitized: boolean;
+            /**
+             * Message
+             * @description What to know about this preview
+             */
+            message: string;
+        };
+        /**
          * AttemptResult
          * @description One repetition of a test.
          */
@@ -2031,6 +2240,24 @@ export interface components {
              * @description Whether sign-in with a user name and password is available
              */
             password_sign_in: boolean;
+        };
+        /**
+         * Body_attach_submissions__submission_id__attachments_post
+         * @description The multipart form of an attachment upload
+         */
+        Body_attach_submissions__submission_id__attachments_post: {
+            /**
+             * File
+             * @description The file to attach
+             */
+            file: string;
+            /**
+             * Visibility
+             * @description internal: only maintainers can see the file (a reporter may not choose it)
+             * @default public
+             * @enum {string}
+             */
+            visibility?: "public" | "internal";
         };
         /**
          * Body_upload_document_documents_post
@@ -5845,6 +6072,23 @@ export interface components {
             disposable_environment?: boolean;
         };
         /**
+         * ScanSummary
+         * @description Whether a malware scanner looked at the file. 'not_scanned' means exactly that: no scanner ran.
+         */
+        ScanSummary: {
+            /**
+             * Status
+             * @description not_scanned: no scanner is configured or it did not run; clean: the scanner found nothing; error: the scanner failed, so the file is not known to be clean
+             * @enum {string}
+             */
+            status: "not_scanned" | "clean" | "infected" | "error";
+            /**
+             * Detail
+             * @description What the scanner said, or why it did not run
+             */
+            detail: string;
+        };
+        /**
          * Scorecard
          * @description Scores per category, the overall score and grade, and what limits them
          */
@@ -5944,6 +6188,35 @@ export interface components {
             weights?: {
                 [key: string]: number;
             };
+        };
+        /**
+         * SecretsSummary
+         * @description What the check for secrets in an attached text file found. Values are never shown.
+         */
+        SecretsSummary: {
+            /**
+             * Status
+             * @description not_applicable: not a text file; none: nothing found; redacted: patterns matched and a sanitized copy was made; needs_review: the second inspection found more, so the file must be reviewed before it is shared outside AgentLab; not_inspected: the file is too large to inspect
+             * @enum {string}
+             */
+            status: "not_applicable" | "none" | "redacted" | "needs_review" | "not_inspected";
+            /**
+             * Counts
+             * @description How many of each kind of thing were masked
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * External Sharing Blocked
+             * @description True when the file may not leave AgentLab until it has been reviewed
+             */
+            external_sharing_blocked: boolean;
+            /**
+             * Note
+             * @description What this does and does not tell you
+             */
+            note: string;
         };
         /**
          * SessionOut
@@ -12988,6 +13261,481 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEventOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attachments_submissions__submission_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attach_submissions__submission_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_attach_submissions__submission_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attachment_submissions__submission_id__attachments__attachment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+                /** @description Id of an attachment, from the submission */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_attachment_submissions__submission_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+                /** @description Id of an attachment, from the submission */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_submissions__submission_id__attachments__attachment_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+                /** @description Id of an attachment, from the submission */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPreview"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_submissions__submission_id__attachments__attachment_id__download_get: {
+        parameters: {
+            query?: {
+                /** @description original: as uploaded; sanitized: secrets masked (text) */
+                version?: "original" | "sanitized";
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+                /** @description Id of an attachment, from the submission */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description The API token is missing or wrong */

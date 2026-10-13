@@ -11,6 +11,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [Triage](#triage)
 * [The discussion](#the-discussion)
 * [Finding submissions](#finding-submissions)
+* [Attachments](#attachments)
 * [Private submissions](#private-submissions)
 * [Limits and protections](#limits-and-protections)
 * [The API](#the-api)
@@ -22,7 +23,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 |---|---|
 | Feature requests and issue reports, numbers, workflow, status history, comments and internal notes, labels, priority, severity, assignment, links between submissions, unread marker, duplicate suggestions, audit trail, allowances, private security reports | **Built** (this page) |
 | The web pages (request and report forms, My Submissions, the maintainer queue) | **Not yet built.** Everything is reachable through the API; the web interface comes in a later slice |
-| File attachments and a redaction pass over what is attached | Not yet built |
+| File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
 | Diagnostics collected from AgentLab (environment, run and trace summaries, logs) | Not yet built |
 | An engineering handoff package (`CLAUDE_CODE_TASK.md` and a ZIP) | Not yet built |
 | Publishing to GitHub, retention and purging | Not yet built |
@@ -125,6 +126,53 @@ The text search looks at the title, the description, what an issue says happened
 request says the problem is; a submission number, or an exact run, test, trace, result or report id, finds what names it. `%` and
 `_` in a search are ordinary characters. Comments are not searched, so a search cannot be used to read what a reporter may not.
 
+## Attachments
+
+`POST /submissions/{id}/attachments` attaches one file (`multipart/form-data`, field `file`, optional `visibility`). The person
+who made the submission may attach to it; a maintainer to any they may see. What a file is, is decided by looking at it:
+
+| Type | How it is checked |
+|---|---|
+| `png`, `jpg`/`jpeg`, `webp` | The file signature must match. |
+| `pdf` | A PDF header. |
+| `docx`, `zip` | A ZIP directory that is read, never extracted: the number of entries, the size it declares to expand to, the ratio, absolute and climbing paths, links, encrypted entries, programs and scripts, and archives inside the archive. A Word document must have its document part. |
+| `txt`, `md`, `csv`, `json`, `jsonl`, `yaml`/`yml`, `log` | Valid UTF-8 and no binary bytes. |
+
+The browser's claim of a type is recorded and not believed; `.html`, `.svg`, `.exe` and the like cannot be attached at all. A
+file name is a label: it is reduced to its last part, without control characters or direction overrides, and the bytes are
+kept in the *restricted* artifact store under a name made from their hash, readable only by the server's user.
+
+**Text files get a sanitized copy.** The DiagnosticRedactor masks what it recognises (headers and cookies with their names
+kept, credentials in URLs, assignments such as `API_TOKEN=...`, every pattern the server knows, registered secret values,
+e-mail, phone and card numbers, and the owner's `redaction.rules`) and then looks at the result again. The original is kept as
+uploaded and is what its owner and maintainers can download; the sanitized copy (`version=sanitized`) is what a preview shows
+and what the engineering handoff will use. The record says, without any value, what was masked and where. The status is:
+
+| `secrets.status` | Meaning |
+|---|---|
+| `none` | The patterns found nothing. |
+| `redacted` | Patterns matched and were masked. |
+| `needs_review` | The second inspection still found something that looks like a key, and masked it too. The file is not to leave AgentLab until a person has looked at it. |
+| `not_inspected` | The file is larger than `attachments.sanitize_max_mb`. |
+| `not_applicable` | Not a text file (an image, a PDF, an archive): nothing can be masked in it. |
+
+This is risk reduction, not a guarantee: a secret in a shape nothing recognises passes, and an image can show one.
+
+**Malware.** AgentLab ships no scanner. With `attachments.scanner_command` set, every file is scanned before it is kept and
+one that is flagged is refused and not stored. Without it the record says `not_scanned`; AgentLab never says a file was scanned
+when no scanner ran.
+
+**Limits** (`feedback.attachments`): 10 files, 25 MB each and 100 MB in all per submission; 50 uploads a day for a reporter;
+an identical file is not attached twice. The server is the authority on all of them.
+
+**Who sees a file.** The same rule as the submission it is on, applied first: someone who may not see a submission cannot tell
+that it has attachments. A reporter does not see files a maintainer attached with `visibility: internal` and cannot attach one.
+Every download is recorded in the submission's audit trail. A download is always sent as `application/octet-stream` with
+`Content-Disposition: attachment`, `nosniff` and a sandboxing CSP, never as something a browser would display.
+
+**Removal.** `DELETE` makes a file unavailable at once and deletes its stored bytes unless another attachment uses them. A
+reporter removes what they attached; a maintainer anything. The record stays, for the audit trail.
+
 ## Private submissions
 
 An issue report in the **security category** (`feedback.security_category`), or one the reporter marks
@@ -151,8 +199,8 @@ the visibility back explicitly.
 * **Changing someone's role or disabling their account** ends their sessions at once ([accounts.md](accounts.md)), so a
   demoted maintainer stops triaging immediately.
 
-What this does **not** do: it does not scan, translate or summarise text, it does not send anything to a language model, and it
-does not tell anyone by e-mail.
+What this does **not** do: it does not translate or summarise text, it does not send anything to a language model, it does not
+tell anyone by e-mail, and it does not scan an attachment for malware unless the owner has configured a scanner.
 
 ## The API
 
@@ -172,6 +220,12 @@ requests that change something.
 | `POST /submissions/{id}/comments` | anyone signed in | Comment (internal notes and information requests: maintainers) |
 | `GET /submissions/{id}/comments` | anyone signed in | The discussion on its own (a reporter: public lines only) |
 | `GET /submissions/{id}/history` | anyone signed in | The status history on its own |
+| `POST /submissions/{id}/attachments` | anyone signed in | Attach a file |
+| `GET /submissions/{id}/attachments` | anyone signed in | List the attachments |
+| `GET /submissions/{id}/attachments/{attachment_id}` | anyone signed in | One attachment's record |
+| `GET /submissions/{id}/attachments/{attachment_id}/preview` | anyone signed in | A sanitized preview of a text file |
+| `GET /submissions/{id}/attachments/{attachment_id}/download` | anyone signed in | The file (`version=sanitized` for the masked copy) |
+| `DELETE /submissions/{id}/attachments/{attachment_id}` | anyone signed in | Remove an attachment |
 | `POST /submissions/{id}/seen` | anyone signed in | Mark the answers seen |
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |

@@ -17,7 +17,7 @@ import pytest
 
 from agentlab.api.app import create_app
 from agentlab.api.security import MAX_FAILURES, TokenGuard, confine, is_loopback, safe_filename
-from agentlab.core.config import ServerConfig
+from agentlab.core.config import AttachmentsConfig, FeedbackConfig, ServerConfig
 from agentlab.core.errors import CredentialError, PolicyBlocked
 from agentlab.services import Services
 from tests.support.api import api_config, mock_target, running_api
@@ -572,7 +572,12 @@ async def test_a_body_that_does_not_say_how_long_it_is_is_counted_as_it_arrives(
 
 
 async def test_an_upload_may_be_larger_than_a_request_body_but_not_larger_than_the_upload_limit(tmp_path: Path) -> None:
-    config = api_config(tmp_path, server=ServerConfig(max_body_mb=1, max_upload_mb=2))
+    # the ceiling for an upload is the larger of server.max_upload_mb and the largest attachment, so the attachment is kept small
+    config = api_config(
+        tmp_path,
+        server=ServerConfig(max_body_mb=1, max_upload_mb=2),
+        feedback=FeedbackConfig(attachments=AttachmentsConfig(max_file_mb=1)),
+    )
     async with running_api(tmp_path, token=TOKEN, config=config) as api:
         c = api.client
         fits = await c.post(

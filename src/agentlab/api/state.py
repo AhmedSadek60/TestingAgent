@@ -10,6 +10,7 @@ from fastapi import Request
 from agentlab.accounts import AccountService
 from agentlab.api.security import LinkSigner, TokenGuard
 from agentlab.feedback import SubmissionService
+from agentlab.feedback.attachments import AttachmentService
 from agentlab.jobs.queue import JobQueue
 from agentlab.jobs.worker import Worker
 from agentlab.services import Services
@@ -22,6 +23,7 @@ class ApiState:
     guard: TokenGuard
     accounts: AccountService | None = None
     feedback: SubmissionService | None = None
+    attachments: AttachmentService | None = None
     worker: Worker | None = None
     uploads_dir: Path = field(default_factory=lambda: Path(".agentlab/uploads"))
     allowed_roots: list[Path] = field(default_factory=list)

@@ -446,3 +446,63 @@ class FeedbackOptions(Model):
     security_category: str = Field(description="An issue in this category is kept private")
     max_text_chars: int = Field(description="The longest any text field may be")
     can_triage: bool = Field(description="True when the caller is a maintainer and may change status and priority")
+
+
+# =========================================================================================================== attachments
+class SecretsSummary(Model):
+    """What the check for secrets in an attached text file found. Values are never shown."""
+
+    status: Literal["not_applicable", "none", "redacted", "needs_review", "not_inspected"] = Field(
+        description="not_applicable: not a text file; none: nothing found; redacted: patterns matched and a sanitized copy "
+        "was made; needs_review: the second inspection found more, so the file must be reviewed before it is shared outside "
+        "AgentLab; not_inspected: the file is too large to inspect"
+    )
+    counts: dict[str, int] = Field(description="How many of each kind of thing were masked")
+    external_sharing_blocked: bool = Field(
+        description="True when the file may not leave AgentLab until it has been reviewed"
+    )
+    note: str = Field(description="What this does and does not tell you")
+
+
+class ScanSummary(Model):
+    """Whether a malware scanner looked at the file. 'not_scanned' means exactly that: no scanner ran."""
+
+    status: Literal["not_scanned", "clean", "infected", "error"] = Field(
+        description="not_scanned: no scanner is configured or it did not run; clean: the scanner found nothing; error: "
+        "the scanner failed, so the file is not known to be clean"
+    )
+    detail: str = Field(description="What the scanner said, or why it did not run")
+
+
+class AttachmentOut(Model):
+    """A file attached to a submission."""
+
+    id: str = Field(description="The attachment's id")
+    name: str = Field(description="The file name the person gave it, made safe to show")
+    extension: str = Field(description="Its type by extension")
+    type: str = Field(description="What it was found to be by looking at its content")
+    declared_type: str = Field(description="What the browser said it was; not trusted")
+    size: int = Field(description="Its size in bytes")
+    sha256: str = Field(description="The SHA-256 of the file as it was uploaded")
+    visibility: Literal["public", "internal"] = Field(description="internal: maintainers only")
+    uploader: str = Field(description="Who attached it (a reporter is not told which maintainer)")
+    uploader_is_staff: bool = Field(description="True when a maintainer or the shared token attached it")
+    mine: bool = Field(description="True when the caller attached it")
+    created_at: datetime = Field(description="When it was attached")
+    text_like: bool = Field(description="True for text files, which can be previewed and have a sanitized copy")
+    secrets: SecretsSummary = Field(description="The check for secrets in a text file")
+    scan: ScanSummary = Field(description="The malware scan")
+    archive: dict[str, Any] | None = Field(description="For a ZIP archive or a Word document: what its directory lists")
+    sanitized_available: bool = Field(description="True when a sanitized copy can be downloaded with version=sanitized")
+
+
+class AttachmentPreview(Model):
+    """A preview of an attachment, as the caller may see it."""
+
+    kind: Literal["text", "image", "none"] = Field(
+        description="text: the sanitized text is in `text`; image: download it and show it; none: no preview exists"
+    )
+    text: str | None = Field(description="The sanitized text, up to a limit")
+    truncated: bool = Field(description="True when the text was cut at the limit")
+    sanitized: bool = Field(description="True when secrets were masked in the text shown")
+    message: str = Field(description="What to know about this preview")
