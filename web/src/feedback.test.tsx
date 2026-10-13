@@ -61,6 +61,18 @@ describe("requesting a feature", () => {
     expect(screen.queryByText(/Describe the problem\.$/)).not.toBeInTheDocument();
   });
 
+  it("takes what is said about a field away as soon as the field is right, without sending again", async () => {
+    serverFor();
+    renderAt("/feedback/feature");
+    const user = userEvent.setup();
+    expect(screen.queryByText("Choose a category.")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Send the request" }));
+    expect(await screen.findByText("Choose a category.")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Category"), "Other");
+    expect(screen.queryByText("Choose a category.")).not.toBeInTheDocument();
+    expect(screen.getByText("Describe the problem or opportunity.")).toBeInTheDocument();
+  });
+
   it("sends the request and then its files, and shows the number only after the server has kept it", async () => {
     installFakeXhr();
     let release!: (value: Response) => void;
