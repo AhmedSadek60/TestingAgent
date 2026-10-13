@@ -585,6 +585,56 @@ a small one, and that is a new store of data about people's activity, so it is b
 Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
 `tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
 
+### Publishing to an issue tracker
+
+Publishing sends text to a system AgentLab does not control, so it is off by default and built so that nothing leaves that a
+person did not read ([ADR 0018](decisions/0018-publication-is-off-by-default-previewed-and-never-twice.md)).
+
+* **Off until the owner switches it on**, with a repository and a token; while off, no call is made and nothing is offered.
+* **A summary and never evidence**: no files, diagnostics, packages, names, internal notes or ratings. What the reporter wrote is
+  masked and quoted, so it cannot mention anyone, close another issue or embed a picture.
+* **A private security report is never published**, whoever asks, and the shared token does not see one.
+* **Exactly what was previewed**: the preview's hash has to come back; a doubted text needs a second, explicit yes.
+* **Never twice**: one record per submission, a key in the issue, a look for it before making one, and a lock for a publication
+  in progress.
+* **The token** is read at call time from `env:` or a stored credential, never stored, logged, returned or audited; calls go to
+  the configured https address only and redirects are not followed; a link that is not https is never shown as one.
+* **Who**: the roles the owner named (administrators by default).
+
+Tested by `tests/unit/test_feedback_publication.py` and `tests/api/test_feedback_publication_api.py`.
+
+### Retention and deletion
+
+Removal is the one thing here that cannot be undone, so it is slow to start and careful where it acts
+([ADR 0017](decisions/0017-retention-counts-from-closing-and-removes-content-not-the-record.md)).
+
+* **Nothing is removed by default**; every period is empty until the owner sets it, and the policy only ever touches a
+  **closed** submission, so the evidence of an open investigation is never removed by the clock.
+* **Deleting a submission is for administrators**, needs a reason (kept, masked) and, for a private security report that is not
+  closed, an explicit acknowledgement. Neither a maintainer nor the shared token may.
+* **A file is deleted only when no record that is still there refers to it**, because stored files are shared by content.
+* **What stays is counts**: the audit record says what was removed and by whom and never what it said. A downloaded copy cannot
+  be recalled, and the record says how many there were.
+
+Tested by `tests/unit/test_feedback_retention.py` and `tests/api/test_feedback_retention_api.py`.
+
+### The web interface of Feedback & Support
+
+It runs in a stranger's browser and sees what they see, so it is built to keep little and to share nothing unreviewed
+([ADR 0016](decisions/0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md)).
+
+* **Drafts** are form text in the tab's session storage, offered back with a way to start again, and gone when the tab closes,
+  when the submission is saved and at sign-out. Files, diagnostics and tokens are never kept there.
+* **What the tab saw** (the last 50 console errors and warnings and failed requests: method, path without its query, status,
+  request id; never a body) is in memory only, forgotten at sign-out, and sent only if the person ticks the browser category and
+  agrees to the masked preview.
+* **No diagnostic information is attached on the person's behalf**: nothing is pre-ticked, "select all" still needs collecting
+  and reviewing, and a report with diagnostics chosen and not reviewed is not sent.
+* **Identifiers in a link** that opens the issue form are checked like typed ones and listed, each removable.
+* **Everything written by a person or a system is a text node**, set apart; nothing is rendered as HTML or Markdown.
+
+Tested by `web/src/feedback.test.tsx`, `web/src/lib/browserErrors.test.ts` and `tests/e2e/test_feedback_ui.py`.
+
 ### The engineering handoff
 
 A package is built so that it can be given to a model, which makes it the place where what a stranger wrote is most likely to be

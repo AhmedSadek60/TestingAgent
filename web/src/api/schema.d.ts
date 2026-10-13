@@ -1194,7 +1194,11 @@ export interface paths {
         get: operations["read_submissions__submission_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a submission
+         * @description Deletes the submission and everything attached to it: its discussion, history, files, diagnostic information and handoff packages, and the stored files nothing else uses. Administrators only, and the reason is kept in the audit trail (masked), with counts and never text. A private security report that is not closed is deleted only when `acknowledge_open_security_report` is true, because its evidence may still be needed. A package that was downloaded before cannot be recalled: the answer says how many times that happened.
+         */
+        delete: operations["delete_submission_submissions__submission_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -1658,6 +1662,90 @@ export interface paths {
         get: operations["task_handoffs__handoff_id__task_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issue trackers a submission can be published to
+         * @description Each tracker the server knows about, whether the owner switched it on, why not when it is not ready, and whether the caller's role may publish. Nothing is ever sent to a tracker that is off. Maintainers only.
+         */
+        get: operations["integrations_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a publication
+         * @description Exactly the title, text, labels and assignee that would be sent, what is deliberately left out, the warnings, and the `content_hash` to send back to publish exactly this. Nothing is sent. Only a sanitized summary is sent: never files, diagnostic information, handoff packages, the reporter's name, internal notes or the maintainers' ratings, and a private security report is never published.
+         */
+        post: operations["preview_submissions__submission_id__publications_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a submission was published
+         * @description The issues made from this submission, with their state and address. Maintainers only.
+         */
+        get: operations["publications_submissions__submission_id__publications_get"];
+        put?: never;
+        /**
+         * Publish a submission
+         * @description Makes an issue in the configured repository from what was previewed. The `content_hash` of the preview must come back, so that nothing is sent that was not read. A retry cannot make a second issue: a publication that exists is returned, and one that failed is retried with the same key. The result carries the issue's address. Only a sanitized summary is sent: never files, diagnostic information, handoff packages, the reporter's name, internal notes or the maintainers' ratings, and a private security report is never published.
+         */
+        post: operations["publish_submissions__submission_id__publications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications/{provider}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push a submission's status to its issue
+         * @description Comments the submission's status on the issue and closes the issue when the submission is closed. Only when the owner switched `status_sync` on, only when a maintainer asks, and only with the status's name: no text of the submission is sent.
+         */
+        post: operations["sync_submissions__submission_id__publications__provider__sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3445,6 +3533,42 @@ export interface components {
             };
         };
         /**
+         * DeletionOut
+         * @description What deleting a submission removed. Counts only.
+         */
+        DeletionOut: {
+            /**
+             * Number
+             * @description The number the submission had; it is not reused
+             */
+            number: string;
+            /**
+             * Attachments
+             * @description Attached files removed
+             */
+            attachments: number;
+            /**
+             * Diagnostic Items
+             * @description Diagnostic items removed
+             */
+            diagnostic_items: number;
+            /**
+             * Handoffs
+             * @description Handoff packages removed
+             */
+            handoffs: number;
+            /**
+             * Files Deleted
+             * @description Stored files actually deleted (a file another record still uses stays)
+             */
+            files_deleted: number;
+            /**
+             * Exported Copies
+             * @description How many times a package or a file of it was downloaded before: those copies cannot be recalled
+             */
+            exported_copies: number;
+        };
+        /**
          * DiagnosticCollectionOut
          * @description What was collected for a report, as the person can review it before attaching it.
          */
@@ -4299,6 +4423,26 @@ export interface components {
              * @description True when the caller is a maintainer and may change status and priority
              */
             can_triage: boolean;
+            /**
+             * Attachment Extensions
+             * @description The file types that may be attached
+             */
+            attachment_extensions: string[];
+            /**
+             * Attachment Max Files
+             * @description The most files one submission may have
+             */
+            attachment_max_files: number;
+            /**
+             * Attachment Max File Mb
+             * @description The largest single file, in megabytes
+             */
+            attachment_max_file_mb: number;
+            /**
+             * Attachment Max Total Mb
+             * @description What the files of one submission may add up to, in megabytes
+             */
+            attachment_max_total_mb: number;
         };
         /**
          * Finding
@@ -4557,10 +4701,10 @@ export interface components {
             id: string | null;
             /**
              * Status
-             * @description preview: nothing was built or kept
+             * @description preview: nothing was built or kept; generated: built and kept; purged: removed by the retention policy (the record of what it held stays, the files are gone)
              * @enum {string}
              */
-            status: "preview" | "generated";
+            status: "preview" | "generated" | "purged";
             /**
              * Submission Id
              * @description The submission it was made from
@@ -4664,6 +4808,47 @@ export interface components {
              * @description Jobs waiting for a worker
              */
             queued: number;
+        };
+        /**
+         * IntegrationOut
+         * @description An issue tracker a submission could be published to, and whether it is switched on.
+         */
+        IntegrationOut: {
+            /**
+             * Provider
+             * @description Its name: github
+             */
+            provider: string;
+            /**
+             * Enabled
+             * @description True when the owner switched it on
+             */
+            enabled: boolean;
+            /**
+             * Ready
+             * @description True when it is enabled and complete, so a publication can be tried
+             */
+            ready: boolean;
+            /**
+             * Reason
+             * @description Why it is not ready, in words the owner can act on
+             */
+            reason: string | null;
+            /**
+             * Repository
+             * @description Where issues are made
+             */
+            repository: string | null;
+            /**
+             * May Publish
+             * @description True when the caller's role is one that may publish
+             */
+            may_publish: boolean;
+            /**
+             * Status Sync
+             * @description True when a maintainer may push a submission's status to its issue
+             */
+            status_sync: boolean;
         };
         /**
          * IssueDetailsIn
@@ -5866,6 +6051,171 @@ export interface components {
              * @description Why the adapter cannot be built, if it cannot
              */
             configured_error?: string | null;
+        };
+        /**
+         * PublicationOut
+         * @description The issue a submission was published to (or the attempt to).
+         */
+        PublicationOut: {
+            /**
+             * Id
+             * @description The record's id
+             */
+            id: string;
+            /**
+             * Provider
+             * @description The issue tracker
+             */
+            provider: string;
+            /**
+             * Repository
+             * @description Where the issue is
+             */
+            repository: string;
+            /**
+             * State
+             * @description publishing: started and not finished; published: the issue exists; failed: it was not made
+             * @enum {string}
+             */
+            state: "publishing" | "published" | "failed";
+            /**
+             * Url
+             * @description Where to open the issue; empty until it exists
+             */
+            url: string;
+            /**
+             * Number
+             * @description Its number in the tracker
+             */
+            number: number | null;
+            /**
+             * External State
+             * @description open or closed, as AgentLab last knew
+             */
+            external_state: string;
+            /**
+             * Error Kind
+             * @description Why it failed, when it did
+             */
+            error_kind: string;
+            /**
+             * Error Detail
+             * @description What to do about it, when it failed
+             */
+            error_detail: string;
+            /**
+             * Submission Version
+             * @description The version of the submission that was published
+             */
+            submission_version: number;
+            /**
+             * Published By
+             * @description Who published it
+             */
+            published_by: string;
+            /**
+             * Published At
+             * @description When
+             */
+            published_at: string | null;
+            /**
+             * Synced Status
+             * @description The status last pushed to the issue, when status sync is on
+             */
+            synced_status: string;
+        };
+        /**
+         * PublicationPreview
+         * @description Exactly what would be sent, and why it might not be. Nothing has been sent.
+         */
+        PublicationPreview: {
+            /**
+             * Provider
+             * @description The issue tracker
+             */
+            provider: string;
+            /**
+             * Repository
+             * @description Where the issue would be made
+             */
+            repository: string;
+            /**
+             * Title
+             * @description The issue's title
+             */
+            title: string;
+            /**
+             * Body
+             * @description The issue's text, as it would be sent
+             */
+            body: string;
+            /**
+             * Labels
+             * @description Labels that would be put on it
+             */
+            labels: string[];
+            /**
+             * Assignees
+             * @description Who it would be assigned to
+             */
+            assignees: string[];
+            /**
+             * Content Hash
+             * @description Send this back to publish exactly this and nothing else
+             */
+            content_hash: string;
+            /**
+             * Needs Review
+             * @description True when the second inspection still doubts a text: publishing then needs `acknowledge_unreviewed`
+             */
+            needs_review: boolean;
+            /**
+             * Warnings
+             * @description What the person should know before it is public
+             */
+            warnings: string[];
+            /**
+             * Left Out
+             * @description What is deliberately not in it: files, diagnostics, packages, names, notes
+             */
+            left_out: string[];
+            /** @description The publication that already exists for this submission, if any */
+            already: components["schemas"]["PublicationOut"] | null;
+        };
+        /**
+         * PublicationPreviewIn
+         * @description Which tracker to look at.
+         */
+        PublicationPreviewIn: {
+            /**
+             * Provider
+             * @description The issue tracker
+             * @constant
+             */
+            provider: "github";
+        };
+        /**
+         * PublishIn
+         * @description Publish what was previewed.
+         */
+        PublishIn: {
+            /**
+             * Provider
+             * @description The issue tracker
+             * @constant
+             */
+            provider: "github";
+            /**
+             * Content Hash
+             * @description The `content_hash` of the preview that was read
+             */
+            content_hash: string;
+            /**
+             * Acknowledge Unreviewed
+             * @description Must be the JSON value true to publish text the second inspection still doubts, after reading it
+             * @default false
+             */
+            acknowledge_unreviewed?: boolean;
         };
         /**
          * RedactPreviewIn
@@ -13529,6 +13879,88 @@ export interface operations {
             };
         };
     };
+    delete_submission_submissions__submission_id__delete: {
+        parameters: {
+            query: {
+                /** @description Why it is being deleted; kept in the audit trail */
+                reason: string;
+                /** @description Required to delete a private security report that is not closed */
+                acknowledge_open_security_report?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     triage_submissions__submission_id__patch: {
         parameters: {
             query?: never;
@@ -15601,6 +16033,398 @@ export interface operations {
                 };
             };
             /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    integrations_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_submissions__submission_id__publications_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationPreview"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publications_submissions__submission_id__publications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_submissions__submission_id__publications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    sync_submissions__submission_id__publications__provider__sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+                /** @description The issue tracker: `github` */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
             429: {
                 headers: {
                     [name: string]: unknown;

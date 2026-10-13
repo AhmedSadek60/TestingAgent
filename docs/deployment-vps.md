@@ -109,6 +109,21 @@ docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /roo
 
 The password is typed at a hidden prompt. On a server that anyone can reach, consider `accounts.registration: approval` or `closed`.
 
+## What is kept, and for how long
+
+Submissions, their files, diagnostic information and handoff packages are kept until an administrator deletes them or the
+owner sets a retention period (`feedback.retention`, empty by default: [feedback-support.md](feedback-support.md#retention-and-deletion)).
+To see what a policy would remove before it does, on the server:
+
+```bash
+docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /root/agentlab/.env \
+  exec api agentlab feedback purge --dry-run
+```
+
+Take a backup (`/root/agentlab/backup.sh`) before the first real pass: a deleted submission is gone, and a backup is the only way back.
+Publishing to GitHub is off until `feedback.integrations.github` is set; its token is read from the environment file, never from the
+repository.
+
 ## Who is calling
 
 Behind Caddy the API would see every request as coming from Caddy. `docker/compose.vps.yaml` therefore sets

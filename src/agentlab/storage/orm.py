@@ -503,6 +503,38 @@ class SubmissionRelationRow(Entity):
     __table_args__ = (UniqueConstraint("from_id", "to_id", "kind", name="uq_submission_relation"),)
 
 
+class ExternalIssueLinkRow(Entity):
+    """The issue a submission was published to in another system. ``status`` is ``publishing`` (the call was started),
+    ``published`` or ``failed``. One per submission and provider: a retry cannot make a second one."""
+
+    __tablename__ = "external_issue_links"
+    submission_id: Mapped[str] = _fk("submissions")
+    provider: Mapped[str] = mapped_column(String(20))
+    key: Mapped[str] = mapped_column(String(64))  # names the publication, so a retry finds an issue that was made
+    external_id: Mapped[str] = mapped_column(String(64), default="")
+    external_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    url: Mapped[str] = mapped_column(String(300), default="")
+    external_state: Mapped[str] = mapped_column(String(10), default="open")
+    error_kind: Mapped[str] = mapped_column(String(20), default="")
+    error_detail: Mapped[str] = mapped_column(String(300), default="")
+    submission_version: Mapped[int] = mapped_column(Integer, default=1)
+    content_hash: Mapped[str] = mapped_column(String(64), default="")
+    repository: Mapped[str] = mapped_column(String(200), default="")
+    published_by_label: Mapped[str] = mapped_column(String(80), default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    synced_status: Mapped[str] = mapped_column(String(40), default="")
+    __table_args__ = (UniqueConstraint("submission_id", "provider", name="uq_external_issue_link"),)
+
+
+class SubmissionCounterRow(Base):
+    """The highest number given out for a type and a year, so that a number of a deleted submission is never given again."""
+
+    __tablename__ = "submission_counters"
+    type: Mapped[str] = mapped_column(String(10), primary_key=True)
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer)
+
+
 class SubmissionAuditRow(Entity):
     """Important actions on submissions. No foreign key: the record outlives the submission it is about."""
 

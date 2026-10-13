@@ -76,6 +76,9 @@ async def test_a_person_files_a_feature_request_and_follows_it_until_it_is_done(
         options = (await alice.get("/submissions/options")).json()
         assert FEATURE["category"] in options["feature_categories"] and options["can_triage"] is False
         assert options["feature_statuses"][0] == "Submitted" and options["max_text_chars"] == 20_000
+        assert "png" in options["attachment_extensions"] and "exe" not in options["attachment_extensions"]
+        assert (options["attachment_max_files"], options["attachment_max_file_mb"]) == (10, 25)
+        assert options["attachment_max_total_mb"] == 100
 
         made = await alice.post("/submissions", json=FEATURE, headers=ah)
         assert made.status_code == 201, made.text
@@ -349,7 +352,7 @@ async def test_the_api_description_lists_every_feedback_operation_with_its_error
             if path.startswith("/submissions")
             for method, op in methods.items()
         }
-        assert len(found) == 26, sorted(found)
+        assert len(found) == 31, sorted(found)
         for (method, path), op in found.items():
             assert op["tags"] == ["Feedback & Support"], (method, path)
             assert op["summary"] and len(op["description"]) > 40, (method, path)
