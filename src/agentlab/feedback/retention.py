@@ -34,7 +34,7 @@ from agentlab.core.ids import utcnow
 from agentlab.feedback.attachments import KIND_ORIGINAL, KIND_SANITIZED
 from agentlab.feedback.diagnostics import KIND as KIND_DIAGNOSTIC
 from agentlab.feedback.handoff import KIND_TASK, KIND_ZIP
-from agentlab.feedback.models import DeletionOut, RetentionReport
+from agentlab.feedback.models import DeletionOut, RetentionReport, clean_text
 from agentlab.feedback.policy import Actor
 from agentlab.feedback.service import SubmissionService
 from agentlab.security.redactor import get_redactor
@@ -218,7 +218,7 @@ class RetentionService:
         """Delete one submission and everything attached to it. Administrators only."""
         if actor.role != "admin" or not actor.is_staff:
             raise PolicyBlocked("only an administrator may delete a submission")
-        reason = reason.strip()
+        reason = clean_text(reason)  # no NUL byte reaches the database: PostgreSQL refuses it
         if len(reason) < 3:
             raise UserError(
                 "say why it is being deleted (at least 3 characters): the reason is kept in the audit trail"
