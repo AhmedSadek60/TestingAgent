@@ -940,6 +940,37 @@ class DiagnosticsService:
             ids = list(s.scalars(select(C.id).where(C.submission_id == sub.id).order_by(C.created_at)))
         return [self.get(actor, i) for i in ids]
 
+    # =========================================================================================== for a package
+    def gather_for_export(self, actor: Actor, request: DiagnosticsRequest) -> list[Gathered]:
+        """Collect and mask, at full size, and keep nothing: for a package that is being built right now."""
+        gathered, _context = self._gather(actor, request)
+        return gathered
+
+    def attached_for_export(
+        self, actor: Actor, ident: str, *, client: str = ""
+    ) -> list[tuple[orm.DiagnosticCollectionRow, orm.DiagnosticItemRow, bytes]]:
+        """The items that were attached to a submission and kept, with their masked bytes. Maintainers only."""
+        if not actor.is_staff:
+            raise NotFoundError("no such collection")
+        C, Itm = orm.DiagnosticCollectionRow, orm.DiagnosticItemRow
+        with self.submissions.visible_submission(actor, ident, client=client) as (s, sub):
+            collections = list(s.scalars(select(C).where(C.submission_id == sub.id).order_by(C.created_at)))
+            found: list[tuple[orm.DiagnosticCollectionRow, orm.DiagnosticItemRow, str]] = []
+            for collection in collections:
+                for item in s.scalars(
+                    select(Itm).where(Itm.collection_id == collection.id).order_by(Itm.created_at, Itm.id)
+                ):
+                    if item.included and item.outcome == "collected" and item.artifact_id:
+                        found.append((collection, item, item.artifact_id))
+            s.expunge_all()
+        out = []
+        for collection, item, artifact in found:
+            try:
+                out.append((collection, item, self.artifacts.get(artifact)))
+            except InfrastructureError:
+                continue
+        return out
+
     # ============================================================================================ the bundle
     def bundle(self, actor: Actor, collection_id: str, *, client: str = "") -> tuple[bytes, str]:
         """The attached items as a ZIP: the files named in the specification, a manifest of what is and is not in it, and a

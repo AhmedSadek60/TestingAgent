@@ -25,3 +25,4 @@ accepted by human review, not by an agent.
 [0012](0012-feedback-visibility-in-the-query.md) — Feedback & Support: who may see a submission is a clause of the query — Proposed
 [0013](0013-attachments-are-private-evidence-with-a-sanitized-copy.md) — Attachments are private evidence; a text file also has a sanitized copy — Proposed
 [0014](0014-diagnostics-from-a-small-log-by-whose-they-are.md) — Diagnostics come from a small, masked log, selected by whose lines they are — Proposed
+[0015](0015-handoff-is-a-package-for-a-person-to-take.md) — A handoff is a quoted, masked package for a person to take; AgentLab never runs it — Proposed

@@ -458,6 +458,21 @@ class DiagnosticsConfig(Model):
     )
 
 
+class HandoffConfig(Model):
+    """The engineering handoff: a sanitized package that an authorised engineer can give to Claude Code."""
+
+    max_package_mb: int = Field(
+        default=50,
+        ge=1,
+        le=1024,
+        description="The largest package that may be built; attachments that do not fit are refused",
+    )
+    allow_internal_notes: bool = Field(
+        default=True,
+        description="Whether a maintainer may choose to put internal notes in a package. They are never put in by default",
+    )
+
+
 class FeedbackConfig(Model):
     """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
 
@@ -565,6 +580,7 @@ class FeedbackConfig(Model):
     attachments: AttachmentsConfig = Field(default_factory=AttachmentsConfig)
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    handoff: HandoffConfig = Field(default_factory=HandoffConfig)
     notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
         default_factory=_all_notifications,
         description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "

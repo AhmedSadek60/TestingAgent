@@ -8744,6 +8744,548 @@
           }
         }
       }
+    },
+    "/submissions/{submission_id}/handoffs/preview": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Preview an engineering handoff",
+        "description": "Every file the package would hold with its hash, what is left out and why, the warnings, and the text of `CLAUDE_CODE_TASK.md`, without building or keeping anything. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.",
+        "operationId": "preview_submissions__submission_id__handoffs_preview_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/handoffs": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Build an engineering handoff",
+        "description": "Builds the package: the structured record, the reproduction, the masked diagnostics, the attachments that may go in, context from the run the report names, a masking report and a privacy summary, a README, a manifest of SHA-256 hashes, and `CLAUDE_CODE_TASK.md` for Claude Code. Only what is available and authorised is put in, and what is not is listed with the reason. The export is recorded. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.",
+        "operationId": "generate_submissions__submission_id__handoffs_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "The handoffs built from a submission",
+        "description": "The packages built from this submission, newest first, each with what it holds, what was left out and its task file. Maintainers only.",
+        "operationId": "of_submission_submissions__submission_id__handoffs_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HandoffOut"
+                  },
+                  "title": "Response Of Submission Submissions  Submission Id  Handoffs Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handoffs/{handoff_id}": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read a handoff",
+        "description": "What a built package holds, what was left out, and the task text. Maintainers only, and only for a submission they may see.",
+        "operationId": "read_handoffs__handoff_id__get",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of a handoff package",
+              "title": "Handoff Id"
+            },
+            "description": "Id of a handoff package"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handoffs/{handoff_id}/download": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Download an engineering handoff as an archive",
+        "description": "The ZIP. Every download is recorded in the submission's audit trail. Maintainers only.",
+        "operationId": "download_handoffs__handoff_id__download_get",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of a handoff package",
+              "title": "Handoff Id"
+            },
+            "description": "Id of a handoff package"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archive",
+            "content": {
+              "application/zip": {}
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handoffs/{handoff_id}/task": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Download CLAUDE_CODE_TASK.md on its own",
+        "description": "The task file as Markdown, without the rest of the package. Recorded like the archive. Maintainers only.",
+        "operationId": "task_handoffs__handoff_id__task_get",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9\\-]+$",
+              "description": "Id of a handoff package",
+              "title": "Handoff Id"
+            },
+            "description": "Id of a handoff package"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The task file",
+            "content": {
+              "text/markdown": {}
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13047,6 +13589,260 @@
         ],
         "title": "FindingDelta",
         "description": "How one finding changed between two runs"
+      },
+      "HandoffFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Where it is in the package"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "diagnostic",
+              "sanitized_copy",
+              "original_evidence"
+            ],
+            "title": "Kind",
+            "description": "generated: written by AgentLab for this package; diagnostic: a collected, masked item; sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "Its size in bytes"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "Its SHA-256"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "What it was made from"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "What to know about it (for example, that it is unsanitized)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "kind",
+          "size",
+          "sha256",
+          "source",
+          "note"
+        ],
+        "title": "HandoffFile",
+        "description": "One file of a package."
+      },
+      "HandoffIn": {
+        "properties": {
+          "exclude_attachments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Exclude Attachments",
+            "description": "Attachment ids to leave out of the package"
+          },
+          "include_originals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Include Originals",
+            "description": "Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in as they were uploaded. Each is marked as unsanitized in the package"
+          },
+          "include_internal_notes": {
+            "type": "boolean",
+            "title": "Include Internal Notes",
+            "description": "Put the maintainers' internal notes in the package (they are not by default). Must be the JSON value true or false, not a string or a number",
+            "default": false
+          },
+          "include_diagnostics": {
+            "type": "boolean",
+            "title": "Include Diagnostics",
+            "description": "Put in the diagnostics attached to the submission, when there are any. Must be the JSON value true or false",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HandoffIn",
+        "description": "What goes into an engineering handoff package, beyond what goes in by default."
+      },
+      "HandoffLeftOut": {
+        "properties": {
+          "what": {
+            "type": "string",
+            "title": "What",
+            "description": "What it is"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it is not in the package"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "what",
+          "reason"
+        ],
+        "title": "HandoffLeftOut",
+        "description": "Something that is not in the package, and why. Nothing stands in for it."
+      },
+      "HandoffOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Its id, or null for a preview that was not built"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "generated"
+            ],
+            "title": "Status",
+            "description": "preview: nothing was built or kept"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id",
+            "description": "The submission it was made from"
+          },
+          "number": {
+            "type": "string",
+            "title": "Number",
+            "description": "The submission's number"
+          },
+          "submission_version": {
+            "type": "integer",
+            "title": "Submission Version",
+            "description": "The version of the submission it reflects"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "When it was built"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "Who asked for it"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/HandoffFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Every file in the package, with its hash"
+          },
+          "left_out": {
+            "items": {
+              "$ref": "#/components/schemas/HandoffLeftOut"
+            },
+            "type": "array",
+            "title": "Left Out",
+            "description": "What was not put in, and why"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "What the engineer and the maintainer should know before using it"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "The size of the ZIP in bytes (0 for a preview)"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256",
+            "description": "The SHA-256 of the ZIP"
+          },
+          "external_sharing_blocked": {
+            "type": "boolean",
+            "title": "External Sharing Blocked",
+            "description": "True when something in it still needs a person's review before it leaves AgentLab"
+          },
+          "includes_unsanitized": {
+            "type": "boolean",
+            "title": "Includes Unsanitized",
+            "description": "True when it holds a file that was put in as uploaded"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task",
+            "description": "The text of CLAUDE_CODE_TASK.md, for review before it is downloaded"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "submission_id",
+          "number",
+          "submission_version",
+          "created_at",
+          "created_by",
+          "files",
+          "left_out",
+          "warnings",
+          "size",
+          "sha256",
+          "external_sharing_blocked",
+          "includes_unsanitized",
+          "task"
+        ],
+        "title": "HandoffOut",
+        "description": "A package, or a preview of one."
       },
       "Health": {
         "properties": {

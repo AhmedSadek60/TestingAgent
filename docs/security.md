@@ -585,6 +585,36 @@ a small one, and that is a new store of data about people's activity, so it is b
 Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
 `tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
 
+### The engineering handoff
+
+A package is built so that it can be given to a model, which makes it the place where what a stranger wrote is most likely to be
+read as an instruction. It is built to be read as evidence, and to be taken by someone authorised.
+
+* **Nothing runs and nothing is sent.** Building a package is reading records and writing one restricted file. It starts no
+  process and opens no connection (a test makes both fail the test), and Claude Code is never started by AgentLab.
+* **Maintainers only, and as hidden as the report.** A reporter is refused by role. A maintainer who may not see a private
+  report gets, for its package, what an id that was never issued gets. Building a package from a private report is recorded
+  as reading it.
+* **Everything a person or a system wrote is quoted, and cannot close its own quote.** The fence is longer than any run of
+  backticks in the text; a version, a build or a file name is a quoted, escaped, single-line string or is made safe
+  (letters, digits, `.`, `-`, `_`); the stated acceptance criteria are quoted one to a line; a heading, a table row or a list
+  item in the package never comes from a person's words. The task file says in its own words that all of it is untrusted and
+  not to be obeyed or executed. This reduces the risk and does not remove it: a model can still be misled by text it is
+  asked to read, which is why the package is for an authorised engineer and not for a public place.
+* **Masked once, recorded by kind.** Every text goes through the diagnostic redactor; the report says where and what kind, never
+  the value. A text the second inspection doubts blocks external sharing and says so.
+* **Not by default:** internal notes and internal files (and a server can refuse them altogether), anything that cannot be
+  sanitized (an image, a document, an archive: each must be chosen, and is marked unsanitized), and a text too large to inspect.
+* **Honest about itself.** Generated files are marked generated and are never presented as evidence; what is unknown is
+  written as unknown, and no empty file stands in for something that is not available. Every build and every download is
+  recorded, with counts and never with text.
+* **Bounded and private.** At most `feedback.handoff.max_package_mb`; kept as a restricted artifact; served with
+  `no-store`, `nosniff` and a sandboxing policy; built in a fixed order with fixed file times, so the same submission built at
+  the same moment gives the same bytes (the build time is in `manifest.json` and nowhere else).
+
+Tested by `tests/unit/test_feedback_handoff.py`, `tests/api/test_feedback_handoff_api.py` and
+`tests/security/test_handoff_security.py`.
+
 What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
 every other person's non-private submission and, with the role, every private one; an image or a PDF can show a secret that
 nothing can mask; no scanner ships with AgentLab; the server's log is the server's own (a line another library wrote is not

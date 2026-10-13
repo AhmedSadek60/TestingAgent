@@ -606,3 +606,25 @@ class DiagnosticItemRow(Entity):
     included: Mapped[bool] = mapped_column(default=True)
     redaction_status: Mapped[str] = mapped_column(String(16), default="clean")
     redaction_report: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+
+
+class EngineeringHandoffRow(Entity):
+    """A package built for an engineer from one submission, as the submission was at that version.
+
+    The package is a restricted artifact; this row says what is in it and who asked for it. ``status`` is ``generated``."""
+
+    __tablename__ = "engineering_handoffs"
+    submission_id: Mapped[str] = _fk("submissions")
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_label: Mapped[str] = mapped_column(String(80), default="")
+    submission_version: Mapped[int] = mapped_column(Integer, default=1)
+    options: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    artifact_id: Mapped[str] = mapped_column(String(80))
+    task_artifact_id: Mapped[str] = mapped_column(String(80))
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    external_sharing_blocked: Mapped[bool] = mapped_column(default=False)
+    includes_unsanitized: Mapped[bool] = mapped_column(default=False)

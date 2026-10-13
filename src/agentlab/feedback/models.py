@@ -709,3 +709,71 @@ class AttachDiagnosticsIn(_Clean):
         description="Must be the JSON value true (not a string or a number): the person has read the consent text and "
         "agrees to share what is attached"
     )
+
+
+# ============================================================================================================ handoff
+class HandoffIn(_Clean):
+    """What goes into an engineering handoff package, beyond what goes in by default."""
+
+    exclude_attachments: list[str] = Field(
+        default_factory=list, max_length=50, description="Attachment ids to leave out of the package"
+    )
+    include_originals: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in "
+        "as they were uploaded. Each is marked as unsanitized in the package",
+    )
+    include_internal_notes: StrictBool = Field(
+        default=False,
+        description="Put the maintainers' internal notes in the package (they are not by default). Must be the JSON "
+        "value true or false, not a string or a number",
+    )
+    include_diagnostics: StrictBool = Field(
+        default=True,
+        description="Put in the diagnostics attached to the submission, when there are any. Must be the JSON value "
+        "true or false",
+    )
+
+
+class HandoffFile(Model):
+    """One file of a package."""
+
+    path: str = Field(description="Where it is in the package")
+    kind: Literal["generated", "diagnostic", "sanitized_copy", "original_evidence"] = Field(
+        description="generated: written by AgentLab for this package; diagnostic: a collected, masked item; "
+        "sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded"
+    )
+    size: int = Field(description="Its size in bytes")
+    sha256: str = Field(description="Its SHA-256")
+    source: str = Field(description="What it was made from")
+    note: str = Field(description="What to know about it (for example, that it is unsanitized)")
+
+
+class HandoffLeftOut(Model):
+    """Something that is not in the package, and why. Nothing stands in for it."""
+
+    what: str = Field(description="What it is")
+    reason: str = Field(description="Why it is not in the package")
+
+
+class HandoffOut(Model):
+    """A package, or a preview of one."""
+
+    id: str | None = Field(description="Its id, or null for a preview that was not built")
+    status: Literal["preview", "generated"] = Field(description="preview: nothing was built or kept")
+    submission_id: str = Field(description="The submission it was made from")
+    number: str = Field(description="The submission's number")
+    submission_version: int = Field(description="The version of the submission it reflects")
+    created_at: datetime | None = Field(description="When it was built")
+    created_by: str | None = Field(description="Who asked for it")
+    files: list[HandoffFile] = Field(description="Every file in the package, with its hash")
+    left_out: list[HandoffLeftOut] = Field(description="What was not put in, and why")
+    warnings: list[str] = Field(description="What the engineer and the maintainer should know before using it")
+    size: int = Field(description="The size of the ZIP in bytes (0 for a preview)")
+    sha256: str | None = Field(description="The SHA-256 of the ZIP")
+    external_sharing_blocked: bool = Field(
+        description="True when something in it still needs a person's review before it leaves AgentLab"
+    )
+    includes_unsanitized: bool = Field(description="True when it holds a file that was put in as uploaded")
+    task: str = Field(description="The text of CLAUDE_CODE_TASK.md, for review before it is downloaded")
