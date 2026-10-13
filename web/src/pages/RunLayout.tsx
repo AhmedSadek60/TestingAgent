@@ -3,6 +3,7 @@ import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-route
 import { describeError } from "../api/errors";
 import type { RunDetail } from "../api/types";
 import { Icon } from "../components/Icon";
+import { reportLink } from "../lib/feedback";
 import { ConfirmDialog, ErrorNote, Field, Loading, NavTabs, Notice, PageHeader, ScoreRing, StatusBadge, useToast } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 import { useNow } from "../hooks/useNow";
@@ -82,6 +83,9 @@ export function RunLayout() {
                 <Icon name="stop" size={16} /> {run.status === "pending" ? "Withdraw" : run.status === "cancelling" ? "Stopping…" : "Stop run"}
               </button>
             )}
+            <Link className="btn" to={reportLink({ related_run_id: run.id, related_target_id: run.target_id ?? "", ui_screen: "Test run" })}>
+              <Icon name="alert" size={16} /> Report an issue with this run
+            </Link>
             {!active && run.target_id && (
               <Link className="btn" to={`/new?target=${encodeURIComponent(run.target_id)}&baseline=${encodeURIComponent(run.id)}`} title="Replay this run's tests and report what changed">
                 <Icon name="compare" size={16} /> Run again as regression

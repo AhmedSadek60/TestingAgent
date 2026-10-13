@@ -2,7 +2,32 @@ import type { ApiClient } from "./client";
 import type {
   Account,
   AccountEvent,
+  Assignee,
+  Deletion,
+  Integration,
+  Publication,
+  PublicationPreview,
+  Attachment,
+  AttachmentPreview,
+  AuditEvent,
   AuthOptions,
+  CommentRequest,
+  DiagnosticCollection,
+  DiagnosticsAvailable,
+  DiagnosticsRequest,
+  FeedbackOptions,
+  Handoff,
+  HandoffRequest,
+  RelationRequest,
+  SimilarSubmission,
+  StatusChange,
+  SubmissionChange,
+  SubmissionComment,
+  SubmissionCounts,
+  SubmissionDetail,
+  SubmissionPage,
+  SubmissionQuery,
+  SubmissionRequest,
   CreateUserRequest,
   Me,
   RegisterRequest,
@@ -154,6 +179,75 @@ export function createApi(client: ApiClient) {
 
     compare: (runA: string, runB: string, signal?: AbortSignal) =>
       client.get<Comparison>("/comparisons", { query: { run_a: runA, run_b: runB }, signal }),
+
+    // feedback & support
+    feedbackOptions: (signal?: AbortSignal) => client.get<FeedbackOptions>("/submissions/options", { signal }),
+    feedbackSummary: (signal?: AbortSignal) => client.get<SubmissionCounts>("/submissions/summary", { signal }),
+    similarSubmissions: (type: "feature" | "issue", title: string, category?: string, signal?: AbortSignal) =>
+      client.get<SimilarSubmission[]>("/submissions/similar", { query: { type, title, category }, signal }),
+    assignees: (signal?: AbortSignal) => client.get<Assignee[]>("/submissions/assignees", { signal }),
+    createSubmission: (body: SubmissionRequest) => client.post<SubmissionDetail>("/submissions", body),
+    submissions: (query: SubmissionQuery = {}, signal?: AbortSignal) =>
+      client.get<SubmissionPage>("/submissions", { query: { ...query, type: query.type || undefined }, signal }),
+    submission: (ident: string, signal?: AbortSignal) => client.get<SubmissionDetail>(`/submissions/${id(ident)}`, { signal }),
+    changeSubmission: (ident: string, body: SubmissionChange) => client.patch<SubmissionDetail>(`/submissions/${id(ident)}`, body),
+    comment: (ident: string, body: CommentRequest) => client.post<SubmissionComment>(`/submissions/${id(ident)}/comments`, body),
+    history: (ident: string, signal?: AbortSignal) => client.get<StatusChange[]>(`/submissions/${id(ident)}/history`, { signal }),
+    markSeen: (ident: string) => client.post<void>(`/submissions/${id(ident)}/seen`),
+    relate: (ident: string, body: RelationRequest) => client.post<SubmissionDetail>(`/submissions/${id(ident)}/relations`, body),
+    unrelate: (ident: string, relationId: string) =>
+      client.delete<SubmissionDetail>(`/submissions/${id(ident)}/relations/${id(relationId)}`),
+    auditTrail: (ident: string, signal?: AbortSignal) => client.get<AuditEvent[]>(`/submissions/${id(ident)}/audit`, { signal }),
+
+    attachments: (ident: string, signal?: AbortSignal) => client.get<Attachment[]>(`/submissions/${id(ident)}/attachments`, { signal }),
+    uploadAttachment: (
+      ident: string,
+      file: File,
+      options: { visibility?: "public" | "internal"; onProgress?: (loaded: number, total: number) => void; signal?: AbortSignal } = {},
+    ) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (options.visibility) form.append("visibility", options.visibility);
+      return client.upload<Attachment>(`/submissions/${id(ident)}/attachments`, form, {
+        onProgress: options.onProgress,
+        signal: options.signal,
+      });
+    },
+    attachmentPreview: (ident: string, attachmentId: string, signal?: AbortSignal) =>
+      client.get<AttachmentPreview>(`/submissions/${id(ident)}/attachments/${id(attachmentId)}/preview`, { signal }),
+    attachmentFile: (ident: string, attachmentId: string, version: "original" | "sanitized" = "original") =>
+      client.blob(`/submissions/${id(ident)}/attachments/${id(attachmentId)}/download`, { query: { version } }),
+    deleteAttachment: (ident: string, attachmentId: string) =>
+      client.delete<void>(`/submissions/${id(ident)}/attachments/${id(attachmentId)}`),
+
+    diagnosticsAvailable: (query: { run_id?: string; test_id?: string; trace_id?: string } = {}, signal?: AbortSignal) =>
+      client.get<DiagnosticsAvailable>("/diagnostics/available", { query, signal }),
+    collectDiagnostics: (body: DiagnosticsRequest) => client.post<DiagnosticCollection>("/diagnostics/collect", body),
+    attachDiagnostics: (ident: string, body: { collection_id: string; include?: string[] | null; consent: true }) =>
+      client.post<DiagnosticCollection>(`/submissions/${id(ident)}/diagnostics`, body),
+    submissionDiagnostics: (ident: string, signal?: AbortSignal) =>
+      client.get<DiagnosticCollection[]>(`/submissions/${id(ident)}/diagnostics`, { signal }),
+    diagnosticBundle: (collectionId: string) => client.blob(`/diagnostics/${id(collectionId)}/download`),
+
+    integrations: (signal?: AbortSignal) => client.get<Integration[]>("/integrations", { signal }),
+    previewPublication: (ident: string, provider: string) =>
+      client.post<PublicationPreview>(`/submissions/${id(ident)}/publications/preview`, { provider }),
+    publish: (ident: string, body: { provider: string; content_hash: string; acknowledge_unreviewed?: boolean }) =>
+      client.post<Publication>(`/submissions/${id(ident)}/publications`, body),
+    publications: (ident: string, signal?: AbortSignal) =>
+      client.get<Publication[]>(`/submissions/${id(ident)}/publications`, { signal }),
+    syncPublication: (ident: string, provider: string) =>
+      client.post<Publication>(`/submissions/${id(ident)}/publications/${id(provider)}/sync`),
+    deleteSubmission: (ident: string, reason: string, acknowledgeOpenSecurityReport = false) =>
+      client.delete<Deletion>(`/submissions/${id(ident)}`, {
+        query: { reason, acknowledge_open_security_report: acknowledgeOpenSecurityReport || undefined },
+      }),
+
+    previewHandoff: (ident: string, body: HandoffRequest) => client.post<Handoff>(`/submissions/${id(ident)}/handoffs/preview`, body),
+    createHandoff: (ident: string, body: HandoffRequest) => client.post<Handoff>(`/submissions/${id(ident)}/handoffs`, body),
+    handoffs: (ident: string, signal?: AbortSignal) => client.get<Handoff[]>(`/submissions/${id(ident)}/handoffs`, { signal }),
+    handoffPackage: (handoffId: string) => client.blob(`/handoffs/${id(handoffId)}/download`),
+    handoffTask: (handoffId: string) => client.blob(`/handoffs/${id(handoffId)}/task`),
   };
 }
 

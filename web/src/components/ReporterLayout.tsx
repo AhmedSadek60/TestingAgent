@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useSession } from "../session";
 import { Icon } from "./Icon";
@@ -17,6 +17,19 @@ export function ReporterLayout() {
             </span>
             AgentLab
           </span>
+          {!me?.must_change_password && (
+            <nav className="row" aria-label="Feedback & Support">
+              <NavLink to="/" end className={({ isActive }) => `btn ghost${isActive ? " active" : ""}`}>
+                Feedback & Support
+              </NavLink>
+              <NavLink to="/feedback/submissions" className={({ isActive }) => `btn ghost${isActive ? " active" : ""}`}>
+                My submissions
+              </NavLink>
+              <NavLink to="/account" className={({ isActive }) => `btn ghost${isActive ? " active" : ""}`}>
+                Your account
+              </NavLink>
+            </nav>
+          )}
           <span className="grow" />
           {me?.username && <span className="muted small">Signed in as {me.display_name ?? me.username}</span>}
           <button

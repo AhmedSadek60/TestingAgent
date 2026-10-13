@@ -126,8 +126,8 @@ function RegisterForm({ minLength, approval }: { minLength: number; approval: bo
     >
       <p className="muted">
         {approval ? "An administrator has to approve a new account before it can be used. " : ""}
-        An account is for Feedback &amp; Support: feature requests and issue reports. Those pages are not in this interface yet, so
-        for now an account only lets you sign in. No e-mail is sent to you: an administrator resets a forgotten password.
+        An account is for Feedback &amp; Support: you can request features, report issues and follow what happens to them. No e-mail
+        is sent to you: an administrator resets a forgotten password.
       </p>
       <div className="field">
         <label htmlFor="register-username">User name</label>

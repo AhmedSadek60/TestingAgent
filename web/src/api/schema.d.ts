@@ -1194,7 +1194,11 @@ export interface paths {
         get: operations["read_submissions__submission_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a submission
+         * @description Deletes the submission and everything attached to it: its discussion, history, files, diagnostic information and handoff packages, and the stored files nothing else uses. Administrators only, and the reason is kept in the audit trail (masked), with counts and never text. A private security report that is not closed is deleted only when `acknowledge_open_security_report` is true, because its evidence may still be needed. A package that was downloaded before cannot be recalled: the answer says how many times that happened.
+         */
+        delete: operations["delete_submission_submissions__submission_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -1410,6 +1414,338 @@ export interface paths {
         get: operations["download_submissions__submission_id__attachments__attachment_id__download_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What diagnostic information can be collected
+         * @description Every category AgentLab knows about, whether it can be collected here and now, and why not when it cannot (a log that is switched off, evaluation data that only maintainers may see, a screenshot AgentLab cannot take). Also the time windows, the limits, and the text the person agrees to before attaching anything.
+         */
+        get: operations["available_diagnostics_available_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview what would be collected
+         * @description Collects the chosen categories, masks them and shows the result, item by item, with what was masked and where, and keeps nothing. A category that cannot be collected is listed with the reason; it never stops the others.
+         */
+        post: operations["preview_diagnostics_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Collect diagnostic information
+         * @description Collects and masks the chosen categories and keeps the masked result as a draft for a limited time, so it can be reviewed and then attached to a submission. Only the masked text is kept. What is collected is limited to the caller's own requests, system-level warnings and, for a maintainer, the named run.
+         */
+        post: operations["collect_diagnostics_collect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/redact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * See text masked before pasting it
+         * @description Masks the text the way a collection would and says what was masked and where, without keeping anything. Use it on a snippet before including it in a report.
+         */
+        post: operations["redact_preview_diagnostics_redact_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/{collection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a collection
+         * @description A draft the caller collected, or a collection attached to a submission the caller may see.
+         */
+        get: operations["read_diagnostics__collection_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/diagnostics/{collection_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a collection as an archive
+         * @description A ZIP of the included items under the names of the specification, with a manifest that says what was collected, what was not available, what was left out and what was masked, and a README. Every file is a generated, masked copy. Downloads of an attached collection are recorded.
+         */
+        get: operations["download_diagnostics__collection_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The diagnostics attached to a submission
+         * @description The collections attached to the submission, with what each holds and what was masked. A reporter sees what they attached; a maintainer sees what was attached to any submission they may see.
+         */
+        get: operations["attached_submissions__submission_id__diagnostics_get"];
+        put?: never;
+        /**
+         * Attach diagnostics to a submission
+         * @description Attaches a draft collection to a submission the caller may see, with their explicit consent (`consent` must be true). Items left out of `include` are deleted, not kept. It is refused when the collection is not the caller's, or has expired.
+         */
+        post: operations["attach_submissions__submission_id__diagnostics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/handoffs/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview an engineering handoff
+         * @description Every file the package would hold with its hash, what is left out and why, the warnings, and the text of `CLAUDE_CODE_TASK.md`, without building or keeping anything. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.
+         */
+        post: operations["preview_submissions__submission_id__handoffs_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The handoffs built from a submission
+         * @description The packages built from this submission, newest first, each with what it holds, what was left out and its task file. Maintainers only.
+         */
+        get: operations["of_submission_submissions__submission_id__handoffs_get"];
+        put?: never;
+        /**
+         * Build an engineering handoff
+         * @description Builds the package: the structured record, the reproduction, the masked diagnostics, the attachments that may go in, context from the run the report names, a masking report and a privacy summary, a README, a manifest of SHA-256 hashes, and `CLAUDE_CODE_TASK.md` for Claude Code. Only what is available and authorised is put in, and what is not is listed with the reason. The export is recorded. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.
+         */
+        post: operations["generate_submissions__submission_id__handoffs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a handoff
+         * @description What a built package holds, what was left out, and the task text. Maintainers only, and only for a submission they may see.
+         */
+        get: operations["read_handoffs__handoff_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an engineering handoff as an archive
+         * @description The ZIP. Every download is recorded in the submission's audit trail. Maintainers only.
+         */
+        get: operations["download_handoffs__handoff_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download CLAUDE_CODE_TASK.md on its own
+         * @description The task file as Markdown, without the rest of the package. Recorded like the archive. Maintainers only.
+         */
+        get: operations["task_handoffs__handoff_id__task_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issue trackers a submission can be published to
+         * @description Each tracker the server knows about, whether the owner switched it on, why not when it is not ready, and whether the caller's role may publish. Nothing is ever sent to a tracker that is off. Maintainers only.
+         */
+        get: operations["integrations_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a publication
+         * @description Exactly the title, text, labels and assignee that would be sent, what is deliberately left out, the warnings, and the `content_hash` to send back to publish exactly this. Nothing is sent. Only a sanitized summary is sent: never files, diagnostic information, handoff packages, the reporter's name, internal notes or the maintainers' ratings, and a private security report is never published.
+         */
+        post: operations["preview_submissions__submission_id__publications_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a submission was published
+         * @description The issues made from this submission, with their state and address. Maintainers only.
+         */
+        get: operations["publications_submissions__submission_id__publications_get"];
+        put?: never;
+        /**
+         * Publish a submission
+         * @description Makes an issue in the configured repository from what was previewed. The `content_hash` of the preview must come back, so that nothing is sent that was not read. A retry cannot make a second issue: a publication that exists is returned, and one that failed is retried with the same key. The result carries the issue's address. Only a sanitized summary is sent: never files, diagnostic information, handoff packages, the reporter's name, internal notes or the maintainers' ratings, and a private security report is never published.
+         */
+        post: operations["publish_submissions__submission_id__publications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/publications/{provider}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push a submission's status to its issue
+         * @description Comments the submission's status on the issue and closes the issue when the submission is closed. Only when the owner switched `status_sync` on, only when a maintainer asks, and only with the status's name: no text of the submission is sent.
+         */
+        post: operations["sync_submissions__submission_id__publications__provider__sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1994,6 +2330,27 @@ export interface components {
             name: string;
         };
         /**
+         * AttachDiagnosticsIn
+         * @description Attach a collection to a submission, with the person's consent.
+         */
+        AttachDiagnosticsIn: {
+            /**
+             * Collection Id
+             * @description The draft collection to attach
+             */
+            collection_id: string;
+            /**
+             * Include
+             * @description The ids of the items to attach; omitted means every item that was collected. Items left out are deleted
+             */
+            include?: string[] | null;
+            /**
+             * Consent
+             * @description Must be the JSON value true (not a string or a number): the person has read the consent text and agrees to share what is attached
+             */
+            consent: boolean;
+        };
+        /**
          * AttachmentOut
          * @description A file attached to a submission.
          */
@@ -2275,6 +2632,97 @@ export interface components {
              * @default default
              */
             project?: string;
+        };
+        /**
+         * BrowserConsoleEntry
+         * @description One error or warning the browser logged to its console.
+         */
+        BrowserConsoleEntry: {
+            /**
+             * Time
+             * @description When it was logged
+             */
+            time?: string | null;
+            /**
+             * Level
+             * @description Its level
+             * @default error
+             * @enum {string}
+             */
+            level?: "error" | "warn" | "warning" | "info" | "log" | "debug";
+            /**
+             * Message
+             * @description What was logged
+             */
+            message: string;
+            /**
+             * Source
+             * @description The script it came from
+             */
+            source?: string | null;
+            /**
+             * Line
+             * @description The line in that script
+             */
+            line?: number | null;
+        };
+        /**
+         * BrowserDiagnostics
+         * @description What the web interface has seen go wrong in this browser tab. Only the web interface can supply it.
+         */
+        BrowserDiagnostics: {
+            /**
+             * Console
+             * @description Console errors
+             */
+            console?: components["schemas"]["BrowserConsoleEntry"][];
+            /**
+             * Network
+             * @description Failed requests
+             */
+            network?: components["schemas"]["BrowserNetworkEntry"][];
+        };
+        /**
+         * BrowserNetworkEntry
+         * @description One request the browser made that failed or came back with an error.
+         */
+        BrowserNetworkEntry: {
+            /**
+             * Time
+             * @description When it was made
+             */
+            time?: string | null;
+            /**
+             * Method
+             * @description The HTTP method
+             * @default GET
+             */
+            method?: string;
+            /**
+             * Url
+             * @description The address. Secrets in a query string are masked
+             */
+            url: string;
+            /**
+             * Status
+             * @description The status, or null when there was no response
+             */
+            status?: number | null;
+            /**
+             * Error
+             * @description What the browser said went wrong
+             */
+            error?: string | null;
+            /**
+             * Request Id
+             * @description The X-Request-Id of the response, which names it in the server's log
+             */
+            request_id?: string | null;
+            /**
+             * Duration Ms
+             * @description How long it took
+             */
+            duration_ms?: number | null;
         };
         /**
          * BrowserStep
@@ -3085,6 +3533,302 @@ export interface components {
             };
         };
         /**
+         * DeletionOut
+         * @description What deleting a submission removed. Counts only.
+         */
+        DeletionOut: {
+            /**
+             * Number
+             * @description The number the submission had; it is not reused
+             */
+            number: string;
+            /**
+             * Attachments
+             * @description Attached files removed
+             */
+            attachments: number;
+            /**
+             * Diagnostic Items
+             * @description Diagnostic items removed
+             */
+            diagnostic_items: number;
+            /**
+             * Handoffs
+             * @description Handoff packages removed
+             */
+            handoffs: number;
+            /**
+             * Files Deleted
+             * @description Stored files actually deleted (a file another record still uses stays)
+             */
+            files_deleted: number;
+            /**
+             * Exported Copies
+             * @description How many times a package or a file of it was downloaded before: those copies cannot be recalled
+             */
+            exported_copies: number;
+        };
+        /**
+         * DiagnosticCollectionOut
+         * @description What was collected for a report, as the person can review it before attaching it.
+         */
+        DiagnosticCollectionOut: {
+            /**
+             * Id
+             * @description Its id, or null for a preview that was not kept
+             */
+            id: string | null;
+            /**
+             * Status
+             * @description preview: not kept; draft: kept until it is attached or expires; attached: part of a submission
+             * @enum {string}
+             */
+            status: "preview" | "draft" | "attached" | "expired";
+            /**
+             * Created At
+             * @description When it was collected
+             */
+            created_at: string | null;
+            /**
+             * Expires At
+             * @description When a draft is deleted if it was not attached
+             */
+            expires_at: string | null;
+            /**
+             * Window From
+             * @description The start of the period looked at
+             */
+            window_from: string | null;
+            /**
+             * Window To
+             * @description The end of the period looked at
+             */
+            window_to: string | null;
+            /**
+             * Items
+             * @description Every category asked for, collected or not
+             */
+            items: components["schemas"]["DiagnosticItemOut"][];
+            /**
+             * Warnings
+             * @description What could not be collected, and what needs a person's attention
+             */
+            warnings: string[];
+            /**
+             * Total Bytes
+             * @description The size of everything included
+             */
+            total_bytes: number;
+            /**
+             * Any Needs Review
+             * @description True when something must be reviewed before it is shared outside AgentLab
+             */
+            any_needs_review: boolean;
+            /**
+             * Submission Id
+             * @description The submission it is attached to
+             */
+            submission_id: string | null;
+            /**
+             * Consent At
+             * @description When the person agreed to share it
+             */
+            consent_at: string | null;
+        };
+        /**
+         * DiagnosticItemOut
+         * @description One thing that was collected, or that could not be.
+         */
+        DiagnosticItemOut: {
+            /**
+             * Id
+             * @description The item's id; pass it back in `include` to attach it
+             */
+            id: string;
+            /**
+             * Category
+             * @description Its category
+             */
+            category: string;
+            /**
+             * Path
+             * @description Where it sits in the downloadable bundle
+             */
+            path: string;
+            /**
+             * Source
+             * @description Where it came from
+             */
+            source: string;
+            /**
+             * Outcome
+             * @description collected; unavailable (nothing to collect, with the reason); failed (it could not be read); excluded (the person left it out)
+             * @enum {string}
+             */
+            outcome: "collected" | "unavailable" | "failed" | "excluded";
+            /**
+             * Detail
+             * @description Why, for anything but collected
+             */
+            detail: string;
+            /**
+             * Time From
+             * @description The start of the period it covers
+             */
+            time_from: string | null;
+            /**
+             * Time To
+             * @description The end of the period it covers
+             */
+            time_to: string | null;
+            /**
+             * Size
+             * @description Its size in bytes after masking
+             */
+            size: number;
+            /**
+             * Truncated
+             * @description True when it was cut to the size limit
+             */
+            truncated: boolean;
+            /**
+             * Included
+             * @description True when it will be attached
+             */
+            included: boolean;
+            /** @description What masking did to it */
+            redaction: components["schemas"]["RedactionSummary"];
+            /**
+             * Preview
+             * @description Its masked text, up to a limit, for review before anything is shared
+             */
+            preview: string | null;
+        };
+        /**
+         * DiagnosticSource
+         * @description One kind of diagnostic information, and whether AgentLab can supply it here.
+         */
+        DiagnosticSource: {
+            /**
+             * Id
+             * @description The category id to ask for
+             */
+            id: string;
+            /**
+             * Label
+             * @description What it is called
+             */
+            label: string;
+            /**
+             * Description
+             * @description What it contains and where it comes from
+             */
+            description: string;
+            /**
+             * Available
+             * @description True when it can be collected now with the details given
+             */
+            available: boolean;
+            /**
+             * Manual
+             * @description True when the person has to supply it themselves (a screenshot)
+             */
+            manual: boolean;
+            /**
+             * Reason
+             * @description Why it is not available, and what to do instead
+             */
+            reason: string | null;
+            /**
+             * Needs
+             * @description What has to be given for it to be available, such as run_id
+             */
+            needs: string[];
+        };
+        /**
+         * DiagnosticsAvailable
+         * @description What can be collected, how far back, and what the person is agreeing to.
+         */
+        DiagnosticsAvailable: {
+            /**
+             * Sources
+             * @description Every category, with whether it is available
+             */
+            sources: components["schemas"]["DiagnosticSource"][];
+            /**
+             * Windows
+             * @description The windows offered: last_5_minutes ... custom
+             */
+            windows: string[];
+            /**
+             * Max Window Minutes
+             * @description The longest custom window
+             */
+            max_window_minutes: number;
+            /**
+             * Consent Text
+             * @description What attaching diagnostics means; shown before the person agrees
+             */
+            consent_text: string;
+            /**
+             * Limits
+             * @description Sizes and counts that bound a collection
+             */
+            limits: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * DiagnosticsRequest
+         * @description What to collect, around which moment, and for which run.
+         */
+        DiagnosticsRequest: {
+            /**
+             * Categories
+             * @description The categories to collect, from `GET /diagnostics/available`
+             */
+            categories: ("environment" | "application_logs" | "backend_logs" | "errors" | "trace" | "run_metadata" | "test_summary" | "browser" | "screenshot")[];
+            /**
+             * Window
+             * @description How far back from the reference time to look
+             * @default last_15_minutes
+             * @enum {string}
+             */
+            window?: "last_5_minutes" | "last_15_minutes" | "last_30_minutes" | "custom";
+            /**
+             * Window From
+             * @description For a custom window: where it starts
+             */
+            window_from?: string | null;
+            /**
+             * Window To
+             * @description For a custom window: where it ends
+             */
+            window_to?: string | null;
+            /**
+             * Reference Time
+             * @description The moment the problem happened; the window ends here. Defaults to now
+             */
+            reference_time?: string | null;
+            /**
+             * Run Id
+             * @description The evaluation run it concerns (maintainers)
+             */
+            run_id?: string | null;
+            /**
+             * Test Id
+             * @description The test case it concerns (maintainers)
+             */
+            test_id?: string | null;
+            /**
+             * Trace Id
+             * @description The trace it concerns (maintainers)
+             */
+            trace_id?: string | null;
+            /** @description What the browser saw go wrong */
+            browser?: components["schemas"]["BrowserDiagnostics"] | null;
+        };
+        /**
          * DiscoverRequest
          * @description A target to fingerprint
          */
@@ -3679,6 +4423,26 @@ export interface components {
              * @description True when the caller is a maintainer and may change status and priority
              */
             can_triage: boolean;
+            /**
+             * Attachment Extensions
+             * @description The file types that may be attached
+             */
+            attachment_extensions: string[];
+            /**
+             * Attachment Max Files
+             * @description The most files one submission may have
+             */
+            attachment_max_files: number;
+            /**
+             * Attachment Max File Mb
+             * @description The largest single file, in megabytes
+             */
+            attachment_max_file_mb: number;
+            /**
+             * Attachment Max Total Mb
+             * @description What the files of one submission may add up to, in megabytes
+             */
+            attachment_max_total_mb: number;
         };
         /**
          * Finding
@@ -3845,6 +4609,169 @@ export interface components {
             is_security?: boolean;
         };
         /**
+         * HandoffFile
+         * @description One file of a package.
+         */
+        HandoffFile: {
+            /**
+             * Path
+             * @description Where it is in the package
+             */
+            path: string;
+            /**
+             * Kind
+             * @description generated: written by AgentLab for this package; diagnostic: a collected, masked item; sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded
+             * @enum {string}
+             */
+            kind: "generated" | "diagnostic" | "sanitized_copy" | "original_evidence";
+            /**
+             * Size
+             * @description Its size in bytes
+             */
+            size: number;
+            /**
+             * Sha256
+             * @description Its SHA-256
+             */
+            sha256: string;
+            /**
+             * Source
+             * @description What it was made from
+             */
+            source: string;
+            /**
+             * Note
+             * @description What to know about it (for example, that it is unsanitized)
+             */
+            note: string;
+        };
+        /**
+         * HandoffIn
+         * @description What goes into an engineering handoff package, beyond what goes in by default.
+         */
+        HandoffIn: {
+            /**
+             * Exclude Attachments
+             * @description Attachment ids to leave out of the package
+             */
+            exclude_attachments?: string[];
+            /**
+             * Include Originals
+             * @description Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in as they were uploaded. Each is marked as unsanitized in the package
+             */
+            include_originals?: string[];
+            /**
+             * Include Internal Notes
+             * @description Put the maintainers' internal notes in the package (they are not by default). Must be the JSON value true or false, not a string or a number
+             * @default false
+             */
+            include_internal_notes?: boolean;
+            /**
+             * Include Diagnostics
+             * @description Put in the diagnostics attached to the submission, when there are any. Must be the JSON value true or false
+             * @default true
+             */
+            include_diagnostics?: boolean;
+        };
+        /**
+         * HandoffLeftOut
+         * @description Something that is not in the package, and why. Nothing stands in for it.
+         */
+        HandoffLeftOut: {
+            /**
+             * What
+             * @description What it is
+             */
+            what: string;
+            /**
+             * Reason
+             * @description Why it is not in the package
+             */
+            reason: string;
+        };
+        /**
+         * HandoffOut
+         * @description A package, or a preview of one.
+         */
+        HandoffOut: {
+            /**
+             * Id
+             * @description Its id, or null for a preview that was not built
+             */
+            id: string | null;
+            /**
+             * Status
+             * @description preview: nothing was built or kept; generated: built and kept; purged: removed by the retention policy (the record of what it held stays, the files are gone)
+             * @enum {string}
+             */
+            status: "preview" | "generated" | "purged";
+            /**
+             * Submission Id
+             * @description The submission it was made from
+             */
+            submission_id: string;
+            /**
+             * Number
+             * @description The submission's number
+             */
+            number: string;
+            /**
+             * Submission Version
+             * @description The version of the submission it reflects
+             */
+            submission_version: number;
+            /**
+             * Created At
+             * @description When it was built
+             */
+            created_at: string | null;
+            /**
+             * Created By
+             * @description Who asked for it
+             */
+            created_by: string | null;
+            /**
+             * Files
+             * @description Every file in the package, with its hash
+             */
+            files: components["schemas"]["HandoffFile"][];
+            /**
+             * Left Out
+             * @description What was not put in, and why
+             */
+            left_out: components["schemas"]["HandoffLeftOut"][];
+            /**
+             * Warnings
+             * @description What the engineer and the maintainer should know before using it
+             */
+            warnings: string[];
+            /**
+             * Size
+             * @description The size of the ZIP in bytes (0 for a preview)
+             */
+            size: number;
+            /**
+             * Sha256
+             * @description The SHA-256 of the ZIP
+             */
+            sha256: string | null;
+            /**
+             * External Sharing Blocked
+             * @description True when something in it still needs a person's review before it leaves AgentLab
+             */
+            external_sharing_blocked: boolean;
+            /**
+             * Includes Unsanitized
+             * @description True when it holds a file that was put in as uploaded
+             */
+            includes_unsanitized: boolean;
+            /**
+             * Task
+             * @description The text of CLAUDE_CODE_TASK.md, for review before it is downloaded
+             */
+            task: string;
+        };
+        /**
          * Health
          * @description Whether the server is up
          */
@@ -3881,6 +4808,47 @@ export interface components {
              * @description Jobs waiting for a worker
              */
             queued: number;
+        };
+        /**
+         * IntegrationOut
+         * @description An issue tracker a submission could be published to, and whether it is switched on.
+         */
+        IntegrationOut: {
+            /**
+             * Provider
+             * @description Its name: github
+             */
+            provider: string;
+            /**
+             * Enabled
+             * @description True when the owner switched it on
+             */
+            enabled: boolean;
+            /**
+             * Ready
+             * @description True when it is enabled and complete, so a publication can be tried
+             */
+            ready: boolean;
+            /**
+             * Reason
+             * @description Why it is not ready, in words the owner can act on
+             */
+            reason: string | null;
+            /**
+             * Repository
+             * @description Where issues are made
+             */
+            repository: string | null;
+            /**
+             * May Publish
+             * @description True when the caller's role is one that may publish
+             */
+            may_publish: boolean;
+            /**
+             * Status Sync
+             * @description True when a maintainer may push a submission's status to its issue
+             */
+            status_sync: boolean;
         };
         /**
          * IssueDetailsIn
@@ -5083,6 +6051,234 @@ export interface components {
              * @description Why the adapter cannot be built, if it cannot
              */
             configured_error?: string | null;
+        };
+        /**
+         * PublicationOut
+         * @description The issue a submission was published to (or the attempt to).
+         */
+        PublicationOut: {
+            /**
+             * Id
+             * @description The record's id
+             */
+            id: string;
+            /**
+             * Provider
+             * @description The issue tracker
+             */
+            provider: string;
+            /**
+             * Repository
+             * @description Where the issue is
+             */
+            repository: string;
+            /**
+             * State
+             * @description publishing: started and not finished; published: the issue exists; failed: it was not made
+             * @enum {string}
+             */
+            state: "publishing" | "published" | "failed";
+            /**
+             * Url
+             * @description Where to open the issue; empty until it exists
+             */
+            url: string;
+            /**
+             * Number
+             * @description Its number in the tracker
+             */
+            number: number | null;
+            /**
+             * External State
+             * @description open or closed, as AgentLab last knew
+             */
+            external_state: string;
+            /**
+             * Error Kind
+             * @description Why it failed, when it did
+             */
+            error_kind: string;
+            /**
+             * Error Detail
+             * @description What to do about it, when it failed
+             */
+            error_detail: string;
+            /**
+             * Submission Version
+             * @description The version of the submission that was published
+             */
+            submission_version: number;
+            /**
+             * Published By
+             * @description Who published it
+             */
+            published_by: string;
+            /**
+             * Published At
+             * @description When
+             */
+            published_at: string | null;
+            /**
+             * Synced Status
+             * @description The status last pushed to the issue, when status sync is on
+             */
+            synced_status: string;
+        };
+        /**
+         * PublicationPreview
+         * @description Exactly what would be sent, and why it might not be. Nothing has been sent.
+         */
+        PublicationPreview: {
+            /**
+             * Provider
+             * @description The issue tracker
+             */
+            provider: string;
+            /**
+             * Repository
+             * @description Where the issue would be made
+             */
+            repository: string;
+            /**
+             * Title
+             * @description The issue's title
+             */
+            title: string;
+            /**
+             * Body
+             * @description The issue's text, as it would be sent
+             */
+            body: string;
+            /**
+             * Labels
+             * @description Labels that would be put on it
+             */
+            labels: string[];
+            /**
+             * Assignees
+             * @description Who it would be assigned to
+             */
+            assignees: string[];
+            /**
+             * Content Hash
+             * @description Send this back to publish exactly this and nothing else
+             */
+            content_hash: string;
+            /**
+             * Needs Review
+             * @description True when the second inspection still doubts a text: publishing then needs `acknowledge_unreviewed`
+             */
+            needs_review: boolean;
+            /**
+             * Warnings
+             * @description What the person should know before it is public
+             */
+            warnings: string[];
+            /**
+             * Left Out
+             * @description What is deliberately not in it: files, diagnostics, packages, names, notes
+             */
+            left_out: string[];
+            /** @description The publication that already exists for this submission, if any */
+            already: components["schemas"]["PublicationOut"] | null;
+        };
+        /**
+         * PublicationPreviewIn
+         * @description Which tracker to look at.
+         */
+        PublicationPreviewIn: {
+            /**
+             * Provider
+             * @description The issue tracker
+             * @constant
+             */
+            provider: "github";
+        };
+        /**
+         * PublishIn
+         * @description Publish what was previewed.
+         */
+        PublishIn: {
+            /**
+             * Provider
+             * @description The issue tracker
+             * @constant
+             */
+            provider: "github";
+            /**
+             * Content Hash
+             * @description The `content_hash` of the preview that was read
+             */
+            content_hash: string;
+            /**
+             * Acknowledge Unreviewed
+             * @description Must be the JSON value true to publish text the second inspection still doubts, after reading it
+             * @default false
+             */
+            acknowledge_unreviewed?: boolean;
+        };
+        /**
+         * RedactPreviewIn
+         * @description Text to see masked before it is pasted into a report.
+         */
+        RedactPreviewIn: {
+            /**
+             * Text
+             * @description The text to look at
+             */
+            text: string;
+        };
+        /**
+         * RedactPreviewOut
+         * @description The text as it would be kept, and what changed.
+         */
+        RedactPreviewOut: {
+            /**
+             * Text
+             * @description The masked text
+             */
+            text: string;
+            /** @description What was masked and where, without the values */
+            redaction: components["schemas"]["RedactionSummary"];
+            /**
+             * Mechanisms
+             * @description Which kinds of detection ran
+             */
+            mechanisms: string[];
+            /**
+             * Note
+             * @description What this does and does not tell you
+             */
+            note: string;
+        };
+        /**
+         * RedactionSummary
+         * @description What masking did to an item, without any value.
+         */
+        RedactionSummary: {
+            /**
+             * Status
+             * @description clean: nothing found; redacted: patterns matched and were masked; needs_review: the second inspection found more, so the item is not to leave AgentLab until a person has looked
+             * @enum {string}
+             */
+            status: "clean" | "redacted" | "needs_review";
+            /**
+             * Counts
+             * @description How many of each kind were masked
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Locations
+             * @description Where, as line numbers or JSON paths (at most 20)
+             */
+            locations: string[];
+            /**
+             * External Sharing Blocked
+             * @description True when it may not be shared outside AgentLab yet
+             */
+            external_sharing_blocked: boolean;
         };
         /**
          * RegisterRequest
@@ -12683,6 +13879,88 @@ export interface operations {
             };
         };
     };
+    delete_submission_submissions__submission_id__delete: {
+        parameters: {
+            query: {
+                /** @description Why it is being deleted; kept in the audit trail */
+                reason: string;
+                /** @description Required to delete a private security report that is not closed */
+                acknowledge_open_security_report?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     triage_submissions__submission_id__patch: {
         parameters: {
             query?: never;
@@ -13784,6 +15062,1369 @@ export interface operations {
                 };
             };
             /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    available_diagnostics_available_get: {
+        parameters: {
+            query?: {
+                /** @description The evaluation run it concerns */
+                run_id?: string | null;
+                /** @description The test case it concerns */
+                test_id?: string | null;
+                /** @description The trace it concerns */
+                trace_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticsAvailable"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_diagnostics_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    collect_diagnostics_collect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    redact_preview_diagnostics_redact_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedactPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedactPreviewOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_diagnostics__collection_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a collection */
+                collection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_diagnostics__collection_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a collection */
+                collection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attached_submissions__submission_id__diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    attach_submissions__submission_id__diagnostics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachDiagnosticsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_submissions__submission_id__handoffs_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    of_submission_submissions__submission_id__handoffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_submissions__submission_id__handoffs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_handoffs__handoff_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_handoffs__handoff_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    task_handoffs__handoff_id__task_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The task file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": unknown;
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    integrations_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_submissions__submission_id__publications_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationPreview"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publications_submissions__submission_id__publications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_submissions__submission_id__publications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    sync_submissions__submission_id__publications__provider__sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+                /** @description The issue tracker: `github` */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description What would be published is not what was previewed, or a publication is in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The tracker's rate limit was reached; `Retry-After` says when to try again */
             429: {
                 headers: {
                     [name: string]: unknown;

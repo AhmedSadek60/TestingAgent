@@ -214,6 +214,10 @@ class SubmissionService:
             security_category=cfg.security_category,
             max_text_chars=TEXT,
             can_triage=actor.is_staff,
+            attachment_extensions=list(cfg.attachments.allowed_extensions),
+            attachment_max_files=cfg.attachments.max_files,
+            attachment_max_file_mb=cfg.attachments.max_file_mb,
+            attachment_max_total_mb=cfg.attachments.max_total_mb,
         )
 
     # ---------------------------------------------------------------------------------------------------- helpers
@@ -519,7 +523,14 @@ class SubmissionService:
         S = orm.SubmissionRow
         feature = data.type == "feature"
         year = now.year
-        seq = (s.scalar(select(func.max(S.seq)).where(S.type == data.type, S.year == year)) or 0) + 1
+        # the highest number given out, which may be above any that is still there (a submission can be deleted)
+        counter = s.get(orm.SubmissionCounterRow, (data.type, year))
+        floor = s.scalar(select(func.max(S.seq)).where(S.type == data.type, S.year == year)) or 0
+        seq = max(counter.last_seq if counter else 0, floor) + 1
+        if counter is None:
+            s.add(orm.SubmissionCounterRow(type=data.type, year=year, last_seq=seq))
+        else:
+            counter.last_seq = seq
         row = S(
             human_id=f"{'FR' if feature else 'IR'}-{year}-{seq:05d}",
             type=data.type,

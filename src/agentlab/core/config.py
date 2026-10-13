@@ -423,6 +423,167 @@ class RedactionConfig(Model):
     )
 
 
+class DiagnosticsConfig(Model):
+    """What a person may attach to an issue report from AgentLab itself, and the log AgentLab keeps for it."""
+
+    capture_logs: bool = Field(
+        default=True,
+        description="Keep a bounded, redacted copy of what the server logs (warnings, errors and the requests that failed or "
+        "were slow), correlated with runs and requests, so it can be attached to an issue report",
+    )
+    log_level: Literal["WARNING", "INFO"] = Field(
+        default="WARNING",
+        description="The least important thing that is kept. INFO also raises the level of AgentLab's own logger, so it "
+        "shows on the server's standard error too",
+    )
+    log_retention_hours: int = Field(default=48, ge=1, le=24 * 30, description="How long captured log lines are kept")
+    log_max_rows: int = Field(default=50_000, ge=1_000, le=5_000_000, description="The most captured log lines kept")
+    max_window_minutes: int = Field(
+        default=360, ge=1, le=24 * 60, description="The longest custom time window a collection may ask for"
+    )
+    max_item_kb: int = Field(
+        default=512, ge=16, le=16_384, description="The most one collected item may hold; more is cut"
+    )
+    max_browser_entries: int = Field(
+        default=200,
+        ge=1,
+        le=2_000,
+        description="The most console and network entries a browser may report in one collection",
+    )
+    draft_hours: int = Field(
+        default=24, ge=1, le=24 * 14, description="How long a collection that was not attached to a report is kept"
+    )
+    max_collections_per_hour: int = Field(
+        default=30, ge=1, le=1_000, description="Collections one person may make in an hour"
+    )
+
+
+class HandoffConfig(Model):
+    """The engineering handoff: a sanitized package that an authorised engineer can give to Claude Code."""
+
+    max_package_mb: int = Field(
+        default=50,
+        ge=1,
+        le=1024,
+        description="The largest package that may be built; attachments that do not fit are refused",
+    )
+    allow_internal_notes: bool = Field(
+        default=True,
+        description="Whether a maintainer may choose to put internal notes in a package. They are never put in by default",
+    )
+
+
+class RetentionConfig(Model):
+    """How long what people sent is kept after the submission is closed. Nothing is removed by default: every period is
+    empty until the owner chooses one, because removal cannot be undone."""
+
+    submissions_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=36500,
+        description="Delete a closed submission, with everything attached to it, this many days after it closed. Empty: keep",
+    )
+    attachments_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=36500,
+        description="Remove the files attached to a closed submission this many days after it closed (the record stays). Empty: keep",
+    )
+    diagnostics_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=36500,
+        description="Remove the diagnostic information attached to a closed submission this many days after it closed. Empty: keep",
+    )
+    handoffs_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=36500,
+        description="Remove the engineering handoff packages built from a closed submission this many days after it closed. Empty: keep",
+    )
+    internal_notes_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=36500,
+        description="Delete the internal notes of a closed submission this many days after it closed. Empty: keep",
+    )
+    automatic: bool = Field(
+        default=True,
+        description="When any period is set, the server applies the policy by itself every `interval_hours`. Off: only "
+        "`agentlab feedback purge` applies it",
+    )
+    interval_hours: int = Field(default=24, ge=1, le=168, description="How often the server applies the policy")
+
+    @property
+    def active(self) -> bool:
+        return any(
+            v is not None
+            for v in (
+                self.submissions_days,
+                self.attachments_days,
+                self.diagnostics_days,
+                self.handoffs_days,
+                self.internal_notes_days,
+            )
+        )
+
+
+class GitHubConfig(Model):
+    """Publishing a sanitized summary of a submission as an issue in a GitHub repository. Off, and nothing leaves this server
+    for GitHub, until the owner switches it on and names the repository and a token."""
+
+    enabled: bool = Field(default=False, description="Switch the integration on. Off: no call to GitHub is ever made")
+    repository: str | None = Field(
+        default=None,
+        pattern=r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$",
+        description="Where issues are made, as owner/name",
+    )
+    api_url: str = Field(
+        default="https://api.github.com",
+        description="The API address: https://api.github.com, or the API of a GitHub Enterprise server (https only)",
+    )
+    token_ref: str | None = Field(
+        default=None,
+        description="Where the access token is: env:NAME for an environment variable, or secret:NAME for a stored "
+        "credential. It needs permission to create issues in the repository and nothing else",
+    )
+    labels: list[str] = Field(default_factory=list, max_length=10, description="Labels put on every issue made")
+    assignee: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9-]{1,39}$", description="A GitHub account to assign every issue to"
+    )
+    internal_url: str | None = Field(
+        default=None,
+        description="Where a person can open the submission here, with {number} in place of its number, for example "
+        "https://agentlab.example.org/#/feedback/submissions/{number}. Empty: the issue names the number and gives no link",
+    )
+    publish_roles: list[Literal["maintainer", "admin"]] = Field(
+        default=["admin"],  # noqa: B006 - pydantic copies a default for every instance
+        description="Who may publish. The shared API token counts as a maintainer",
+    )
+    status_sync: bool = Field(
+        default=False,
+        description="Allow a maintainer to push a submission's status to its issue (a comment, and closing it when the "
+        "submission is closed). Never done automatically",
+    )
+    timeout_seconds: float = Field(default=20.0, ge=1.0, le=120.0, description="How long a call to GitHub may take")
+
+    @model_validator(mode="after")
+    def _a_complete_integration(self) -> GitHubConfig:
+        if self.enabled and not (self.repository and self.token_ref):
+            raise ValueError("feedback.integrations.github needs a repository and a token_ref when it is enabled")
+        if not self.api_url.startswith("https://"):
+            raise ValueError("feedback.integrations.github.api_url must be an https:// address")
+        if self.internal_url is not None and "{number}" not in self.internal_url:
+            raise ValueError("feedback.integrations.github.internal_url must contain {number}")
+        return self
+
+
+class IntegrationsConfig(Model):
+    """Other systems a submission can be published to. Each is off until the owner switches it on."""
+
+    github: GitHubConfig = Field(default_factory=GitHubConfig)
+
+
 class FeedbackConfig(Model):
     """Feedback & Support: feature requests and issue reports, who sees what, and the lists a form offers."""
 
@@ -529,6 +690,10 @@ class FeedbackConfig(Model):
     )
     attachments: AttachmentsConfig = Field(default_factory=AttachmentsConfig)
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
+    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    handoff: HandoffConfig = Field(default_factory=HandoffConfig)
+    retention: RetentionConfig = Field(default_factory=RetentionConfig)
+    integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
     notify_reporter_on: list[Literal["comment", "information_request", "status_change"]] = Field(
         default_factory=_all_notifications,
         description="What makes a submission unread for its reporter: a maintainer's public comment, a request for "

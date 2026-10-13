@@ -162,6 +162,22 @@ class AttachmentService:
         except InfrastructureError as exc:
             raise NotFoundError("the stored file is no longer available") from exc
 
+    def export(
+        self, actor: Actor, ident: str, attachment_id: str, *, sanitized: bool, client: str = ""
+    ) -> tuple[bytes, AttachmentOut]:
+        """The bytes of an attachment for an engineering package. No audit record per file: the export is recorded once,
+        with the list of what went in."""
+        with self.submissions.visible_submission(actor, ident, client=client) as (s, sub):
+            att = self._find(s, actor, sub.id, attachment_id)
+            if sanitized and not (att.text_like and att.sanitized_artifact_id):
+                raise NotFoundError("this attachment has no sanitized copy")
+            artifact = att.sanitized_artifact_id if sanitized else att.artifact_id
+            out = self._out(actor, att)
+        try:
+            return self.store.get(str(artifact)), out
+        except InfrastructureError as exc:
+            raise NotFoundError("the stored file is no longer available") from exc
+
     def preview(self, actor: Actor, ident: str, attachment_id: str, *, client: str = "") -> AttachmentPreview:
         with self.submissions.visible_submission(actor, ident, client=client) as (s, sub):
             att = self._find(s, actor, sub.id, attachment_id)

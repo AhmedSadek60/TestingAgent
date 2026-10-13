@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { AttemptResult, Review, TestResult } from "../api/types";
+import { reportLink } from "../lib/feedback";
 import { formatCost, formatLatency, formatNumber, formatPercent, formatTime } from "../lib/format";
 import { rootCauseLabel } from "../lib/labels";
 import { outcomeLine } from "../lib/results";
@@ -129,6 +130,13 @@ export function ResultDetail({ runId, result, reviews, onReviewed }: { runId: st
         <SeverityBadge severity={result.severity} />
         {result.review && <Badge tone="info">reviewed</Badge>}
         <span className="muted mono small">{result.test_id}</span>
+        <span className="grow" />
+        <Link
+          className="btn small"
+          to={reportLink({ related_run_id: runId, related_test_id: result.test_id, related_result_id: result.id, ui_screen: "Test result" })}
+        >
+          Report an issue with this result
+        </Link>
       </div>
       <p style={{ margin: 0 }}>
         <RedactedText text={outcomeLine(result)} />

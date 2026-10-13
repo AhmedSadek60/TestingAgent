@@ -565,9 +565,110 @@ Tested by `tests/unit/test_diagnostic_redactor.py`, `tests/unit/test_feedback_fi
 `tests/unit/test_feedback_attachments.py`, `tests/api/test_feedback_attachments_api.py` and
 `tests/security/test_feedback_attachments_security.py`.
 
+### Diagnostics and the log that is kept for them
+
+AgentLab wrote its log to standard error and kept none. To attach "what the server said around 10:42" to a report it now keeps
+a small one, and that is a new store of data about people's activity, so it is built to say little, to the right people.
+
+* **It keeps little.** `WARNING` and above of AgentLab's own logger, and one line for each request that failed (other than
+  `401`, which anyone can send a thousand of) or took 2 seconds or more: method, the route as declared, status, time, a request
+  id and who. Never a request or response body. Every line is masked and cut before it is queued, the table is bounded by age
+  and by count, and the writer is a background thread that drops lines rather than ever blocking or failing the server.
+* **It is findable only by what it belongs to.** Lines carry a run id (set by the worker for the run's length) and a request id
+  (made by the server; one a client sends is ignored, because a client could name someone else's). A collection takes the
+  caller's own requests, system-level lines, and for a maintainer the named run's. A request id a browser reports does not
+  select anyone's lines, and a reporter who names a run gets the same answer whether it exists or not.
+* **Only masked text is kept.** The raw text of a collection is never stored; drafts expire and are deleted with their files;
+  items the person leaves out are deleted at once; consent is the JSON value `true`.
+* **Nothing is faked.** A source that is unavailable, off or failed is listed with the reason and has no file.
+
+Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
+`tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
+
+### Publishing to an issue tracker
+
+Publishing sends text to a system AgentLab does not control, so it is off by default and built so that nothing leaves that a
+person did not read ([ADR 0018](decisions/0018-publication-is-off-by-default-previewed-and-never-twice.md)).
+
+* **Off until the owner switches it on**, with a repository and a token; while off, no call is made and nothing is offered.
+* **A summary and never evidence**: no files, diagnostics, packages, names, internal notes or ratings. What the reporter wrote is
+  masked and quoted, so it cannot mention anyone, close another issue or embed a picture.
+* **A private security report is never published**, whoever asks, and the shared token does not see one.
+* **Exactly what was previewed**: the preview's hash has to come back; a doubted text needs a second, explicit yes.
+* **Never twice**: one record per submission, a key in the issue, a look for it before making one, and a lock for a publication
+  in progress.
+* **The token** is read at call time from `env:` or a stored credential, never stored, logged, returned or audited; calls go to
+  the configured https address only and redirects are not followed; a link that is not https is never shown as one.
+* **Who**: the roles the owner named (administrators by default).
+
+Tested by `tests/unit/test_feedback_publication.py` and `tests/api/test_feedback_publication_api.py`.
+
+### Retention and deletion
+
+Removal is the one thing here that cannot be undone, so it is slow to start and careful where it acts
+([ADR 0017](decisions/0017-retention-counts-from-closing-and-removes-content-not-the-record.md)).
+
+* **Nothing is removed by default**; every period is empty until the owner sets it, and the policy only ever touches a
+  **closed** submission, so the evidence of an open investigation is never removed by the clock.
+* **Deleting a submission is for administrators**, needs a reason (kept, masked) and, for a private security report that is not
+  closed, an explicit acknowledgement. Neither a maintainer nor the shared token may.
+* **A file is deleted only when no record that is still there refers to it**, because stored files are shared by content.
+* **What stays is counts**: the audit record says what was removed and by whom and never what it said. A downloaded copy cannot
+  be recalled, and the record says how many there were.
+
+Tested by `tests/unit/test_feedback_retention.py` and `tests/api/test_feedback_retention_api.py`.
+
+### The web interface of Feedback & Support
+
+It runs in a stranger's browser and sees what they see, so it is built to keep little and to share nothing unreviewed
+([ADR 0016](decisions/0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md)).
+
+* **Drafts** are form text in the tab's session storage, offered back with a way to start again, and gone when the tab closes,
+  when the submission is saved and at sign-out. Files, diagnostics and tokens are never kept there.
+* **What the tab saw** (the last 50 console errors and warnings and failed requests: method, path without its query, status,
+  request id; never a body) is in memory only, forgotten at sign-out, and sent only if the person ticks the browser category and
+  agrees to the masked preview.
+* **No diagnostic information is attached on the person's behalf**: nothing is pre-ticked, "select all" still needs collecting
+  and reviewing, and a report with diagnostics chosen and not reviewed is not sent.
+* **Identifiers in a link** that opens the issue form are checked like typed ones and listed, each removable.
+* **Everything written by a person or a system is a text node**, set apart; nothing is rendered as HTML or Markdown.
+
+Tested by `web/src/feedback.test.tsx`, `web/src/lib/browserErrors.test.ts` and `tests/e2e/test_feedback_ui.py`.
+
+### The engineering handoff
+
+A package is built so that it can be given to a model, which makes it the place where what a stranger wrote is most likely to be
+read as an instruction. It is built to be read as evidence, and to be taken by someone authorised.
+
+* **Nothing runs and nothing is sent.** Building a package is reading records and writing one restricted file. It starts no
+  process and opens no connection (a test makes both fail the test), and Claude Code is never started by AgentLab.
+* **Maintainers only, and as hidden as the report.** A reporter is refused by role. A maintainer who may not see a private
+  report gets, for its package, what an id that was never issued gets. Building a package from a private report is recorded
+  as reading it.
+* **Everything a person or a system wrote is quoted, and cannot close its own quote.** The fence is longer than any run of
+  backticks in the text; a version, a build or a file name is a quoted, escaped, single-line string or is made safe
+  (letters, digits, `.`, `-`, `_`); the stated acceptance criteria are quoted one to a line; a heading, a table row or a list
+  item in the package never comes from a person's words. The task file says in its own words that all of it is untrusted and
+  not to be obeyed or executed. This reduces the risk and does not remove it: a model can still be misled by text it is
+  asked to read, which is why the package is for an authorised engineer and not for a public place.
+* **Masked once, recorded by kind.** Every text goes through the diagnostic redactor; the report says where and what kind, never
+  the value. A text the second inspection doubts blocks external sharing and says so.
+* **Not by default:** internal notes and internal files (and a server can refuse them altogether), anything that cannot be
+  sanitized (an image, a document, an archive: each must be chosen, and is marked unsanitized), and a text too large to inspect.
+* **Honest about itself.** Generated files are marked generated and are never presented as evidence; what is unknown is
+  written as unknown, and no empty file stands in for something that is not available. Every build and every download is
+  recorded, with counts and never with text.
+* **Bounded and private.** At most `feedback.handoff.max_package_mb`; kept as a restricted artifact; served with
+  `no-store`, `nosniff` and a sandboxing policy; built in a fixed order with fixed file times, so the same submission built at
+  the same moment gives the same bytes (the build time is in `manifest.json` and nowhere else).
+
+Tested by `tests/unit/test_feedback_handoff.py`, `tests/api/test_feedback_handoff_api.py` and
+`tests/security/test_handoff_security.py`.
+
 What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
 every other person's non-private submission and, with the role, every private one; an image or a PDF can show a secret that
-nothing can mask; no scanner ships with AgentLab; and there is no e-mail.
+nothing can mask; no scanner ships with AgentLab; the server's log is the server's own (a line another library wrote is not
+in it); and there is no e-mail.
 
 ## What this does not promise
 

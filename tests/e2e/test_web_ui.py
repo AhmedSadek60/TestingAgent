@@ -544,6 +544,10 @@ def test_no_screen_scrolls_sideways_on_a_phone(lab: Lab, browser: Browser) -> No
         "/providers",
         "/credentials",
         "/settings",
+        "/feedback",
+        "/feedback/feature",
+        "/feedback/issue",
+        "/feedback/submissions",
         f"/runs/{run}",
         f"/runs/{run}/results",
         f"/runs/{run}/findings",
@@ -583,14 +587,16 @@ def test_a_server_that_wants_a_token_asks_for_it_and_the_token_stays_in_the_tab(
             "nothing protected is asked for first"
         )
 
+        # accounts put the password form first; the shared token is one click away
+        page.get_by_role("button", name="Sign in with an API token").click()
         wrong = "wrong-" + "token-" + "y" * 20
         page.get_by_label("API token").fill(wrong)
-        page.get_by_role("button", name="Sign in").click()
+        page.get_by_role("button", name="Sign in", exact=True).click()
         expect(page.get_by_text("The server did not accept that token.")).to_be_visible()
         assert wrong not in str(stored(page)) and wrong not in page.url
 
         page.get_by_label("API token").fill(TOKEN)
-        page.get_by_role("button", name="Sign in").click()
+        page.get_by_role("button", name="Sign in", exact=True).click()
         expect(page.get_by_role("heading", name="Dashboard", level=1)).to_be_visible()
 
         # the token is in this tab's session storage and nowhere else: not the URL, not local storage, not the page

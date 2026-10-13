@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StrictBool, field_validator, model_validator
 
 from agentlab.core.models.base import Model
 
@@ -446,6 +446,10 @@ class FeedbackOptions(Model):
     security_category: str = Field(description="An issue in this category is kept private")
     max_text_chars: int = Field(description="The longest any text field may be")
     can_triage: bool = Field(description="True when the caller is a maintainer and may change status and priority")
+    attachment_extensions: list[str] = Field(description="The file types that may be attached")
+    attachment_max_files: int = Field(description="The most files one submission may have")
+    attachment_max_file_mb: int = Field(description="The largest single file, in megabytes")
+    attachment_max_total_mb: int = Field(description="What the files of one submission may add up to, in megabytes")
 
 
 # =========================================================================================================== attachments
@@ -506,3 +510,381 @@ class AttachmentPreview(Model):
     truncated: bool = Field(description="True when the text was cut at the limit")
     sanitized: bool = Field(description="True when secrets were masked in the text shown")
     message: str = Field(description="What to know about this preview")
+
+
+# ========================================================================================================= diagnostics
+CATEGORIES = (
+    "environment",
+    "application_logs",
+    "backend_logs",
+    "errors",
+    "trace",
+    "run_metadata",
+    "test_summary",
+    "browser",
+    "screenshot",
+)
+WINDOWS = ("last_5_minutes", "last_15_minutes", "last_30_minutes", "custom")
+CONSENT_TEXT = (
+    "The diagnostic information you attach, and any files, will be available to AgentLab maintainers who handle your "
+    "report. Secrets that AgentLab recognises are masked first, but masking cannot be guaranteed to catch everything: "
+    "review what is listed, and remove anything you do not want to share. Nothing is sent outside this AgentLab server."
+)
+REQUEST_ID = r"^[A-Za-z0-9]{8,40}$"
+
+
+class BrowserConsoleEntry(_Clean):
+    """One error or warning the browser logged to its console."""
+
+    time: datetime | None = Field(default=None, description="When it was logged")
+    level: Literal["error", "warn", "warning", "info", "log", "debug"] = Field(default="error", description="Its level")
+    message: str = Field(max_length=2000, description="What was logged")
+    source: str | None = Field(default=None, max_length=300, description="The script it came from")
+    line: int | None = Field(default=None, ge=0, le=10_000_000, description="The line in that script")
+
+
+class BrowserNetworkEntry(_Clean):
+    """One request the browser made that failed or came back with an error."""
+
+    time: datetime | None = Field(default=None, description="When it was made")
+    method: str = Field(default="GET", max_length=10, description="The HTTP method")
+    url: str = Field(max_length=500, description="The address. Secrets in a query string are masked")
+    status: int | None = Field(default=None, ge=0, le=999, description="The status, or null when there was no response")
+    error: str | None = Field(default=None, max_length=300, description="What the browser said went wrong")
+    request_id: str | None = Field(
+        default=None,
+        pattern=REQUEST_ID,
+        description="The X-Request-Id of the response, which names it in the server's log",
+    )
+    duration_ms: int | None = Field(default=None, ge=0, le=3_600_000, description="How long it took")
+
+
+class BrowserDiagnostics(_Clean):
+    """What the web interface has seen go wrong in this browser tab. Only the web interface can supply it."""
+
+    console: list[BrowserConsoleEntry] = Field(default_factory=list, max_length=2000, description="Console errors")
+    network: list[BrowserNetworkEntry] = Field(default_factory=list, max_length=2000, description="Failed requests")
+
+
+class DiagnosticsRequest(_Clean):
+    """What to collect, around which moment, and for which run."""
+
+    categories: list[
+        Literal[
+            "environment",
+            "application_logs",
+            "backend_logs",
+            "errors",
+            "trace",
+            "run_metadata",
+            "test_summary",
+            "browser",
+            "screenshot",
+        ]
+    ] = Field(min_length=1, max_length=9, description="The categories to collect, from `GET /diagnostics/available`")
+    window: Literal["last_5_minutes", "last_15_minutes", "last_30_minutes", "custom"] = Field(
+        default="last_15_minutes", description="How far back from the reference time to look"
+    )
+    window_from: datetime | None = Field(default=None, description="For a custom window: where it starts")
+    window_to: datetime | None = Field(default=None, description="For a custom window: where it ends")
+    reference_time: datetime | None = Field(
+        default=None, description="The moment the problem happened; the window ends here. Defaults to now"
+    )
+    run_id: str | None = Field(default=None, pattern=ID, description="The evaluation run it concerns (maintainers)")
+    test_id: str | None = Field(default=None, pattern=ID, description="The test case it concerns (maintainers)")
+    trace_id: str | None = Field(default=None, pattern=ID, description="The trace it concerns (maintainers)")
+    browser: BrowserDiagnostics | None = Field(default=None, description="What the browser saw go wrong")
+
+    @model_validator(mode="after")
+    def _a_custom_window_has_its_ends(self) -> DiagnosticsRequest:
+        if self.window == "custom" and (self.window_from is None or self.window_to is None):
+            raise ValueError("a custom window needs window_from and window_to")
+        if (
+            self.window == "custom"
+            and self.window_from is not None
+            and self.window_to is not None
+            and self.window_to <= self.window_from
+        ):
+            raise ValueError("window_to must be after window_from")
+        return self
+
+
+class DiagnosticSource(Model):
+    """One kind of diagnostic information, and whether AgentLab can supply it here."""
+
+    id: str = Field(description="The category id to ask for")
+    label: str = Field(description="What it is called")
+    description: str = Field(description="What it contains and where it comes from")
+    available: bool = Field(description="True when it can be collected now with the details given")
+    manual: bool = Field(description="True when the person has to supply it themselves (a screenshot)")
+    reason: str | None = Field(description="Why it is not available, and what to do instead")
+    needs: list[str] = Field(description="What has to be given for it to be available, such as run_id")
+
+
+class DiagnosticsAvailable(Model):
+    """What can be collected, how far back, and what the person is agreeing to."""
+
+    sources: list[DiagnosticSource] = Field(description="Every category, with whether it is available")
+    windows: list[str] = Field(description="The windows offered: last_5_minutes ... custom")
+    max_window_minutes: int = Field(description="The longest custom window")
+    consent_text: str = Field(description="What attaching diagnostics means; shown before the person agrees")
+    limits: dict[str, int] = Field(description="Sizes and counts that bound a collection")
+
+
+class RedactionSummary(Model):
+    """What masking did to an item, without any value."""
+
+    status: Literal["clean", "redacted", "needs_review"] = Field(
+        description="clean: nothing found; redacted: patterns matched and were masked; needs_review: the second inspection "
+        "found more, so the item is not to leave AgentLab until a person has looked"
+    )
+    counts: dict[str, int] = Field(description="How many of each kind were masked")
+    locations: list[str] = Field(description="Where, as line numbers or JSON paths (at most 20)")
+    external_sharing_blocked: bool = Field(description="True when it may not be shared outside AgentLab yet")
+
+
+class DiagnosticItemOut(Model):
+    """One thing that was collected, or that could not be."""
+
+    id: str = Field(description="The item's id; pass it back in `include` to attach it")
+    category: str = Field(description="Its category")
+    path: str = Field(description="Where it sits in the downloadable bundle")
+    source: str = Field(description="Where it came from")
+    outcome: Literal["collected", "unavailable", "failed", "excluded"] = Field(
+        description="collected; unavailable (nothing to collect, with the reason); failed (it could not be read); excluded "
+        "(the person left it out)"
+    )
+    detail: str = Field(description="Why, for anything but collected")
+    time_from: datetime | None = Field(description="The start of the period it covers")
+    time_to: datetime | None = Field(description="The end of the period it covers")
+    size: int = Field(description="Its size in bytes after masking")
+    truncated: bool = Field(description="True when it was cut to the size limit")
+    included: bool = Field(description="True when it will be attached")
+    redaction: RedactionSummary = Field(description="What masking did to it")
+    preview: str | None = Field(description="Its masked text, up to a limit, for review before anything is shared")
+
+
+class DiagnosticCollectionOut(Model):
+    """What was collected for a report, as the person can review it before attaching it."""
+
+    id: str | None = Field(description="Its id, or null for a preview that was not kept")
+    status: Literal["preview", "draft", "attached", "expired"] = Field(
+        description="preview: not kept; draft: kept until it is attached or expires; attached: part of a submission"
+    )
+    created_at: datetime | None = Field(description="When it was collected")
+    expires_at: datetime | None = Field(description="When a draft is deleted if it was not attached")
+    window_from: datetime | None = Field(description="The start of the period looked at")
+    window_to: datetime | None = Field(description="The end of the period looked at")
+    items: list[DiagnosticItemOut] = Field(description="Every category asked for, collected or not")
+    warnings: list[str] = Field(description="What could not be collected, and what needs a person's attention")
+    total_bytes: int = Field(description="The size of everything included")
+    any_needs_review: bool = Field(
+        description="True when something must be reviewed before it is shared outside AgentLab"
+    )
+    submission_id: str | None = Field(description="The submission it is attached to")
+    consent_at: datetime | None = Field(description="When the person agreed to share it")
+
+
+class RedactPreviewIn(_Clean):
+    """Text to see masked before it is pasted into a report."""
+
+    text: str = Field(min_length=1, max_length=200_000, description="The text to look at")
+
+
+class RedactPreviewOut(Model):
+    """The text as it would be kept, and what changed."""
+
+    text: str = Field(description="The masked text")
+    redaction: RedactionSummary = Field(description="What was masked and where, without the values")
+    mechanisms: list[str] = Field(description="Which kinds of detection ran")
+    note: str = Field(description="What this does and does not tell you")
+
+
+class AttachDiagnosticsIn(_Clean):
+    """Attach a collection to a submission, with the person's consent."""
+
+    collection_id: str = Field(min_length=8, max_length=40, description="The draft collection to attach")
+    include: list[str] | None = Field(
+        default=None,
+        max_length=50,
+        description="The ids of the items to attach; omitted means every item that was collected. Items left out are deleted",
+    )
+    consent: StrictBool = Field(
+        description="Must be the JSON value true (not a string or a number): the person has read the consent text and "
+        "agrees to share what is attached"
+    )
+
+
+# ============================================================================================================ handoff
+class HandoffIn(_Clean):
+    """What goes into an engineering handoff package, beyond what goes in by default."""
+
+    exclude_attachments: list[str] = Field(
+        default_factory=list, max_length=50, description="Attachment ids to leave out of the package"
+    )
+    include_originals: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in "
+        "as they were uploaded. Each is marked as unsanitized in the package",
+    )
+    include_internal_notes: StrictBool = Field(
+        default=False,
+        description="Put the maintainers' internal notes in the package (they are not by default). Must be the JSON "
+        "value true or false, not a string or a number",
+    )
+    include_diagnostics: StrictBool = Field(
+        default=True,
+        description="Put in the diagnostics attached to the submission, when there are any. Must be the JSON value "
+        "true or false",
+    )
+
+
+class HandoffFile(Model):
+    """One file of a package."""
+
+    path: str = Field(description="Where it is in the package")
+    kind: Literal["generated", "diagnostic", "sanitized_copy", "original_evidence"] = Field(
+        description="generated: written by AgentLab for this package; diagnostic: a collected, masked item; "
+        "sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded"
+    )
+    size: int = Field(description="Its size in bytes")
+    sha256: str = Field(description="Its SHA-256")
+    source: str = Field(description="What it was made from")
+    note: str = Field(description="What to know about it (for example, that it is unsanitized)")
+
+
+class HandoffLeftOut(Model):
+    """Something that is not in the package, and why. Nothing stands in for it."""
+
+    what: str = Field(description="What it is")
+    reason: str = Field(description="Why it is not in the package")
+
+
+class HandoffOut(Model):
+    """A package, or a preview of one."""
+
+    id: str | None = Field(description="Its id, or null for a preview that was not built")
+    status: Literal["preview", "generated", "purged"] = Field(
+        description="preview: nothing was built or kept; generated: built and kept; purged: removed by the retention policy "
+        "(the record of what it held stays, the files are gone)"
+    )
+    submission_id: str = Field(description="The submission it was made from")
+    number: str = Field(description="The submission's number")
+    submission_version: int = Field(description="The version of the submission it reflects")
+    created_at: datetime | None = Field(description="When it was built")
+    created_by: str | None = Field(description="Who asked for it")
+    files: list[HandoffFile] = Field(description="Every file in the package, with its hash")
+    left_out: list[HandoffLeftOut] = Field(description="What was not put in, and why")
+    warnings: list[str] = Field(description="What the engineer and the maintainer should know before using it")
+    size: int = Field(description="The size of the ZIP in bytes (0 for a preview)")
+    sha256: str | None = Field(description="The SHA-256 of the ZIP")
+    external_sharing_blocked: bool = Field(
+        description="True when something in it still needs a person's review before it leaves AgentLab"
+    )
+    includes_unsanitized: bool = Field(description="True when it holds a file that was put in as uploaded")
+    task: str = Field(description="The text of CLAUDE_CODE_TASK.md, for review before it is downloaded")
+
+
+# ========================================================================================================== retention
+class RetentionReport(Model):
+    """What the retention policy removed (or, for a dry run, would remove). Counts only: never a title or a text."""
+
+    ran_at: datetime = Field(description="When it was applied")
+    dry_run: bool = Field(description="True when nothing was removed: this is what would be")
+    submissions: int = Field(description="Closed submissions deleted, with everything attached to them")
+    attachments: int = Field(description="Attached files removed from submissions that were kept")
+    diagnostic_items: int = Field(description="Diagnostic items removed from submissions that were kept")
+    handoffs: int = Field(description="Handoff packages removed from submissions that were kept")
+    internal_notes: int = Field(description="Internal notes deleted from submissions that were kept")
+    files_deleted: int = Field(description="Stored files actually deleted (a file another record still uses stays)")
+
+
+class DeletionOut(Model):
+    """What deleting a submission removed. Counts only."""
+
+    number: str = Field(description="The number the submission had; it is not reused")
+    attachments: int = Field(description="Attached files removed")
+    diagnostic_items: int = Field(description="Diagnostic items removed")
+    handoffs: int = Field(description="Handoff packages removed")
+    files_deleted: int = Field(description="Stored files actually deleted (a file another record still uses stays)")
+    exported_copies: int = Field(
+        description="How many times a package or a file of it was downloaded before: those copies cannot be recalled"
+    )
+
+
+# ================================================================================================= publication
+class IntegrationOut(Model):
+    """An issue tracker a submission could be published to, and whether it is switched on."""
+
+    provider: str = Field(description="Its name: github")
+    enabled: bool = Field(description="True when the owner switched it on")
+    ready: bool = Field(description="True when it is enabled and complete, so a publication can be tried")
+    reason: str | None = Field(description="Why it is not ready, in words the owner can act on")
+    repository: str | None = Field(description="Where issues are made")
+    may_publish: bool = Field(description="True when the caller's role is one that may publish")
+    status_sync: bool = Field(description="True when a maintainer may push a submission's status to its issue")
+
+
+class PublicationPreviewIn(_Clean):
+    """Which tracker to look at."""
+
+    provider: Literal["github"] = Field(description="The issue tracker")
+
+
+class PublicationOut(Model):
+    """The issue a submission was published to (or the attempt to)."""
+
+    id: str = Field(description="The record's id")
+    provider: str = Field(description="The issue tracker")
+    repository: str = Field(description="Where the issue is")
+    state: Literal["publishing", "published", "failed"] = Field(
+        description="publishing: started and not finished; published: the issue exists; failed: it was not made"
+    )
+    url: str = Field(description="Where to open the issue; empty until it exists")
+    number: int | None = Field(description="Its number in the tracker")
+    external_state: str = Field(description="open or closed, as AgentLab last knew")
+    error_kind: str = Field(description="Why it failed, when it did")
+    error_detail: str = Field(description="What to do about it, when it failed")
+    submission_version: int = Field(description="The version of the submission that was published")
+    published_by: str = Field(description="Who published it")
+    published_at: datetime | None = Field(description="When")
+    synced_status: str = Field(description="The status last pushed to the issue, when status sync is on")
+
+
+class PublicationPreview(Model):
+    """Exactly what would be sent, and why it might not be. Nothing has been sent."""
+
+    provider: str = Field(description="The issue tracker")
+    repository: str = Field(description="Where the issue would be made")
+    title: str = Field(description="The issue's title")
+    body: str = Field(description="The issue's text, as it would be sent")
+    labels: list[str] = Field(description="Labels that would be put on it")
+    assignees: list[str] = Field(description="Who it would be assigned to")
+    content_hash: str = Field(description="Send this back to publish exactly this and nothing else")
+    needs_review: bool = Field(
+        description="True when the second inspection still doubts a text: publishing then needs `acknowledge_unreviewed`"
+    )
+    warnings: list[str] = Field(description="What the person should know before it is public")
+    left_out: list[str] = Field(
+        description="What is deliberately not in it: files, diagnostics, packages, names, notes"
+    )
+    already: PublicationOut | None = Field(
+        description="The publication that already exists for this submission, if any"
+    )
+
+
+class PublishIn(_Clean):
+    """Publish what was previewed."""
+
+    provider: Literal["github"] = Field(description="The issue tracker")
+    content_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+        description="The `content_hash` of the preview that was read",
+    )
+    acknowledge_unreviewed: StrictBool = Field(
+        default=False,
+        description="Must be the JSON value true to publish text the second inspection still doubts, after reading it",
+    )

@@ -503,6 +503,38 @@ class SubmissionRelationRow(Entity):
     __table_args__ = (UniqueConstraint("from_id", "to_id", "kind", name="uq_submission_relation"),)
 
 
+class ExternalIssueLinkRow(Entity):
+    """The issue a submission was published to in another system. ``status`` is ``publishing`` (the call was started),
+    ``published`` or ``failed``. One per submission and provider: a retry cannot make a second one."""
+
+    __tablename__ = "external_issue_links"
+    submission_id: Mapped[str] = _fk("submissions")
+    provider: Mapped[str] = mapped_column(String(20))
+    key: Mapped[str] = mapped_column(String(64))  # names the publication, so a retry finds an issue that was made
+    external_id: Mapped[str] = mapped_column(String(64), default="")
+    external_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    url: Mapped[str] = mapped_column(String(300), default="")
+    external_state: Mapped[str] = mapped_column(String(10), default="open")
+    error_kind: Mapped[str] = mapped_column(String(20), default="")
+    error_detail: Mapped[str] = mapped_column(String(300), default="")
+    submission_version: Mapped[int] = mapped_column(Integer, default=1)
+    content_hash: Mapped[str] = mapped_column(String(64), default="")
+    repository: Mapped[str] = mapped_column(String(200), default="")
+    published_by_label: Mapped[str] = mapped_column(String(80), default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    synced_status: Mapped[str] = mapped_column(String(40), default="")
+    __table_args__ = (UniqueConstraint("submission_id", "provider", name="uq_external_issue_link"),)
+
+
+class SubmissionCounterRow(Base):
+    """The highest number given out for a type and a year, so that a number of a deleted submission is never given again."""
+
+    __tablename__ = "submission_counters"
+    type: Mapped[str] = mapped_column(String(10), primary_key=True)
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer)
+
+
 class SubmissionAuditRow(Entity):
     """Important actions on submissions. No foreign key: the record outlives the submission it is about."""
 
@@ -545,3 +577,86 @@ class SubmissionAttachmentRow(Entity):
     archive_summary: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     removed_by_label: Mapped[str] = mapped_column(String(80), default="")
+
+
+# ===================================================================================================== diagnostics
+class LogEventRow(Base):
+    """One line AgentLab logged, kept briefly and already redacted, so it can be attached to an issue report.
+
+    Not an ``Entity``: there are many, they are never updated, and an integer key is what a bounded table needs."""
+
+    __tablename__ = "log_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    level: Mapped[str] = mapped_column(String(10))
+    logger: Mapped[str] = mapped_column(String(120))
+    process: Mapped[str] = mapped_column(String(12), index=True)  # api | worker
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    principal: Mapped[str] = mapped_column(String(80), default="", index=True)
+    message: Mapped[str] = mapped_column(Text)
+    exception: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DiagnosticCollectionRow(Entity):
+    """What one person chose to collect for a report, kept sanitized, until it is attached to a submission or expires.
+
+    ``status`` is ``draft``, ``attached`` or ``expired``."""
+
+    __tablename__ = "diagnostic_collections"
+    owner_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    owner_label: Mapped[str] = mapped_column(String(80), default="")
+    submission_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("submissions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    requested: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)  # categories, window, ids
+    window_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    window_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consent_by: Mapped[str] = mapped_column(String(80), default="")
+
+
+class DiagnosticItemRow(Entity):
+    """One thing collected: a log extract, an environment record, a trace. Only the sanitized text is kept."""
+
+    __tablename__ = "diagnostic_items"
+    collection_id: Mapped[str] = _fk("diagnostic_collections")
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    path: Mapped[str] = mapped_column(String(120), default="")  # where it sits in the bundle
+    source: Mapped[str] = mapped_column(String(120), default="")
+    media_type: Mapped[str] = mapped_column(String(60), default="text/plain")
+    time_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    time_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(16), default="collected")  # collected | unavailable | failed
+    detail: Mapped[str] = mapped_column(String(300), default="")
+    artifact_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    truncated: Mapped[bool] = mapped_column(default=False)
+    included: Mapped[bool] = mapped_column(default=True)
+    redaction_status: Mapped[str] = mapped_column(String(16), default="clean")
+    redaction_report: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+
+
+class EngineeringHandoffRow(Entity):
+    """A package built for an engineer from one submission, as the submission was at that version.
+
+    The package is a restricted artifact; this row says what is in it and who asked for it. ``status`` is ``generated``."""
+
+    __tablename__ = "engineering_handoffs"
+    submission_id: Mapped[str] = _fk("submissions")
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_label: Mapped[str] = mapped_column(String(80), default="")
+    submission_version: Mapped[int] = mapped_column(Integer, default=1)
+    options: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    artifact_id: Mapped[str] = mapped_column(String(80))
+    task_artifact_id: Mapped[str] = mapped_column(String(80))
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    external_sharing_blocked: Mapped[bool] = mapped_column(default=False)
+    includes_unsanitized: Mapped[bool] = mapped_column(default=False)

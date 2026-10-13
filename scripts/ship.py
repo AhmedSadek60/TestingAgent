@@ -568,7 +568,7 @@ def cmd_publish(args: argparse.Namespace) -> None:
     superseded = run(["docker", "image", "inspect", PREVIOUS_IMAGE, "--format", "{{.Id}}"], quiet=True).stdout.strip()
     if previous:
         run(["docker", "tag", previous, PREVIOUS_IMAGE], quiet=True)
-    built = run([*COMPOSE, "build", "api"], quiet=True)
+    built = run([*COMPOSE, "build", "api"], env={"AGENTLAB_BUILD": head()[:12]}, quiet=True)
     if built.returncode != 0:
         if previous:  # a build that fails half way can leave the tag on a partial image; it must keep naming what runs
             run(["docker", "tag", previous, IMAGE], quiet=True)

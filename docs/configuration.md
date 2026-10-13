@@ -19,6 +19,7 @@ Environment variables:
 | `AGENTLAB_CONFIG` | The configuration file (same as `--config`). |
 | `AGENTLAB_DATABASE_URL` | Replaces `storage.database_url`. |
 | `AGENTLAB_REDIS_URL` | Replaces `queue.redis_url`. |
+| `AGENTLAB_BUILD` | Which build this is (a commit): the image is built with it (`docker build --build-arg AGENTLAB_BUILD=...`, which `scripts/ship.py publish` does) and the environment of an issue report states it. `unknown` when unset. |
 | `AGENTLAB_API_TOKEN` | Conventional name for the API token; it is used only when `server.token_ref` is `env:AGENTLAB_API_TOKEN`. |
 | `AGENTLAB_MASTER_KEY` | The Fernet key that encrypts stored credentials. Without it a key file (`secrets.key`, owner-only) sits next to the credential file. |
 | `AGENTLAB_WEB_DIR` | A built web interface to serve instead of the one inside the package. |
@@ -204,6 +205,34 @@ what a submission moves through; changing them changes the forms and the maintai
 | `attachments.scanner_command` | `[]` | A command that scans a file for malware: its arguments, with `{path}` where the file goes (it is appended when there is none). Exit 0 means clean and 1 means infected, as `clamscan` does. Empty: no scanner, and attachments are recorded as not scanned. |
 | `attachments.scanner_timeout_seconds` | `60` | How long the scanner may take for one file. |
 | `attachments.scanner_required` | `false` | Refuse an attachment when the scanner is configured but fails or times out. Otherwise it is kept and recorded as a scan error. |
+| `diagnostics.capture_logs` | `true` | Keep a bounded, masked copy of what the server logs (warnings, errors, and the requests that failed or were slow), tied to runs and requests, so it can be attached to an issue report. Off: the log categories are reported as unavailable. |
+| `diagnostics.log_level` | `WARNING` | The least important thing that is kept: `WARNING` or `INFO`. `INFO` also lowers the level of AgentLab's own logger, so it shows on the server's standard error too. |
+| `diagnostics.log_retention_hours` | `48` | How long captured lines are kept. |
+| `diagnostics.log_max_rows` | `50000` | The most captured lines kept; the oldest go first. |
+| `diagnostics.max_window_minutes` | `360` | The longest custom time window a collection may ask for. |
+| `diagnostics.max_item_kb` | `512` | The most one collected item may hold; more is cut (a log keeps its newest lines). |
+| `diagnostics.max_browser_entries` | `200` | The most console and network entries a browser may report in one collection. |
+| `diagnostics.draft_hours` | `24` | How long a collection that was not attached to a report is kept. |
+| `diagnostics.max_collections_per_hour` | `30` | Collections one person may make in an hour. |
+| `handoff.max_package_mb` | `50` | The largest engineering handoff package that may be built. A larger one is refused before anything is kept, with the advice to leave attachments out. |
+| `handoff.allow_internal_notes` | `true` | Whether a maintainer may choose to put internal notes (and internal files) in a package. They are never put in by default. Off: a request that asks for them is refused. |
+| `integrations.github.enabled` | `false` | Allow a maintainer to publish a sanitized summary of a submission as a GitHub issue. Off: nothing is ever sent to GitHub. Needs `repository` and `token_ref`. |
+| `integrations.github.repository` | empty | Where issues are made, as `owner/name`. |
+| `integrations.github.token_ref` | empty | Where the access token is: `env:NAME` or `secret:NAME`. It needs permission to create issues in that repository and nothing else. |
+| `integrations.github.api_url` | `https://api.github.com` | The API address; an `https://` address of a GitHub Enterprise server is accepted. |
+| `integrations.github.labels` | `[]` | Labels put on every issue made (at most 10). |
+| `integrations.github.assignee` | empty | A GitHub account every issue is assigned to. |
+| `integrations.github.internal_url` | empty | Where a person can open the submission here, with `{number}` for its number. Empty: the issue names the number and gives no link. |
+| `integrations.github.publish_roles` | `[admin]` | Who may publish: `admin`, and `maintainer` (which includes administrators and the shared API token). |
+| `integrations.github.status_sync` | `false` | Allow a maintainer to push a status to an issue, on request. Never automatic. |
+| `integrations.github.timeout_seconds` | `20` | How long a call to GitHub may take. |
+| `retention.submissions_days` | empty | Delete a **closed** submission, with everything attached to it, this many days after it closed. Empty: keep it. |
+| `retention.attachments_days` | empty | Remove the files attached to a closed submission this many days after it closed (the record of them stays). |
+| `retention.diagnostics_days` | empty | Remove the diagnostic information attached to a closed submission this many days after it closed. |
+| `retention.handoffs_days` | empty | Remove the engineering handoff packages built from a closed submission this many days after it closed (the record of what they held stays). |
+| `retention.internal_notes_days` | empty | Delete the internal notes of a closed submission this many days after it closed. |
+| `retention.automatic` | `true` | When any period is set, the server applies the policy by itself. Off: only `agentlab feedback purge` does. |
+| `retention.interval_hours` | `24` | How often the server applies the policy. The first pass is five minutes after it starts. |
 | `redaction.rules` | `[]` | Patterns of your own, each `{name, pattern}`, that attached and collected text is masked by, beyond the built-in ones. They appear in reports as `custom:<name>`. |
 | `redaction.redact_ip_addresses` | `false` | Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on. |
 | `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |

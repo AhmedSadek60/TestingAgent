@@ -11,6 +11,7 @@ import contextlib
 import dataclasses
 import logging
 
+from agentlab.core import context
 from agentlab.core.enums import RunStatus
 from agentlab.core.errors import AgentLabError
 from agentlab.core.ids import as_utc, utcnow
@@ -50,6 +51,13 @@ class JobRunner:
     # ------------------------------------------------------------------------------------------------ one job
     async def run(self, job: JobSpec) -> RunOutcome | None:
         run_id = job.run_id
+        marker = context.run_id.set(run_id)  # what is logged while this run executes can be found by its id
+        try:
+            return await self._run(job, run_id)
+        finally:
+            context.run_id.reset(marker)
+
+    async def _run(self, job: JobSpec, run_id: str) -> RunOutcome | None:
         reason = await self.queue.cancel_requested(run_id)
         if reason is not None:  # cancelled while it waited: nothing was started, so there is nothing to wind down
             self._finish(run_id, RunStatus.CANCELLED, note=f"cancelled before it started: {reason}")

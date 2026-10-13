@@ -42,6 +42,8 @@ export function fakeServer(routes: Record<string, Handler>) {
       } catch {
         body = init.body;
       }
+    } else if (init?.body instanceof FormData) {
+      body = init.body; // an upload: the test reads the parts it sent
     }
     const call: RecordedCall = { method, path: url.pathname, query: url.searchParams, headers: new Headers(init?.headers), body };
     calls.push(call);
@@ -69,4 +71,59 @@ export function renderWithSession(ui: ReactElement, { route = "/" }: { route?: s
       </ToastProvider>
     </MemoryRouter>,
   );
+}
+
+/** XMLHttpRequest for tests (jsdom's would try the network): what is posted goes through the fake server's `fetch`, and the
+ * upload reports its progress once, half way and at the end, as a browser would. */
+export function installFakeXhr(): void {
+  class FakeXhr {
+    upload: { onprogress: ((event: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    status = 0;
+    responseText = "";
+    responseType = "";
+    private method = "GET";
+    private url = "";
+    private readonly headers = new Headers();
+    private responseHeaders: Headers | null = null;
+    private stopped = false;
+
+    open(method: string, url: string): void {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name: string, value: string): void {
+      this.headers.set(name, value);
+    }
+    getResponseHeader(name: string): string | null {
+      return this.responseHeaders?.get(name) ?? null;
+    }
+    abort(): void {
+      this.stopped = true;
+      this.onabort?.();
+    }
+    send(body: FormData): void {
+      void (async () => {
+        let total = 0;
+        body.forEach((value) => {
+          total += typeof value === "string" ? value.length : value.size;
+        });
+        this.upload.onprogress?.({ lengthComputable: true, loaded: Math.floor(total / 2), total });
+        try {
+          const response = await fetch(this.url, { method: this.method, headers: this.headers, body });
+          if (this.stopped) return;
+          this.status = response.status;
+          this.responseText = await response.text();
+          this.responseHeaders = response.headers;
+          this.upload.onprogress?.({ lengthComputable: true, loaded: total, total });
+          this.onload?.();
+        } catch {
+          if (!this.stopped) this.onerror?.();
+        }
+      })();
+    }
+  }
+  vi.stubGlobal("XMLHttpRequest", FakeXhr);
 }
