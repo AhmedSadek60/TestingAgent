@@ -24,6 +24,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import ssl
 import stat
 import subprocess
@@ -31,6 +32,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -53,6 +55,9 @@ COMPOSE = [
     str(ENV_FILE),
 ]
 IMAGE = "agentlab:local"
+PREVIOUS_IMAGE = "agentlab:previous"
+DOCKER_ROOT = Path(os.environ.get("AGENTLAB_DOCKER_ROOT", "/var/lib/docker"))
+MIN_FREE_GB = 8  # building the image writes its layers twice (compressed and unpacked) next to the build cache
 PYTEST_MARKS = "not docker and not browser and not postgres and not redis and not ollama and not matrix"
 GOOD = {"success", "neutral", "skipped"}  # conclusions that do not block a merge
 WAIT_START = 180  # seconds to wait for the first check to appear after a push
@@ -129,6 +134,18 @@ def smoke_verdict(health: int, anonymous: int, authorised: int, ui: int) -> list
     return wrong
 
 
+def room_to_build(free_bytes: int, needed_gb: float = MIN_FREE_GB) -> str | None:
+    """``None`` when there is room to build the image; otherwise the sentence that says how much is free and what frees more."""
+    free_gb = free_bytes / 1024**3
+    if free_gb >= needed_gb:
+        return None
+    return (
+        f"only {free_gb:.1f} GB is free where Docker keeps its images and {needed_gb:g} GB are needed to build one. A build "
+        "that runs out of space stops half way. Free some first: `docker image prune -f` removes images nothing uses, "
+        "`docker builder prune -f --filter until=24h` removes old build cache. Nothing was changed."
+    )
+
+
 # ================================================================================================================ helpers
 def say(text: str = "") -> None:
     print(text, flush=True)
@@ -179,6 +196,17 @@ def token() -> str:
     return TOKEN_FILE.read_text(encoding="utf-8").strip()
 
 
+class SameHostRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect, but never hand the Authorization header to another host. GitHub answers a job's log with a redirect to
+    signed storage, which refuses a request that also carries a GitHub token."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urllib.parse.urlsplit(newurl).netloc != urllib.parse.urlsplit(req.full_url).netloc:
+            new.remove_header("Authorization")
+        return new
+
+
 def github(method: str, path: str, body: dict[str, Any] | None = None, *, raw: bool = False) -> Any:
     request = urllib.request.Request(  # noqa: S310 - https only, the host is fixed
         API + path if path.startswith("/") else path,
@@ -192,7 +220,7 @@ def github(method: str, path: str, body: dict[str, Any] | None = None, *, raw: b
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        with urllib.request.build_opener(SameHostRedirects).open(request, timeout=60) as response:  # noqa: S310
             data = response.read()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")[:300]
@@ -389,11 +417,22 @@ def failing_logs(checks: Iterable[CheckRun]) -> None:
             say(f"\n--- {c.name}: the end of its log\n" + "\n".join("  " + line[:200] for line in tail))
 
 
+def pull_request_at_head(patience: float) -> dict[str, Any]:
+    """The open pull request of this branch, once GitHub reports it at this checkout's commit. Right after a push its record
+    can lag a few seconds behind the branch; after ``patience`` seconds whatever it says is returned."""
+    deadline = time.monotonic() + patience
+    while True:
+        pr = find_pull_request()
+        if pr is None:
+            die("wait", "no open pull request for this branch: run `pr` first")
+        if pr["head"]["sha"] == head() or time.monotonic() >= deadline:
+            return pr
+        time.sleep(5)
+
+
 def cmd_wait(args: argparse.Namespace, *, poll: bool = True) -> dict[str, Any]:
     say("== 4-5  wait for the checks, then verify they are green")
-    pr = find_pull_request()
-    if pr is None:
-        die("wait", "no open pull request for this branch: run `pr` first")
+    pr = pull_request_at_head(60 if poll else 0)  # a merge verifies what is there right now
     sha = pr["head"]["sha"]
     if sha != head():
         die("wait", f"the pull request is at {sha[:7]} but this checkout is at {head()[:7]}: run `pr` to push")
@@ -516,15 +555,28 @@ def cmd_publish(args: argparse.Namespace) -> None:
     ):
         die("publish", "main cannot be fast-forwarded to origin/main here")
     say(f"  main is at {head()[:7]}")
+    try:
+        lacking = room_to_build(shutil.disk_usage(DOCKER_ROOT if DOCKER_ROOT.exists() else Path("/")).free)
+    except OSError:
+        lacking = None  # the free space cannot be read: let the build say if it runs out
+    if lacking:
+        die("publish", lacking)
     if BACKUP.exists() and run([str(BACKUP)], quiet=True).returncode != 0:
         die("publish", "the backup failed; nothing was changed")
     say("  backup taken")
     previous = run(["docker", "image", "inspect", IMAGE, "--format", "{{.Id}}"], quiet=True).stdout.strip()
+    superseded = run(["docker", "image", "inspect", PREVIOUS_IMAGE, "--format", "{{.Id}}"], quiet=True).stdout.strip()
     if previous:
-        run(["docker", "tag", previous, "agentlab:previous"], quiet=True)
+        run(["docker", "tag", previous, PREVIOUS_IMAGE], quiet=True)
     built = run([*COMPOSE, "build", "api"], env={"AGENTLAB_BUILD": head()[:12]}, quiet=True)
     if built.returncode != 0:
-        die("publish", "the image did not build; the running system is untouched:\n" + built.stderr.strip()[-500:])
+        if previous:  # a build that fails half way can leave the tag on a partial image; it must keep naming what runs
+            run(["docker", "tag", previous, IMAGE], quiet=True)
+        die(
+            "publish",
+            "the image did not build; the running system is untouched and the image tag still names it:\n"
+            + built.stderr.strip()[-500:],
+        )
     say("  image built")
     run([*COMPOSE, "up", "-d", "api", "worker"], quiet=True)
     wrong: list[str] = ["the system did not come up"]
@@ -536,13 +588,18 @@ def cmd_publish(args: argparse.Namespace) -> None:
     if wrong:
         say("  smoke test FAILED: " + "; ".join(wrong))
         if previous:
-            run(["docker", "tag", "agentlab:previous", IMAGE], quiet=True)
+            run(["docker", "tag", PREVIOUS_IMAGE, IMAGE], quiet=True)
             run([*COMPOSE, "up", "-d", "--no-build", "api", "worker"], quiet=True)
             after = smoke(base, bearer)
             state = "healthy again" if not after else "STILL FAILING: " + "; ".join(after)
             die("publish", f"rolled back to the previous image ({state})")
         die("publish", "there was no previous image to go back to")
     say(f"  published {head()[:7]} at {base}: health 200, token required, interface 200")
+    if superseded and superseded != previous:
+        # the image from two publishes ago: nothing runs on it and no tag names it any more. `docker image rm` without
+        # --force refuses an image a container uses, so this cannot remove anything that is needed.
+        gone = run(["docker", "image", "rm", superseded], quiet=True)
+        say("  removed the image of the publish before the last" if gone.returncode == 0 else "  (kept an older image)")
 
 
 # ================================================================================================================== main
