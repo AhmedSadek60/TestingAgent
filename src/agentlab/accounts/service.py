@@ -32,6 +32,14 @@ SIGN_IN_PER_CLIENT = 30  # sign-in attempts one address may make in the window, 
 STATUSES = ("active", "pending", "disabled")
 
 
+def _one_line(text: str) -> str:
+    """A name or an address on one line, with no control characters: PostgreSQL refuses a NUL byte in text, and no name
+    needs a line break. A line break or a tab becomes a space; any other control character is dropped."""
+    spaced = "".join(" " if c in "\t\n\r" else c for c in text)
+    kept = "".join(c for c in spaced if c >= " " and c != "\x7f")
+    return " ".join(kept.split())
+
+
 def _aware(moment: datetime | None) -> datetime | None:
     """SQLite hands back naive datetimes; everything here is UTC."""
     if moment is None:
@@ -131,8 +139,11 @@ class AccountService:
             return self._view(row)
 
     def by_username(self, username: str) -> UserView | None:
+        name = username.strip().casefold()
+        if "\x00" in name:
+            return None  # PostgreSQL text cannot hold a NUL byte, and no account has one in its name
         with self.db.session() as s:
-            row = s.scalar(select(orm.UserRow).where(orm.UserRow.username == username.strip().casefold()))
+            row = s.scalar(select(orm.UserRow).where(orm.UserRow.username == name))
             return self._view(row) if row else None
 
     def list_users(self, *, limit: int = 200) -> list[UserView]:
@@ -177,8 +188,8 @@ class AccountService:
             raise AccountConflict("that user name is taken")
         row = orm.UserRow(
             username=username,
-            display_name=(display_name or username).strip()[:120],
-            email=(email or None) and email.strip()[:254],
+            display_name=_one_line(display_name or username)[:120],
+            email=(email or None) and _one_line(email)[:254],
             role=role,
             status=status,
             password_hash=passwords.hash_password(password),
@@ -263,9 +274,12 @@ class AccountService:
                 "too many sign-in attempts from this address; wait a few minutes", retry_after_seconds=wait
             )
         name = (username or "").strip().casefold()
+        # a name with a NUL byte is no one's (and PostgreSQL would refuse to look for it): answered like any unknown name
+        hostile = "\x00" in name
+        name = name.replace("\x00", "")
         now = self._now()
         with self.db.session() as s:
-            row = s.scalar(select(orm.UserRow).where(orm.UserRow.username == name))
+            row = None if hostile else s.scalar(select(orm.UserRow).where(orm.UserRow.username == name))
             if row is None:
                 passwords.verify_password(password, passwords.DUMMY_HASH)  # the same time as a real account
                 self._audit(s, "sign_in_failed", actor=name[:64], subject="", client=client, why="unknown user")
@@ -455,7 +469,7 @@ class AccountService:
                 row.status = status
                 revoke = revoke or status != "active"
             if display_name is not None:
-                row.display_name = display_name.strip()[:120]
+                row.display_name = _one_line(display_name)[:120]
             result = self._view(row)
         if revoke:
             self.revoke_user_sessions(user_id)
