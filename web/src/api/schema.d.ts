@@ -1076,6 +1076,258 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/submissions/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The choices of the forms
+         * @description Categories, workflow statuses, priorities and limits, as this server is configured, and whether the caller may triage. The forms and the maintainer queue read this instead of hard-coding the lists.
+         */
+        get: operations["options_submissions_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts of the submissions the caller can see
+         * @description Totals by status and type, how many are open, and how many of the caller's own have an answer they have not seen. A reporter counts their own; a maintainer counts every submission they may see.
+         */
+        get: operations["summary_submissions_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Submissions that look like a title
+         * @description Suggests submissions with similar words in the title, to avoid filing the same thing twice. It is a suggestion and never blocks anything. Only submissions the caller may see are considered: for a reporter, their own.
+         */
+        get: operations["similar_submissions_similar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * People a submission can be assigned to
+         * @description Active maintainer and admin accounts. Maintainers only.
+         */
+        get: operations["assignees_submissions_assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List submissions
+         * @description The submissions the caller may see, newest activity first. A reporter's list is their own; filtering or sorting by what a reporter is not told (priority, severity, assignee, reporter, label, visibility) is refused to them. Text search looks at the title and description.
+         */
+        get: operations["search_submissions_get"];
+        put?: never;
+        /**
+         * Make a feature request or an issue report
+         * @description Records the submission with a number (`FR-2026-00042` or `IR-2026-00042`) and the first status of its workflow, and answers with it only after it has been stored. A person with the role reporter may make a limited number a day (`feedback.max_submissions_per_day`); a category of suspected security issues, or `suspected_security`, keeps it private to the reporter and the maintainers. Anything that looks like a secret in the text is masked before it is stored.
+         */
+        post: operations["create_submissions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a submission
+         * @description The submission with its discussion and status history. A reporter gets the public discussion and nothing that says who the maintainers are; a maintainer also gets the internal notes, labels, priority and links. A submission the caller may not see is answered as not found. A maintainer opening someone else's private submission is recorded.
+         */
+        get: operations["read_submissions__submission_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Triage a submission
+         * @description Changes the status (the reporter sees the change and its comment), priority, severity, assignee, category, labels or visibility; what is sent is applied together. Send back the `version` that was read: if someone else changed it since, this answers 409 and changes nothing. Maintainers only.
+         */
+        patch: operations["triage_submissions__submission_id__patch"];
+        trace?: never;
+    };
+    "/submissions/{submission_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the discussion of a submission
+         * @description The comments, oldest first. A reporter gets the public ones only, and a maintainer who wrote one reads as "AgentLab maintainer" to them.
+         */
+        get: operations["comments_submissions__submission_id__comments_get"];
+        put?: never;
+        /**
+         * Comment on a submission
+         * @description Adds a line to the discussion. A reporter may comment on their own submission, publicly. A maintainer may also write an internal note (never shown to the reporter) or ask the reporter for information.
+         */
+        post: operations["comment_submissions__submission_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the status history of a submission
+         * @description Every status change, oldest first, with who made it, when, and the comment that went with it. Nothing is ever overwritten.
+         */
+        get: operations["history_submissions__submission_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the answers on a submission as seen
+         * @description Records that the reporter has read what the maintainers wrote, which clears `unread`. For anyone but the reporter it does nothing.
+         */
+        post: operations["seen_submissions__submission_id__seen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link two submissions
+         * @description Says that this submission duplicates, relates to, is caused by or implements another. Maintainers only; both must be ones the caller may see.
+         */
+        post: operations["relate_submissions__submission_id__relations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/relations/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a link
+         * @description Removes a link between two submissions. Maintainers only.
+         */
+        delete: operations["unrelate_submissions__submission_id__relations__relation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The audit trail of a submission
+         * @description What was done to a submission and by whom, newest first: made, status changes, edits, comments, links, and who opened it when it is private. It never holds the text of anything. Maintainers only.
+         */
+        get: operations["audit_submissions__submission_id__audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1638,6 +1890,22 @@ export interface components {
             turn?: number | null;
         };
         /**
+         * AssigneeOut
+         * @description A person a submission is assigned to.
+         */
+        AssigneeOut: {
+            /**
+             * Id
+             * @description The account's id
+             */
+            id: string;
+            /**
+             * Name
+             * @description The account's display name
+             */
+            name: string;
+        };
+        /**
          * AttemptResult
          * @description One repetition of a test.
          */
@@ -1707,6 +1975,35 @@ export interface components {
              * @description Id of the trace that recorded this attempt
              */
             trace_id?: string | null;
+        };
+        /**
+         * AuditEventOut
+         * @description One line of a submission's audit trail. It holds fields and statuses, never text.
+         */
+        AuditEventOut: {
+            /**
+             * Event
+             * @description What happened: created, status_changed, updated, commented, related, viewed, ...
+             */
+            event: string;
+            /**
+             * Actor
+             * @description Who did it
+             */
+            actor: string;
+            /**
+             * At
+             * Format: date-time
+             * @description When
+             */
+            at: string;
+            /**
+             * Detail
+             * @description Which fields or statuses; never the text itself
+             */
+            detail: {
+                [key: string]: unknown;
+            };
         };
         /**
          * AuthOptions
@@ -2089,6 +2386,80 @@ export interface components {
              * @description Hosts reachable when network is allowlist
              */
             allow_hosts?: string[];
+        };
+        /**
+         * CommentIn
+         * @description A line of the discussion.
+         */
+        CommentIn: {
+            /**
+             * Body
+             * @description The comment
+             */
+            body: string;
+            /**
+             * Visibility
+             * @description public: the reporter sees it; internal: maintainers only (a reporter may not write one)
+             * @default public
+             * @enum {string}
+             */
+            visibility?: "public" | "internal";
+            /**
+             * Kind
+             * @description info_request asks the reporter for more information; reproduction_request asks them to try again and report what happens (both maintainers only, and always public)
+             * @default comment
+             * @enum {string}
+             */
+            kind?: "comment" | "info_request" | "reproduction_request";
+        };
+        /**
+         * CommentOut
+         * @description One line of the discussion, as the caller may see it.
+         */
+        CommentOut: {
+            /**
+             * Id
+             * @description The comment's id
+             */
+            id: string;
+            /**
+             * Author
+             * @description Who wrote it. A reporter is never told which maintainer wrote something: it reads "AgentLab maintainer"
+             */
+            author: string;
+            /**
+             * Author Is Staff
+             * @description True when a maintainer or the shared token wrote it
+             */
+            author_is_staff: boolean;
+            /**
+             * Mine
+             * @description True when the caller wrote it
+             */
+            mine: boolean;
+            /**
+             * Visibility
+             * @description public: the reporter sees it; internal: maintainers only
+             * @enum {string}
+             */
+            visibility: "public" | "internal";
+            /**
+             * Kind
+             * @description What sort of line it is
+             * @enum {string}
+             */
+            kind: "comment" | "info_request" | "reproduction_request";
+            /**
+             * Body
+             * @description The text
+             */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When it was written
+             */
+            created_at: string;
         };
         /**
          * Comparison
@@ -2857,6 +3228,232 @@ export interface components {
             created_new_version: boolean;
         };
         /**
+         * FeatureDetailsIn
+         * @description What a feature request says beyond its title and description.
+         */
+        FeatureDetailsIn: {
+            /**
+             * Problem Statement
+             * @description The problem or opportunity this addresses
+             */
+            problem_statement: string;
+            /**
+             * Expected Behavior
+             * @description What the person should be able to do afterwards
+             * @default
+             */
+            expected_behavior?: string;
+            /**
+             * Primary Use Case
+             * @description The main situation in which it would be used
+             * @default
+             */
+            primary_use_case?: string;
+            /**
+             * Why Important
+             * @description Why it matters
+             * @default
+             */
+            why_important?: string;
+            /**
+             * Users Affected
+             * @description Who is affected: people, teams
+             * @default
+             */
+            users_affected?: string;
+            /**
+             * Business Impact
+             * @description What it is worth, or what its absence costs
+             * @default
+             */
+            business_impact?: string;
+            /**
+             * Use Frequency
+             * @description How often the use case comes up
+             * @default
+             */
+            use_frequency?: string;
+            /**
+             * Current Workaround
+             * @description What is done today instead
+             * @default
+             */
+            current_workaround?: string;
+            /**
+             * Proposed Solution
+             * @description An idea of how it could work
+             * @default
+             */
+            proposed_solution?: string;
+            /**
+             * Acceptance Criteria
+             * @description How to tell it is done, as measurable statements when possible
+             * @default
+             */
+            acceptance_criteria?: string;
+            /**
+             * Related Area
+             * @description The page or feature of AgentLab it concerns
+             * @default
+             */
+            related_area?: string;
+            /**
+             * Dependencies
+             * @description What it depends on
+             * @default
+             */
+            dependencies?: string;
+            /**
+             * Requested Priority
+             * @description The business importance the person asks for. The maintainers set their own priority when they triage
+             * @default normal
+             * @enum {string}
+             */
+            requested_priority?: "low" | "normal" | "high" | "critical_business_need";
+        };
+        /**
+         * FeatureDetailsOut
+         * @description The details of a feature request, as stored.
+         */
+        FeatureDetailsOut: {
+            /**
+             * Problem Statement
+             * @description The problem or opportunity this addresses
+             */
+            problem_statement: string;
+            /**
+             * Expected Behavior
+             * @description What the person should be able to do afterwards
+             */
+            expected_behavior: string;
+            /**
+             * Primary Use Case
+             * @description The main situation in which it would be used
+             */
+            primary_use_case: string;
+            /**
+             * Why Important
+             * @description Why it matters
+             */
+            why_important: string;
+            /**
+             * Users Affected
+             * @description Who is affected
+             */
+            users_affected: string;
+            /**
+             * Business Impact
+             * @description What it is worth, or what its absence costs
+             */
+            business_impact: string;
+            /**
+             * Use Frequency
+             * @description How often the use case comes up
+             */
+            use_frequency: string;
+            /**
+             * Current Workaround
+             * @description What is done today instead
+             */
+            current_workaround: string;
+            /**
+             * Proposed Solution
+             * @description An idea of how it could work
+             */
+            proposed_solution: string;
+            /**
+             * Acceptance Criteria
+             * @description How to tell it is done
+             */
+            acceptance_criteria: string;
+            /**
+             * Related Area
+             * @description The page or feature of AgentLab it concerns
+             */
+            related_area: string;
+            /**
+             * Dependencies
+             * @description What it depends on
+             */
+            dependencies: string;
+        };
+        /**
+         * FeedbackOptions
+         * @description The choices of the forms and the workflow, as this server is configured.
+         */
+        FeedbackOptions: {
+            /**
+             * Feature Categories
+             * @description Categories of a feature request
+             */
+            feature_categories: string[];
+            /**
+             * Issue Categories
+             * @description Categories of an issue report
+             */
+            issue_categories: string[];
+            /**
+             * Feature Statuses
+             * @description The workflow of a feature request, in order
+             */
+            feature_statuses: string[];
+            /**
+             * Issue Statuses
+             * @description The workflow of an issue report, in order
+             */
+            issue_statuses: string[];
+            /**
+             * Closed Statuses
+             * @description Statuses that close a submission
+             */
+            closed_statuses: string[];
+            /**
+             * Feature Priorities
+             * @description What a person can ask for on a feature request
+             */
+            feature_priorities: string[];
+            /**
+             * Priorities
+             * @description Priorities a maintainer assigns
+             */
+            priorities: string[];
+            /**
+             * Severities
+             * @description Severities a maintainer assigns
+             */
+            severities: string[];
+            /**
+             * Frequencies
+             * @description How often an issue happens
+             */
+            frequencies: string[];
+            /**
+             * Impacts
+             * @description How an issue can affect the work
+             */
+            impacts: string[];
+            /**
+             * Relation Kinds
+             * @description Kinds of link between submissions
+             */
+            relation_kinds: string[];
+            /**
+             * Security Category
+             * @description An issue in this category is kept private
+             */
+            security_category: string;
+            /**
+             * Max Text Chars
+             * @description The longest any text field may be
+             */
+            max_text_chars: number;
+            /**
+             * Can Triage
+             * @description True when the caller is a maintainer and may change status and priority
+             */
+            can_triage: boolean;
+        };
+        /**
          * Finding
          * @description A specific, evidenced defect (spec section 30). Never 'agent is bad'.
          */
@@ -3057,6 +3654,168 @@ export interface components {
              * @description Jobs waiting for a worker
              */
             queued: number;
+        };
+        /**
+         * IssueDetailsIn
+         * @description What an issue report says beyond its title and description.
+         */
+        IssueDetailsIn: {
+            /**
+             * Impact Summary
+             * @description A brief summary of how the issue affects the work
+             */
+            impact_summary: string;
+            /**
+             * Expected Behavior
+             * @description What AgentLab should have done
+             * @default
+             */
+            expected_behavior?: string;
+            /**
+             * Actual Behavior
+             * @description What AgentLab did instead
+             * @default
+             */
+            actual_behavior?: string;
+            /**
+             * Reproduction Steps
+             * @description Steps to reproduce, if known
+             * @default
+             */
+            reproduction_steps?: string;
+            /**
+             * Not Reproducible
+             * @description True when the person cannot say how to make it happen again
+             * @default false
+             */
+            not_reproducible?: boolean;
+            /**
+             * Frequency
+             * @description How often it happens
+             * @default unknown
+             * @enum {string}
+             */
+            frequency?: "every_time" | "frequently" | "occasionally" | "once" | "unknown";
+            /**
+             * First Observed At
+             * @description Approximately when it was first seen
+             */
+            first_observed_at?: string | null;
+            /**
+             * Consistent
+             * @description Whether it happens consistently
+             */
+            consistent?: boolean | null;
+            /**
+             * Blocks Work
+             * @description Whether it blocks the person's work
+             */
+            blocks_work?: boolean | null;
+            /**
+             * Workaround
+             * @description A way around it, if there is one
+             * @default
+             */
+            workaround?: string;
+            /**
+             * Reported Impact
+             * @description How the person says it affects their work. The maintainers decide the severity when they triage
+             * @default other
+             * @enum {string}
+             */
+            reported_impact?: "cosmetic" | "slows_work" | "prevents_workflow" | "blocks_project" | "incorrect_results" | "data_loss_or_exposure" | "unavailable" | "other";
+            /**
+             * Ui Screen
+             * @description The screen it happened on
+             * @default
+             */
+            ui_screen?: string;
+            /**
+             * Worker Job Id
+             * @description The background job it concerns
+             */
+            worker_job_id?: string | null;
+            /**
+             * Provider Config Id
+             * @description The provider configuration it concerns
+             */
+            provider_config_id?: string | null;
+        };
+        /**
+         * IssueDetailsOut
+         * @description The details of an issue report, as stored.
+         */
+        IssueDetailsOut: {
+            /**
+             * Impact Summary
+             * @description A brief summary of how the issue affects the work
+             */
+            impact_summary: string;
+            /**
+             * Expected Behavior
+             * @description What AgentLab should have done
+             */
+            expected_behavior: string;
+            /**
+             * Actual Behavior
+             * @description What AgentLab did instead
+             */
+            actual_behavior: string;
+            /**
+             * Reproduction Steps
+             * @description Steps to reproduce, if known
+             */
+            reproduction_steps: string;
+            /**
+             * Not Reproducible
+             * @description True when the person cannot say how to make it happen again
+             */
+            not_reproducible: boolean;
+            /**
+             * Frequency
+             * @description How often it happens
+             */
+            frequency: string;
+            /**
+             * First Observed At
+             * @description Approximately when it was first seen
+             */
+            first_observed_at: string | null;
+            /**
+             * Consistent
+             * @description Whether it happens consistently
+             */
+            consistent: boolean | null;
+            /**
+             * Blocks Work
+             * @description Whether it blocks the person's work
+             */
+            blocks_work: boolean | null;
+            /**
+             * Workaround
+             * @description A way around it, if there is one
+             */
+            workaround: string;
+            /**
+             * Reported Impact
+             * @description How the person says it affects their work
+             */
+            reported_impact: string;
+            /**
+             * Ui Screen
+             * @description The screen it happened on
+             */
+            ui_screen: string;
+            /**
+             * Worker Job Id
+             * @description The background job it concerns
+             */
+            worker_job_id: string | null;
+            /**
+             * Provider Config Id
+             * @description The provider configuration it concerns
+             */
+            provider_config_id: string | null;
         };
         /**
          * JobOptions
@@ -4141,6 +4900,65 @@ export interface components {
             me: components["schemas"]["MeOut"] | null;
         };
         /**
+         * RelationIn
+         * @description A link between two submissions.
+         */
+        RelationIn: {
+            /**
+             * To
+             * @description The other submission: its id or its number (FR-2026-00042)
+             */
+            to: string;
+            /**
+             * Kind
+             * @description duplicate_of: this repeats the other; related; caused_by: the other is the cause; implements: this feature request is delivered by the other
+             * @enum {string}
+             */
+            kind: "duplicate_of" | "related" | "caused_by" | "implements";
+        };
+        /**
+         * RelationOut
+         * @description A link from or to another submission the caller may see.
+         */
+        RelationOut: {
+            /**
+             * Id
+             * @description The link's id
+             */
+            id: string;
+            /**
+             * Kind
+             * @description duplicate_of, related, caused_by or implements
+             */
+            kind: string;
+            /**
+             * Direction
+             * @description from: this submission is the source of the link; to: the other one is
+             * @enum {string}
+             */
+            direction: "from" | "to";
+            /**
+             * Other Id
+             * @description The other submission's id
+             */
+            other_id: string;
+            /**
+             * Other Number
+             * @description The other submission's number, such as FR-2026-00042
+             */
+            other_number: string;
+            /**
+             * Other Title
+             * @description The other submission's title
+             */
+            other_title: string;
+            /**
+             * Other Status
+             * @description The other submission's status
+             */
+            other_status: string;
+        };
+        /**
          * ReliabilityStats
          * @description How consistent a test was over its repetitions
          */
@@ -5167,6 +5985,37 @@ export interface components {
          */
         Severity: "critical" | "high" | "medium" | "low" | "info";
         /**
+         * SimilarOut
+         * @description A submission whose title shares words with the one being typed.
+         */
+        SimilarOut: {
+            /**
+             * Id
+             * @description The submission's id
+             */
+            id: string;
+            /**
+             * Number
+             * @description The submission's number
+             */
+            number: string;
+            /**
+             * Title
+             * @description The title
+             */
+            title: string;
+            /**
+             * Status
+             * @description The status
+             */
+            status: string;
+            /**
+             * Score
+             * @description 0 to 1: how much of the title they share
+             */
+            score: number;
+        };
+        /**
          * SkillDetail
          * @description A skill with its manifest and documentation
          */
@@ -5375,6 +6224,554 @@ export interface components {
              * @description Problems found when the skill was loaded
              */
             problems?: string[];
+        };
+        /**
+         * StatusChangeOut
+         * @description One change of status, kept for good.
+         */
+        StatusChangeOut: {
+            /**
+             * Id
+             * @description The change's id
+             */
+            id: string;
+            /**
+             * Old Status
+             * @description The status before; null for the first one
+             */
+            old_status: string | null;
+            /**
+             * New Status
+             * @description The status after
+             */
+            new_status: string;
+            /**
+             * Changed By
+             * @description Who changed it (a reporter sees the role of a maintainer, not their name)
+             */
+            changed_by: string;
+            /**
+             * By Staff
+             * @description True when a maintainer or the shared token changed it
+             */
+            by_staff: boolean;
+            /**
+             * Comment
+             * @description The comment kept with the change; the reporter sees it
+             */
+            comment: string;
+            /**
+             * At
+             * Format: date-time
+             * @description When it changed
+             */
+            at: string;
+        };
+        /**
+         * SubmissionCounts
+         * @description Counts of the submissions the caller can see.
+         */
+        SubmissionCounts: {
+            /**
+             * Total
+             * @description How many submissions the caller can see
+             */
+            total: number;
+            /**
+             * Open
+             * @description How many of them are not in a closed status
+             */
+            open: number;
+            /**
+             * Unread
+             * @description How many of the caller's own have an answer they have not seen
+             */
+            unread: number;
+            /**
+             * Unassigned
+             * @description Open ones nobody is assigned to; null for a reporter
+             */
+            unassigned: number | null;
+            /**
+             * By Status
+             * @description Count per status
+             */
+            by_status: {
+                [key: string]: number;
+            };
+            /**
+             * By Type
+             * @description Count per type
+             */
+            by_type: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * SubmissionDetail
+         * @description A submission with its details, discussion and status history.
+         */
+        SubmissionDetail: {
+            /**
+             * Id
+             * @description The submission's id
+             */
+            id: string;
+            /**
+             * Number
+             * @description The submission's number, such as FR-2026-00042 (feature) or IR-2026-00042 (issue)
+             */
+            number: string;
+            /**
+             * Type
+             * @description feature or issue
+             * @enum {string}
+             */
+            type: "feature" | "issue";
+            /**
+             * Title
+             * @description The title
+             */
+            title: string;
+            /**
+             * Category
+             * @description The category
+             */
+            category: string;
+            /**
+             * Status
+             * @description The status; the workflow is `GET /submissions/options`
+             */
+            status: string;
+            /**
+             * Visibility
+             * @description security: only the reporter and authorised maintainers see it
+             * @enum {string}
+             */
+            visibility: "normal" | "security";
+            /**
+             * Requested Priority
+             * @description The priority the reporter asked for (feature requests)
+             */
+            requested_priority: string | null;
+            /**
+             * Assigned Priority
+             * @description The maintainers' priority; null for a reporter, who is not told
+             */
+            assigned_priority: string | null;
+            /**
+             * Severity
+             * @description The maintainers' severity; null for a reporter, who is not told
+             */
+            severity: string | null;
+            /**
+             * Reporter
+             * @description Who made it
+             */
+            reporter: string;
+            /**
+             * Reporter Id
+             * @description The reporter's account id; null for a reporter's own view, and when the shared token made it
+             */
+            reporter_id: string | null;
+            /**
+             * Mine
+             * @description True when the caller made it
+             */
+            mine: boolean;
+            /** @description Who it is assigned to; null for a reporter, who is not told */
+            assignee: components["schemas"]["AssigneeOut"] | null;
+            /**
+             * Labels
+             * @description The labels; empty for a reporter, who is not told
+             */
+            labels: string[];
+            /**
+             * Created At
+             * Format: date-time
+             * @description When it was made
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description When it was last changed
+             */
+            updated_at: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             * @description The last change, comment or status change
+             */
+            last_activity_at: string;
+            /**
+             * Unread
+             * @description True when a maintainer answered or changed the status since the reporter last looked
+             */
+            unread: boolean;
+            /**
+             * Comments
+             * @description How many comments the caller can see
+             */
+            comments: number;
+            /**
+             * Version
+             * @description Send this back with a change; a stale one is refused with 409
+             */
+            version: number;
+            /**
+             * Description
+             * @description The description
+             */
+            description: string;
+            /** @description The details of a feature request */
+            feature: components["schemas"]["FeatureDetailsOut"] | null;
+            /** @description The details of an issue report */
+            issue: components["schemas"]["IssueDetailsOut"] | null;
+            /**
+             * Project Id
+             * @description The project it concerns
+             */
+            project_id: string | null;
+            /**
+             * Related Run Id
+             * @description The run it concerns
+             */
+            related_run_id: string | null;
+            /**
+             * Related Test Id
+             * @description The test it concerns
+             */
+            related_test_id: string | null;
+            /**
+             * Related Trace Id
+             * @description The trace it concerns
+             */
+            related_trace_id: string | null;
+            /**
+             * Related Result Id
+             * @description The test result it concerns
+             */
+            related_result_id: string | null;
+            /**
+             * Related Report Id
+             * @description The report it concerns
+             */
+            related_report_id: string | null;
+            /**
+             * Related Target Id
+             * @description The target it concerns
+             */
+            related_target_id: string | null;
+            /**
+             * App Version
+             * @description The AgentLab version the person was using
+             */
+            app_version: string | null;
+            /**
+             * Build
+             * @description The build or commit identifier
+             */
+            build: string | null;
+            /**
+             * Resolved At
+             * @description When it entered a resolved status
+             */
+            resolved_at: string | null;
+            /**
+             * Closed At
+             * @description When it entered a closed status
+             */
+            closed_at: string | null;
+            /**
+             * Discussion
+             * @description The comments, oldest first; a reporter gets the public ones only
+             */
+            discussion: components["schemas"]["CommentOut"][];
+            /**
+             * History
+             * @description Every status change, oldest first
+             */
+            history: components["schemas"]["StatusChangeOut"][];
+            /**
+             * Relations
+             * @description Links to other submissions the caller may see; empty for a reporter
+             */
+            relations: components["schemas"]["RelationOut"][];
+            /**
+             * Statuses
+             * @description The statuses this kind of submission moves through
+             */
+            statuses: string[];
+        };
+        /**
+         * SubmissionIn
+         * @description A feature request or an issue report.
+         */
+        SubmissionIn: {
+            /**
+             * Type
+             * @description feature: a request for something new; issue: a problem
+             * @enum {string}
+             */
+            type: "feature" | "issue";
+            /**
+             * Title
+             * @description A short title
+             */
+            title: string;
+            /**
+             * Description
+             * @description The description, in the person's own words
+             * @default
+             */
+            description?: string;
+            /**
+             * Category
+             * @description One of the categories the server offers for this type
+             */
+            category: string;
+            /** @description The details of a feature request */
+            feature?: components["schemas"]["FeatureDetailsIn"] | null;
+            /** @description The details of an issue report */
+            issue?: components["schemas"]["IssueDetailsIn"] | null;
+            /**
+             * Project Id
+             * @description The AgentLab project it concerns
+             */
+            project_id?: string | null;
+            /**
+             * Related Run Id
+             * @description The evaluation run it concerns
+             */
+            related_run_id?: string | null;
+            /**
+             * Related Test Id
+             * @description The test case it concerns
+             */
+            related_test_id?: string | null;
+            /**
+             * Related Trace Id
+             * @description The trace it concerns
+             */
+            related_trace_id?: string | null;
+            /**
+             * Related Result Id
+             * @description The test result it concerns
+             */
+            related_result_id?: string | null;
+            /**
+             * Related Report Id
+             * @description The report it concerns
+             */
+            related_report_id?: string | null;
+            /**
+             * Related Target Id
+             * @description The target it concerns
+             */
+            related_target_id?: string | null;
+            /**
+             * App Version
+             * @description The AgentLab version the person was using
+             */
+            app_version?: string | null;
+            /**
+             * Build
+             * @description The build or commit identifier, when known
+             */
+            build?: string | null;
+            /**
+             * Suspected Security
+             * @description True when the person believes this is a security problem: it is then kept private
+             * @default false
+             */
+            suspected_security?: boolean;
+        };
+        /**
+         * SubmissionPage
+         * @description One page of a list of submissions.
+         */
+        SubmissionPage: {
+            /**
+             * Items
+             * @description The submissions on this page
+             */
+            items: components["schemas"]["SubmissionSummary"][];
+            /**
+             * Total
+             * @description How many match, over all pages
+             */
+            total: number;
+            /**
+             * Limit
+             * @description The page size
+             */
+            limit: number;
+            /**
+             * Offset
+             * @description How many were skipped
+             */
+            offset: number;
+        };
+        /**
+         * SubmissionPatch
+         * @description What a maintainer may change when triaging. Everything but ``version`` is optional; what is sent is applied together.
+         */
+        SubmissionPatch: {
+            /**
+             * Version
+             * @description The version of the submission the caller read: a stale one is refused with 409
+             */
+            version: number;
+            /**
+             * Status
+             * @description The new status, one of the configured ones
+             */
+            status?: string | null;
+            /**
+             * Status Comment
+             * @description A comment kept with the status change; the reporter sees it
+             * @default
+             */
+            status_comment?: string;
+            /**
+             * Assigned Priority
+             * @description The maintainers' priority, separate from the one the person requested; null clears it
+             */
+            assigned_priority?: ("low" | "normal" | "high" | "critical") | null;
+            /**
+             * Severity
+             * @description The severity the maintainers decided on; null clears it
+             */
+            severity?: ("info" | "low" | "medium" | "high" | "critical") | null;
+            /**
+             * Assignee Id
+             * @description The id of the account to assign it to; null or an empty string unassigns
+             */
+            assignee_id?: string | null;
+            /**
+             * Category
+             * @description A different category
+             */
+            category?: string | null;
+            /**
+             * Labels
+             * @description The complete set of labels (replaces the old set)
+             */
+            labels?: string[] | null;
+            /**
+             * Visibility
+             * @description security: only the reporter and authorised maintainers see it
+             */
+            visibility?: ("normal" | "security") | null;
+        };
+        /**
+         * SubmissionSummary
+         * @description A submission as a list shows it. What the caller is not told is null or empty.
+         */
+        SubmissionSummary: {
+            /**
+             * Id
+             * @description The submission's id
+             */
+            id: string;
+            /**
+             * Number
+             * @description The submission's number, such as FR-2026-00042 (feature) or IR-2026-00042 (issue)
+             */
+            number: string;
+            /**
+             * Type
+             * @description feature or issue
+             * @enum {string}
+             */
+            type: "feature" | "issue";
+            /**
+             * Title
+             * @description The title
+             */
+            title: string;
+            /**
+             * Category
+             * @description The category
+             */
+            category: string;
+            /**
+             * Status
+             * @description The status; the workflow is `GET /submissions/options`
+             */
+            status: string;
+            /**
+             * Visibility
+             * @description security: only the reporter and authorised maintainers see it
+             * @enum {string}
+             */
+            visibility: "normal" | "security";
+            /**
+             * Requested Priority
+             * @description The priority the reporter asked for (feature requests)
+             */
+            requested_priority: string | null;
+            /**
+             * Assigned Priority
+             * @description The maintainers' priority; null for a reporter, who is not told
+             */
+            assigned_priority: string | null;
+            /**
+             * Severity
+             * @description The maintainers' severity; null for a reporter, who is not told
+             */
+            severity: string | null;
+            /**
+             * Reporter
+             * @description Who made it
+             */
+            reporter: string;
+            /**
+             * Reporter Id
+             * @description The reporter's account id; null for a reporter's own view, and when the shared token made it
+             */
+            reporter_id: string | null;
+            /**
+             * Mine
+             * @description True when the caller made it
+             */
+            mine: boolean;
+            /** @description Who it is assigned to; null for a reporter, who is not told */
+            assignee: components["schemas"]["AssigneeOut"] | null;
+            /**
+             * Labels
+             * @description The labels; empty for a reporter, who is not told
+             */
+            labels: string[];
+            /**
+             * Created At
+             * Format: date-time
+             * @description When it was made
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description When it was last changed
+             */
+            updated_at: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             * @description The last change, comment or status change
+             */
+            last_activity_at: string;
+            /**
+             * Unread
+             * @description True when a maintainer answered or changed the status since the reporter last looked
+             */
+            unread: boolean;
+            /**
+             * Comments
+             * @description How many comments the caller can see
+             */
+            comments: number;
         };
         /**
          * Support
@@ -10409,6 +11806,1219 @@ export interface operations {
             };
             /** @description The thing does not exist */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    options_submissions_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOptions"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    summary_submissions_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionCounts"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    similar_submissions_similar_get: {
+        parameters: {
+            query: {
+                /** @description The title being typed */
+                title: string;
+                /** @description Compare with feature requests or issue reports */
+                type: "feature" | "issue";
+                /** @description Prefer the same category */
+                category?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    assignees_submissions_assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssigneeOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    search_submissions_get: {
+        parameters: {
+            query?: {
+                /** @description Only this type */
+                type?: ("feature" | "issue") | null;
+                /** @description Only these statuses (repeat the parameter) */
+                status?: string[] | null;
+                /** @description Only this category */
+                category?: string | null;
+                /** @description Only this priority as the reporter asked for it (feature requests) */
+                requested_priority?: ("low" | "normal" | "high" | "critical_business_need") | null;
+                /** @description Only this project (id) */
+                project?: string | null;
+                /** @description Only reports of this AgentLab version */
+                version?: string | null;
+                /** @description Only submissions about this evaluation run */
+                run?: string | null;
+                /** @description Only this assigned priority (maintainers) */
+                priority?: ("low" | "normal" | "high" | "critical") | null;
+                /** @description Only this severity (maintainers) */
+                severity?: ("info" | "low" | "medium" | "high" | "critical") | null;
+                /** @description An account id, `me` or `none` (maintainers) */
+                assignee?: string | null;
+                /** @description An account id (maintainers) */
+                reporter?: string | null;
+                /** @description Only this label (maintainers) */
+                label?: string | null;
+                /** @description Only this visibility (maintainers) */
+                visibility?: ("normal" | "security") | null;
+                /** @description Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id */
+                q?: string | null;
+                /** @description Only the submissions the caller made */
+                mine?: boolean;
+                /** @description Only the caller's own that have an answer they have not seen */
+                unread?: boolean;
+                /** @description Made at or after this time */
+                created_from?: string | null;
+                /** @description Made at or before this time */
+                created_to?: string | null;
+                /** @description activity: last change; created: when made; priority: assigned priority (maintainers) */
+                sort?: "activity" | "created" | "priority";
+                /** @description Newest or highest first (desc) or last (asc) */
+                order?: "desc" | "asc";
+                /** @description Page size */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionPage"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_submissions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmissionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_submissions__submission_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    triage_submissions__submission_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmissionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    comments_submissions__submission_id__comments_get: {
+        parameters: {
+            query?: {
+                /** @description How many comments */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    comment_submissions__submission_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    history_submissions__submission_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusChangeOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    seen_submissions__submission_id__seen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    relate_submissions__submission_id__relations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unrelate_submissions__submission_id__relations__relation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+                /** @description Id of a link, from the submission */
+                relation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    audit_submissions__submission_id__audit_get: {
+        parameters: {
+            query?: {
+                /** @description How many events */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue) */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The submission was changed by someone else since it was read */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

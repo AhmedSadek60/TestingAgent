@@ -174,6 +174,26 @@ People who sign in to the web interface: [accounts.md](accounts.md). The shared 
 | `registrations_per_hour` | `5` | Registrations accepted per client address per hour. |
 | `cookie_secure` | `auto` | Whether the session cookie is marked Secure: `auto` when the request came over HTTPS (or a proxy said so with `X-Forwarded-Proto`), `always`, or `never`. |
 
+## `feedback`
+
+Feature requests and issue reports: [feedback-support.md](feedback-support.md). The lists below are what the forms offer and
+what a submission moves through; changing them changes the forms and the maintainer queue, not the stored data.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `feature_categories` | 17 categories, ending in `Other` | The categories a feature request can have. |
+| `issue_categories` | 19 categories, ending in `Other` | The categories an issue report can have. |
+| `feature_statuses` | `Submitted`, `Needs Triage`, `Under Review`, `Planned`, `In Progress`, `Completed`, `Declined`, `Duplicate` | The workflow of a feature request. The first status is the one it starts with. |
+| `issue_statuses` | `Submitted`, `Needs Triage`, `Investigating`, `Awaiting User`, `Reproducing`, `In Progress`, `Fix Available`, `Resolved`, `Closed`, `Duplicate`, `Cannot Reproduce` | The workflow of an issue report. The first status is the one it starts with. |
+| `resolved_statuses` | `Completed`, `Fix Available`, `Resolved` | Statuses that set a submission's resolution time. Each must be in a workflow. |
+| `closed_statuses` | `Completed`, `Declined`, `Duplicate`, `Closed`, `Cannot Reproduce` | Statuses that close a submission: they set its closing time and take it out of the open count. Each must be in a workflow. |
+| `security_category` | `Suspected Security Issue` | An issue report in this category is private: only its reporter, maintainers and admins see it. Must be one of `issue_categories`. |
+| `service_token_sees_security` | `false` | Whether the shared API token, a credential many people may hold, may see private submissions made by other people. Maintainers, admins and the local machine always may. |
+| `max_submissions_per_day` | `20` | Submissions one person with the role `reporter` may make in 24 hours. Maintainers have no limit. |
+| `max_comments_per_day` | `100` | Comments one person with the role `reporter` may write in 24 hours. |
+| `similar_limit` | `5` | How many possibly similar submissions are suggested while a title is typed. |
+| `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |
+
 ## `planning`
 
 | Key | Default | Meaning |

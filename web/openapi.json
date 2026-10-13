@@ -5407,6 +5407,1947 @@
           }
         }
       }
+    },
+    "/submissions/options": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "The choices of the forms",
+        "description": "Categories, workflow statuses, priorities and limits, as this server is configured, and whether the caller may triage. The forms and the maintainer queue read this instead of hard-coding the lists.",
+        "operationId": "options_submissions_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/summary": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Counts of the submissions the caller can see",
+        "description": "Totals by status and type, how many are open, and how many of the caller's own have an answer they have not seen. A reporter counts their own; a maintainer counts every submission they may see.",
+        "operationId": "summary_submissions_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionCounts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/similar": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Submissions that look like a title",
+        "description": "Suggests submissions with similar words in the title, to avoid filing the same thing twice. It is a suggestion and never blocks anything. Only submissions the caller may see are considered: for a reporter, their own.",
+        "operationId": "similar_submissions_similar_get",
+        "parameters": [
+          {
+            "name": "title",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200,
+              "description": "The title being typed",
+              "title": "Title"
+            },
+            "description": "The title being typed"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "feature",
+                "issue"
+              ],
+              "type": "string",
+              "description": "Compare with feature requests or issue reports",
+              "title": "Type"
+            },
+            "description": "Compare with feature requests or issue reports"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prefer the same category",
+              "title": "Category"
+            },
+            "description": "Prefer the same category"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SimilarOut"
+                  },
+                  "title": "Response Similar Submissions Similar Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/assignees": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "People a submission can be assigned to",
+        "description": "Active maintainer and admin accounts. Maintainers only.",
+        "operationId": "assignees_submissions_assignees_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssigneeOut"
+                  },
+                  "type": "array",
+                  "title": "Response Assignees Submissions Assignees Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Make a feature request or an issue report",
+        "description": "Records the submission with a number (`FR-2026-00042` or `IR-2026-00042`) and the first status of its workflow, and answers with it only after it has been stored. A person with the role reporter may make a limited number a day (`feedback.max_submissions_per_day`); a category of suspected security issues, or `suspected_security`, keeps it private to the reporter and the maintainers. Anything that looks like a secret in the text is masked before it is stored.",
+        "operationId": "create_submissions_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "List submissions",
+        "description": "The submissions the caller may see, newest activity first. A reporter's list is their own; filtering or sorting by what a reporter is not told (priority, severity, assignee, reporter, label, visibility) is refused to them. Text search looks at the title and description.",
+        "operationId": "search_submissions_get",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "feature",
+                    "issue"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this type",
+              "title": "Type"
+            },
+            "description": "Only this type"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 20
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these statuses (repeat the parameter)",
+              "title": "Status"
+            },
+            "description": "Only these statuses (repeat the parameter)"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this category",
+              "title": "Category"
+            },
+            "description": "Only this category"
+          },
+          {
+            "name": "requested_priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "low",
+                    "normal",
+                    "high",
+                    "critical_business_need"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this priority as the reporter asked for it (feature requests)",
+              "title": "Requested Priority"
+            },
+            "description": "Only this priority as the reporter asked for it (feature requests)"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this project (id)",
+              "title": "Project"
+            },
+            "description": "Only this project (id)"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only reports of this AgentLab version",
+              "title": "Version"
+            },
+            "description": "Only reports of this AgentLab version"
+          },
+          {
+            "name": "run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only submissions about this evaluation run",
+              "title": "Run"
+            },
+            "description": "Only submissions about this evaluation run"
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "low",
+                    "normal",
+                    "high",
+                    "critical"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this assigned priority (maintainers)",
+              "title": "Priority"
+            },
+            "description": "Only this assigned priority (maintainers)"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "info",
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this severity (maintainers)",
+              "title": "Severity"
+            },
+            "description": "Only this severity (maintainers)"
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 36
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An account id, `me` or `none` (maintainers)",
+              "title": "Assignee"
+            },
+            "description": "An account id, `me` or `none` (maintainers)"
+          },
+          {
+            "name": "reporter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 36
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An account id (maintainers)",
+              "title": "Reporter"
+            },
+            "description": "An account id (maintainers)"
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this label (maintainers)",
+              "title": "Label"
+            },
+            "description": "Only this label (maintainers)"
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "normal",
+                    "security"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this visibility (maintainers)",
+              "title": "Visibility"
+            },
+            "description": "Only this visibility (maintainers)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id",
+              "title": "Q"
+            },
+            "description": "Text to find: in the title, the description, what an issue says happened, or an exact run, test, trace, result or report id"
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only the submissions the caller made",
+              "default": false,
+              "title": "Mine"
+            },
+            "description": "Only the submissions the caller made"
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only the caller's own that have an answer they have not seen",
+              "default": false,
+              "title": "Unread"
+            },
+            "description": "Only the caller's own that have an answer they have not seen"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Made at or after this time",
+              "title": "Created From"
+            },
+            "description": "Made at or after this time"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Made at or before this time",
+              "title": "Created To"
+            },
+            "description": "Made at or before this time"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "activity",
+                "created",
+                "priority"
+              ],
+              "type": "string",
+              "description": "activity: last change; created: when made; priority: assigned priority (maintainers)",
+              "default": "activity",
+              "title": "Sort"
+            },
+            "description": "activity: last change; created: when made; priority: assigned priority (maintainers)"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "desc",
+                "asc"
+              ],
+              "type": "string",
+              "description": "Newest or highest first (desc) or last (asc)",
+              "default": "desc",
+              "title": "Order"
+            },
+            "description": "Newest or highest first (desc) or last (asc)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "How many to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "How many to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read a submission",
+        "description": "The submission with its discussion and status history. A reporter gets the public discussion and nothing that says who the maintainers are; a maintainer also gets the internal notes, labels, priority and links. A submission the caller may not see is answered as not found. A maintainer opening someone else's private submission is recorded.",
+        "operationId": "read_submissions__submission_id__get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Triage a submission",
+        "description": "Changes the status (the reporter sees the change and its comment), priority, severity, assignee, category, labels or visibility; what is sent is applied together. Send back the `version` that was read: if someone else changed it since, this answers 409 and changes nothing. Maintainers only.",
+        "operationId": "triage_submissions__submission_id__patch",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/comments": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Comment on a submission",
+        "description": "Adds a line to the discussion. A reporter may comment on their own submission, publicly. A maintainer may also write an internal note (never shown to the reporter) or ask the reporter for information.",
+        "operationId": "comment_submissions__submission_id__comments_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read the discussion of a submission",
+        "description": "The comments, oldest first. A reporter gets the public ones only, and a maintainer who wrote one reads as \"AgentLab maintainer\" to them.",
+        "operationId": "comments_submissions__submission_id__comments_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "How many comments",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "How many comments"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "How many to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "How many to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentOut"
+                  },
+                  "title": "Response Comments Submissions  Submission Id  Comments Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/history": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Read the status history of a submission",
+        "description": "Every status change, oldest first, with who made it, when, and the comment that went with it. Nothing is ever overwritten.",
+        "operationId": "history_submissions__submission_id__history_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StatusChangeOut"
+                  },
+                  "title": "Response History Submissions  Submission Id  History Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/seen": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Mark the answers on a submission as seen",
+        "description": "Records that the reporter has read what the maintainers wrote, which clears `unread`. For anyone but the reporter it does nothing.",
+        "operationId": "seen_submissions__submission_id__seen_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/relations": {
+      "post": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Link two submissions",
+        "description": "Says that this submission duplicates, relates to, is caused by or implements another. Maintainers only; both must be ones the caller may see.",
+        "operationId": "relate_submissions__submission_id__relations_post",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/relations/{relation_id}": {
+      "delete": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "Remove a link",
+        "description": "Removes a link between two submissions. Maintainers only.",
+        "operationId": "unrelate_submissions__submission_id__relations__relation_id__delete",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "relation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 36,
+              "description": "Id of a link, from the submission",
+              "title": "Relation Id"
+            },
+            "description": "Id of a link, from the submission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submissions/{submission_id}/audit": {
+      "get": {
+        "tags": [
+          "Feedback & Support"
+        ],
+        "summary": "The audit trail of a submission",
+        "description": "What was done to a submission and by whom, newest first: made, status changes, edits, comments, links, and who opened it when it is private. It never holds the text of anything. Maintainers only.",
+        "operationId": "audit_submissions__submission_id__audit_get",
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]*$",
+              "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)",
+              "title": "Submission Id"
+            },
+            "description": "The submission's id, or its number such as `FR-2026-00042` (feature) or `IR-2026-00042` (issue)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "How many events",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "How many events"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventOut"
+                  },
+                  "title": "Response Audit Submissions  Submission Id  Audit Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API token is missing or wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request is not allowed (policy, origin or restricted evidence)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The thing does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid; the message says what to change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed authentication attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The submission was changed by someone else since it was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6258,6 +8199,28 @@
         "title": "AssertionSpec",
         "description": "A deterministic check. ``type`` selects the evaluator plug-in."
       },
+      "AssigneeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The account's id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The account's display name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AssigneeOut",
+        "description": "A person a submission is assigned to."
+      },
       "AttemptResult": {
         "properties": {
           "attempt": {
@@ -6367,6 +8330,42 @@
         ],
         "title": "AttemptResult",
         "description": "One repetition of a test."
+      },
+      "AuditEventOut": {
+        "properties": {
+          "event": {
+            "type": "string",
+            "title": "Event",
+            "description": "What happened: created, status_changed, updated, commented, related, viewed, ..."
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "description": "Who did it"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At",
+            "description": "When"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail",
+            "description": "Which fields or statuses; never the text itself"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event",
+          "actor",
+          "at",
+          "detail"
+        ],
+        "title": "AuditEventOut",
+        "description": "One line of a submission's audit trail. It holds fields and statuses, never text."
       },
       "AuthOptions": {
         "properties": {
@@ -6949,6 +8948,113 @@
         ],
         "title": "CommandConfig",
         "description": "A target run as a command inside the sandbox (coding/CLI agents).\n\n``mode: chat`` runs the command once per message (the message on standard input, the answer on standard output).\n``mode: task`` is a coding agent: it is started on a disposable workspace with the task on standard input, and what\nit did is judged from the files it left behind and the project's own tests."
+      },
+      "CommentIn": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Body",
+            "description": "The comment"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ],
+            "title": "Visibility",
+            "description": "public: the reporter sees it; internal: maintainers only (a reporter may not write one)",
+            "default": "public"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "comment",
+              "info_request",
+              "reproduction_request"
+            ],
+            "title": "Kind",
+            "description": "info_request asks the reporter for more information; reproduction_request asks them to try again and report what happens (both maintainers only, and always public)",
+            "default": "comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "CommentIn",
+        "description": "A line of the discussion."
+      },
+      "CommentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The comment's id"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "description": "Who wrote it. A reporter is never told which maintainer wrote something: it reads \"AgentLab maintainer\""
+          },
+          "author_is_staff": {
+            "type": "boolean",
+            "title": "Author Is Staff",
+            "description": "True when a maintainer or the shared token wrote it"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine",
+            "description": "True when the caller wrote it"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ],
+            "title": "Visibility",
+            "description": "public: the reporter sees it; internal: maintainers only"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "comment",
+              "info_request",
+              "reproduction_request"
+            ],
+            "title": "Kind",
+            "description": "What sort of line it is"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "description": "The text"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When it was written"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "author",
+          "author_is_staff",
+          "mine",
+          "visibility",
+          "kind",
+          "body",
+          "created_at"
+        ],
+        "title": "CommentOut",
+        "description": "One line of the discussion, as the caller may see it."
       },
       "Comparison": {
         "properties": {
@@ -8066,6 +10172,322 @@
         "title": "ExportResponse",
         "description": "The exported file and the report it belongs to"
       },
+      "FeatureDetailsIn": {
+        "properties": {
+          "problem_statement": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Problem Statement",
+            "description": "The problem or opportunity this addresses"
+          },
+          "expected_behavior": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Expected Behavior",
+            "description": "What the person should be able to do afterwards",
+            "default": ""
+          },
+          "primary_use_case": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Primary Use Case",
+            "description": "The main situation in which it would be used",
+            "default": ""
+          },
+          "why_important": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Why Important",
+            "description": "Why it matters",
+            "default": ""
+          },
+          "users_affected": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Users Affected",
+            "description": "Who is affected: people, teams",
+            "default": ""
+          },
+          "business_impact": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Business Impact",
+            "description": "What it is worth, or what its absence costs",
+            "default": ""
+          },
+          "use_frequency": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Use Frequency",
+            "description": "How often the use case comes up",
+            "default": ""
+          },
+          "current_workaround": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Current Workaround",
+            "description": "What is done today instead",
+            "default": ""
+          },
+          "proposed_solution": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Proposed Solution",
+            "description": "An idea of how it could work",
+            "default": ""
+          },
+          "acceptance_criteria": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Acceptance Criteria",
+            "description": "How to tell it is done, as measurable statements when possible",
+            "default": ""
+          },
+          "related_area": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Related Area",
+            "description": "The page or feature of AgentLab it concerns",
+            "default": ""
+          },
+          "dependencies": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Dependencies",
+            "description": "What it depends on",
+            "default": ""
+          },
+          "requested_priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "critical_business_need"
+            ],
+            "title": "Requested Priority",
+            "description": "The business importance the person asks for. The maintainers set their own priority when they triage",
+            "default": "normal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "problem_statement"
+        ],
+        "title": "FeatureDetailsIn",
+        "description": "What a feature request says beyond its title and description."
+      },
+      "FeatureDetailsOut": {
+        "properties": {
+          "problem_statement": {
+            "type": "string",
+            "title": "Problem Statement",
+            "description": "The problem or opportunity this addresses"
+          },
+          "expected_behavior": {
+            "type": "string",
+            "title": "Expected Behavior",
+            "description": "What the person should be able to do afterwards"
+          },
+          "primary_use_case": {
+            "type": "string",
+            "title": "Primary Use Case",
+            "description": "The main situation in which it would be used"
+          },
+          "why_important": {
+            "type": "string",
+            "title": "Why Important",
+            "description": "Why it matters"
+          },
+          "users_affected": {
+            "type": "string",
+            "title": "Users Affected",
+            "description": "Who is affected"
+          },
+          "business_impact": {
+            "type": "string",
+            "title": "Business Impact",
+            "description": "What it is worth, or what its absence costs"
+          },
+          "use_frequency": {
+            "type": "string",
+            "title": "Use Frequency",
+            "description": "How often the use case comes up"
+          },
+          "current_workaround": {
+            "type": "string",
+            "title": "Current Workaround",
+            "description": "What is done today instead"
+          },
+          "proposed_solution": {
+            "type": "string",
+            "title": "Proposed Solution",
+            "description": "An idea of how it could work"
+          },
+          "acceptance_criteria": {
+            "type": "string",
+            "title": "Acceptance Criteria",
+            "description": "How to tell it is done"
+          },
+          "related_area": {
+            "type": "string",
+            "title": "Related Area",
+            "description": "The page or feature of AgentLab it concerns"
+          },
+          "dependencies": {
+            "type": "string",
+            "title": "Dependencies",
+            "description": "What it depends on"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "problem_statement",
+          "expected_behavior",
+          "primary_use_case",
+          "why_important",
+          "users_affected",
+          "business_impact",
+          "use_frequency",
+          "current_workaround",
+          "proposed_solution",
+          "acceptance_criteria",
+          "related_area",
+          "dependencies"
+        ],
+        "title": "FeatureDetailsOut",
+        "description": "The details of a feature request, as stored."
+      },
+      "FeedbackOptions": {
+        "properties": {
+          "feature_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feature Categories",
+            "description": "Categories of a feature request"
+          },
+          "issue_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issue Categories",
+            "description": "Categories of an issue report"
+          },
+          "feature_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feature Statuses",
+            "description": "The workflow of a feature request, in order"
+          },
+          "issue_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issue Statuses",
+            "description": "The workflow of an issue report, in order"
+          },
+          "closed_statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed Statuses",
+            "description": "Statuses that close a submission"
+          },
+          "feature_priorities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feature Priorities",
+            "description": "What a person can ask for on a feature request"
+          },
+          "priorities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Priorities",
+            "description": "Priorities a maintainer assigns"
+          },
+          "severities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Severities",
+            "description": "Severities a maintainer assigns"
+          },
+          "frequencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Frequencies",
+            "description": "How often an issue happens"
+          },
+          "impacts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Impacts",
+            "description": "How an issue can affect the work"
+          },
+          "relation_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relation Kinds",
+            "description": "Kinds of link between submissions"
+          },
+          "security_category": {
+            "type": "string",
+            "title": "Security Category",
+            "description": "An issue in this category is kept private"
+          },
+          "max_text_chars": {
+            "type": "integer",
+            "title": "Max Text Chars",
+            "description": "The longest any text field may be"
+          },
+          "can_triage": {
+            "type": "boolean",
+            "title": "Can Triage",
+            "description": "True when the caller is a maintainer and may change status and priority"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "feature_categories",
+          "issue_categories",
+          "feature_statuses",
+          "issue_statuses",
+          "closed_statuses",
+          "feature_priorities",
+          "priorities",
+          "severities",
+          "frequencies",
+          "impacts",
+          "relation_kinds",
+          "security_category",
+          "max_text_chars",
+          "can_triage"
+        ],
+        "title": "FeedbackOptions",
+        "description": "The choices of the forms and the workflow, as this server is configured."
+      },
       "Finding": {
         "properties": {
           "id": {
@@ -8339,6 +10761,287 @@
         ],
         "title": "Health",
         "description": "Whether the server is up"
+      },
+      "IssueDetailsIn": {
+        "properties": {
+          "impact_summary": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Impact Summary",
+            "description": "A brief summary of how the issue affects the work"
+          },
+          "expected_behavior": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Expected Behavior",
+            "description": "What AgentLab should have done",
+            "default": ""
+          },
+          "actual_behavior": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Actual Behavior",
+            "description": "What AgentLab did instead",
+            "default": ""
+          },
+          "reproduction_steps": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Reproduction Steps",
+            "description": "Steps to reproduce, if known",
+            "default": ""
+          },
+          "not_reproducible": {
+            "type": "boolean",
+            "title": "Not Reproducible",
+            "description": "True when the person cannot say how to make it happen again",
+            "default": false
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "every_time",
+              "frequently",
+              "occasionally",
+              "once",
+              "unknown"
+            ],
+            "title": "Frequency",
+            "description": "How often it happens",
+            "default": "unknown"
+          },
+          "first_observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Observed At",
+            "description": "Approximately when it was first seen"
+          },
+          "consistent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistent",
+            "description": "Whether it happens consistently"
+          },
+          "blocks_work": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks Work",
+            "description": "Whether it blocks the person's work"
+          },
+          "workaround": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Workaround",
+            "description": "A way around it, if there is one",
+            "default": ""
+          },
+          "reported_impact": {
+            "type": "string",
+            "enum": [
+              "cosmetic",
+              "slows_work",
+              "prevents_workflow",
+              "blocks_project",
+              "incorrect_results",
+              "data_loss_or_exposure",
+              "unavailable",
+              "other"
+            ],
+            "title": "Reported Impact",
+            "description": "How the person says it affects their work. The maintainers decide the severity when they triage",
+            "default": "other"
+          },
+          "ui_screen": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Ui Screen",
+            "description": "The screen it happened on",
+            "default": ""
+          },
+          "worker_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Job Id",
+            "description": "The background job it concerns"
+          },
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id",
+            "description": "The provider configuration it concerns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "impact_summary"
+        ],
+        "title": "IssueDetailsIn",
+        "description": "What an issue report says beyond its title and description."
+      },
+      "IssueDetailsOut": {
+        "properties": {
+          "impact_summary": {
+            "type": "string",
+            "title": "Impact Summary",
+            "description": "A brief summary of how the issue affects the work"
+          },
+          "expected_behavior": {
+            "type": "string",
+            "title": "Expected Behavior",
+            "description": "What AgentLab should have done"
+          },
+          "actual_behavior": {
+            "type": "string",
+            "title": "Actual Behavior",
+            "description": "What AgentLab did instead"
+          },
+          "reproduction_steps": {
+            "type": "string",
+            "title": "Reproduction Steps",
+            "description": "Steps to reproduce, if known"
+          },
+          "not_reproducible": {
+            "type": "boolean",
+            "title": "Not Reproducible",
+            "description": "True when the person cannot say how to make it happen again"
+          },
+          "frequency": {
+            "type": "string",
+            "title": "Frequency",
+            "description": "How often it happens"
+          },
+          "first_observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Observed At",
+            "description": "Approximately when it was first seen"
+          },
+          "consistent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistent",
+            "description": "Whether it happens consistently"
+          },
+          "blocks_work": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks Work",
+            "description": "Whether it blocks the person's work"
+          },
+          "workaround": {
+            "type": "string",
+            "title": "Workaround",
+            "description": "A way around it, if there is one"
+          },
+          "reported_impact": {
+            "type": "string",
+            "title": "Reported Impact",
+            "description": "How the person says it affects their work"
+          },
+          "ui_screen": {
+            "type": "string",
+            "title": "Ui Screen",
+            "description": "The screen it happened on"
+          },
+          "worker_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Job Id",
+            "description": "The background job it concerns"
+          },
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id",
+            "description": "The provider configuration it concerns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "impact_summary",
+          "expected_behavior",
+          "actual_behavior",
+          "reproduction_steps",
+          "not_reproducible",
+          "frequency",
+          "first_observed_at",
+          "consistent",
+          "blocks_work",
+          "workaround",
+          "reported_impact",
+          "ui_screen",
+          "worker_job_id",
+          "provider_config_id"
+        ],
+        "title": "IssueDetailsOut",
+        "description": "The details of an issue report, as stored."
       },
       "JobOptions": {
         "properties": {
@@ -10080,6 +12783,92 @@
         "title": "RegistrationOut",
         "description": "The result of registering."
       },
+      "RelationIn": {
+        "properties": {
+          "to": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 3,
+            "title": "To",
+            "description": "The other submission: its id or its number (FR-2026-00042)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "duplicate_of",
+              "related",
+              "caused_by",
+              "implements"
+            ],
+            "title": "Kind",
+            "description": "duplicate_of: this repeats the other; related; caused_by: the other is the cause; implements: this feature request is delivered by the other"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "to",
+          "kind"
+        ],
+        "title": "RelationIn",
+        "description": "A link between two submissions."
+      },
+      "RelationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The link's id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "duplicate_of, related, caused_by or implements"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "from",
+              "to"
+            ],
+            "title": "Direction",
+            "description": "from: this submission is the source of the link; to: the other one is"
+          },
+          "other_id": {
+            "type": "string",
+            "title": "Other Id",
+            "description": "The other submission's id"
+          },
+          "other_number": {
+            "type": "string",
+            "title": "Other Number",
+            "description": "The other submission's number, such as FR-2026-00042"
+          },
+          "other_title": {
+            "type": "string",
+            "title": "Other Title",
+            "description": "The other submission's title"
+          },
+          "other_status": {
+            "type": "string",
+            "title": "Other Status",
+            "description": "The other submission's status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "direction",
+          "other_id",
+          "other_number",
+          "other_title",
+          "other_status"
+        ],
+        "title": "RelationOut",
+        "description": "A link from or to another submission the caller may see."
+      },
       "ReliabilityStats": {
         "properties": {
           "repetitions": {
@@ -11705,6 +14494,46 @@
         "title": "Severity",
         "description": "How serious a defect is: info, low, medium, high or critical"
       },
+      "SimilarOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The submission's id"
+          },
+          "number": {
+            "type": "string",
+            "title": "Number",
+            "description": "The submission's number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The status"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "0 to 1: how much of the title they share"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "status",
+          "score"
+        ],
+        "title": "SimilarOut",
+        "description": "A submission whose title shares words with the one being typed."
+      },
       "SkillDetail": {
         "properties": {
           "name": {
@@ -11977,6 +14806,1055 @@
         ],
         "title": "SkillSummary",
         "description": "A skill in a list"
+      },
+      "StatusChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The change's id"
+          },
+          "old_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Status",
+            "description": "The status before; null for the first one"
+          },
+          "new_status": {
+            "type": "string",
+            "title": "New Status",
+            "description": "The status after"
+          },
+          "changed_by": {
+            "type": "string",
+            "title": "Changed By",
+            "description": "Who changed it (a reporter sees the role of a maintainer, not their name)"
+          },
+          "by_staff": {
+            "type": "boolean",
+            "title": "By Staff",
+            "description": "True when a maintainer or the shared token changed it"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "description": "The comment kept with the change; the reporter sees it"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At",
+            "description": "When it changed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "old_status",
+          "new_status",
+          "changed_by",
+          "by_staff",
+          "comment",
+          "at"
+        ],
+        "title": "StatusChangeOut",
+        "description": "One change of status, kept for good."
+      },
+      "SubmissionCounts": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "How many submissions the caller can see"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open",
+            "description": "How many of them are not in a closed status"
+          },
+          "unread": {
+            "type": "integer",
+            "title": "Unread",
+            "description": "How many of the caller's own have an answer they have not seen"
+          },
+          "unassigned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unassigned",
+            "description": "Open ones nobody is assigned to; null for a reporter"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status",
+            "description": "Count per status"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type",
+            "description": "Count per type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "open",
+          "unread",
+          "unassigned",
+          "by_status",
+          "by_type"
+        ],
+        "title": "SubmissionCounts",
+        "description": "Counts of the submissions the caller can see."
+      },
+      "SubmissionDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The submission's id"
+          },
+          "number": {
+            "type": "string",
+            "title": "Number",
+            "description": "The submission's number, such as FR-2026-00042 (feature) or IR-2026-00042 (issue)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "issue"
+            ],
+            "title": "Type",
+            "description": "feature or issue"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The title"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "The category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The status; the workflow is `GET /submissions/options`"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "security"
+            ],
+            "title": "Visibility",
+            "description": "security: only the reporter and authorised maintainers see it"
+          },
+          "requested_priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Priority",
+            "description": "The priority the reporter asked for (feature requests)"
+          },
+          "assigned_priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Priority",
+            "description": "The maintainers' priority; null for a reporter, who is not told"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity",
+            "description": "The maintainers' severity; null for a reporter, who is not told"
+          },
+          "reporter": {
+            "type": "string",
+            "title": "Reporter",
+            "description": "Who made it"
+          },
+          "reporter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Id",
+            "description": "The reporter's account id; null for a reporter's own view, and when the shared token made it"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine",
+            "description": "True when the caller made it"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who it is assigned to; null for a reporter, who is not told"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "The labels; empty for a reporter, who is not told"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When it was made"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When it was last changed"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Activity At",
+            "description": "The last change, comment or status change"
+          },
+          "unread": {
+            "type": "boolean",
+            "title": "Unread",
+            "description": "True when a maintainer answered or changed the status since the reporter last looked"
+          },
+          "comments": {
+            "type": "integer",
+            "title": "Comments",
+            "description": "How many comments the caller can see"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Send this back with a change; a stale one is refused with 409"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "The description"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeatureDetailsOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The details of a feature request"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IssueDetailsOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The details of an issue report"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The project it concerns"
+          },
+          "related_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Run Id",
+            "description": "The run it concerns"
+          },
+          "related_test_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Test Id",
+            "description": "The test it concerns"
+          },
+          "related_trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Trace Id",
+            "description": "The trace it concerns"
+          },
+          "related_result_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Result Id",
+            "description": "The test result it concerns"
+          },
+          "related_report_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Report Id",
+            "description": "The report it concerns"
+          },
+          "related_target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Target Id",
+            "description": "The target it concerns"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version",
+            "description": "The AgentLab version the person was using"
+          },
+          "build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build",
+            "description": "The build or commit identifier"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At",
+            "description": "When it entered a resolved status"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At",
+            "description": "When it entered a closed status"
+          },
+          "discussion": {
+            "items": {
+              "$ref": "#/components/schemas/CommentOut"
+            },
+            "type": "array",
+            "title": "Discussion",
+            "description": "The comments, oldest first; a reporter gets the public ones only"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/StatusChangeOut"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Every status change, oldest first"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationOut"
+            },
+            "type": "array",
+            "title": "Relations",
+            "description": "Links to other submissions the caller may see; empty for a reporter"
+          },
+          "statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Statuses",
+            "description": "The statuses this kind of submission moves through"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "type",
+          "title",
+          "category",
+          "status",
+          "visibility",
+          "requested_priority",
+          "assigned_priority",
+          "severity",
+          "reporter",
+          "reporter_id",
+          "mine",
+          "assignee",
+          "labels",
+          "created_at",
+          "updated_at",
+          "last_activity_at",
+          "unread",
+          "comments",
+          "version",
+          "description",
+          "feature",
+          "issue",
+          "project_id",
+          "related_run_id",
+          "related_test_id",
+          "related_trace_id",
+          "related_result_id",
+          "related_report_id",
+          "related_target_id",
+          "app_version",
+          "build",
+          "resolved_at",
+          "closed_at",
+          "discussion",
+          "history",
+          "relations",
+          "statuses"
+        ],
+        "title": "SubmissionDetail",
+        "description": "A submission with its details, discussion and status history."
+      },
+      "SubmissionIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "issue"
+            ],
+            "title": "Type",
+            "description": "feature: a request for something new; issue: a problem"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Title",
+            "description": "A short title"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Description",
+            "description": "The description, in the person's own words",
+            "default": ""
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Category",
+            "description": "One of the categories the server offers for this type"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeatureDetailsIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The details of a feature request"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IssueDetailsIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The details of an issue report"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The AgentLab project it concerns"
+          },
+          "related_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Run Id",
+            "description": "The evaluation run it concerns"
+          },
+          "related_test_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Test Id",
+            "description": "The test case it concerns"
+          },
+          "related_trace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Trace Id",
+            "description": "The trace it concerns"
+          },
+          "related_result_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Result Id",
+            "description": "The test result it concerns"
+          },
+          "related_report_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Report Id",
+            "description": "The report it concerns"
+          },
+          "related_target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Target Id",
+            "description": "The target it concerns"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version",
+            "description": "The AgentLab version the person was using"
+          },
+          "build": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build",
+            "description": "The build or commit identifier, when known"
+          },
+          "suspected_security": {
+            "type": "boolean",
+            "title": "Suspected Security",
+            "description": "True when the person believes this is a security problem: it is then kept private",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "category"
+        ],
+        "title": "SubmissionIn",
+        "description": "A feature request or an issue report."
+      },
+      "SubmissionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The submissions on this page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "How many match, over all pages"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "The page size"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "How many were skipped"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "SubmissionPage",
+        "description": "One page of a list of submissions."
+      },
+      "SubmissionPatch": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "description": "The version of the submission the caller read: a stale one is refused with 409"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "The new status, one of the configured ones"
+          },
+          "status_comment": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Status Comment",
+            "description": "A comment kept with the status change; the reporter sees it",
+            "default": ""
+          },
+          "assigned_priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high",
+                  "critical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Priority",
+            "description": "The maintainers' priority, separate from the one the person requested; null clears it"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity",
+            "description": "The severity the maintainers decided on; null clears it"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id",
+            "description": "The id of the account to assign it to; null or an empty string unassigns"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "description": "A different category"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels",
+            "description": "The complete set of labels (replaces the old set)"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "security"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "security: only the reporter and authorised maintainers see it"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "SubmissionPatch",
+        "description": "What a maintainer may change when triaging. Everything but ``version`` is optional; what is sent is applied together."
+      },
+      "SubmissionSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The submission's id"
+          },
+          "number": {
+            "type": "string",
+            "title": "Number",
+            "description": "The submission's number, such as FR-2026-00042 (feature) or IR-2026-00042 (issue)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "issue"
+            ],
+            "title": "Type",
+            "description": "feature or issue"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The title"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "The category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The status; the workflow is `GET /submissions/options`"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "security"
+            ],
+            "title": "Visibility",
+            "description": "security: only the reporter and authorised maintainers see it"
+          },
+          "requested_priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Priority",
+            "description": "The priority the reporter asked for (feature requests)"
+          },
+          "assigned_priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Priority",
+            "description": "The maintainers' priority; null for a reporter, who is not told"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity",
+            "description": "The maintainers' severity; null for a reporter, who is not told"
+          },
+          "reporter": {
+            "type": "string",
+            "title": "Reporter",
+            "description": "Who made it"
+          },
+          "reporter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Id",
+            "description": "The reporter's account id; null for a reporter's own view, and when the shared token made it"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine",
+            "description": "True when the caller made it"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who it is assigned to; null for a reporter, who is not told"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "The labels; empty for a reporter, who is not told"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When it was made"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When it was last changed"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Activity At",
+            "description": "The last change, comment or status change"
+          },
+          "unread": {
+            "type": "boolean",
+            "title": "Unread",
+            "description": "True when a maintainer answered or changed the status since the reporter last looked"
+          },
+          "comments": {
+            "type": "integer",
+            "title": "Comments",
+            "description": "How many comments the caller can see"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "type",
+          "title",
+          "category",
+          "status",
+          "visibility",
+          "requested_priority",
+          "assigned_priority",
+          "severity",
+          "reporter",
+          "reporter_id",
+          "mine",
+          "assignee",
+          "labels",
+          "created_at",
+          "updated_at",
+          "last_activity_at",
+          "unread",
+          "comments"
+        ],
+        "title": "SubmissionSummary",
+        "description": "A submission as a list shows it. What the caller is not told is null or empty."
       },
       "Support": {
         "type": "string",
@@ -13567,6 +17445,10 @@
     {
       "name": "Accounts",
       "description": "Registration, sign-in with a password, the signed-in person, and account administration."
+    },
+    {
+      "name": "Feedback & Support",
+      "description": "Feature requests and issue reports: make one, follow it, and (for maintainers) triage it."
     },
     {
       "name": "Projects",

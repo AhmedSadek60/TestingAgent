@@ -16,6 +16,7 @@ promise. To report a vulnerability *in AgentLab*, see [SECURITY.md](../SECURITY.
 * [Sandbox](#sandbox)
 * [Web interface and API](#web-interface-and-api)
 * [Evidence and restricted artifacts](#evidence-and-restricted-artifacts)
+* [Feedback and support](#feedback-and-support)
 * [What this does not promise](#what-this-does-not-promise)
 
 ## What is protected from what
@@ -507,6 +508,41 @@ downloaded only with `include_restricted=true`, which writes a warning to the lo
 
 AgentLab keeps its records until you remove them. There is **no retention policy and no command to delete a run**: the
 runs are rows in the database and the artifacts are files, and removing them is the operator's job.
+
+## Feedback and support
+
+[Feedback & Support](feedback-support.md) takes free text from people, some of whom registered themselves, and keeps it for
+maintainers. Opening registration to everyone makes that text hostile by default, and it can contain things a person should
+not have pasted.
+
+* **Isolation between people is applied to the query**, not checked after it: the one definition of "may see" is a clause of
+  every read (`src/agentlab/feedback/policy.py`). A submission the caller may not see is answered exactly as one that does not
+  exist (the same status and body), by id and by number, so probing identifiers reveals nothing *about* a submission, not
+  even whether it is private. (Numbers are sequential, so roughly how many there are is no secret: it follows from one's own.)
+* **What a reporter is not told is not sent.** The maintainers' priority, severity, assignee, labels, links and internal notes
+  are absent from a reporter's answers, and a maintainer who wrote a comment reads "AgentLab maintainer" to the reporter, so an
+  account cannot learn who the maintainers are. Filters and sorts on those fields are refused to a reporter, because their
+  answer would tell them.
+* **Private submissions** (the security category, or marked by the reporter) are visible to their reporter, maintainers and
+  admins, and **not to the shared API token** unless the owner allows it, because the token is a credential many people may
+  hold. Opening one that is not yours, and being refused one, are written to its audit trail.
+* **Free text** is stripped of control characters (a NUL byte makes PostgreSQL refuse a row), is run through the redactor before
+  it is stored, and is returned as JSON that the interface shows as text, never as markup. The audit trail records fields and
+  statuses and never text.
+* **Abuse.** A reporter has a daily allowance of submissions and comments; text fields have a fixed size limit; identifiers in a
+  URL are checked against what an id or a number looks like before they reach a query; filters are bound parameters and a search
+  treats `%` and `_` as ordinary characters.
+* **Concurrent triage** cannot overwrite itself: one statement checks the version the caller read and raises it.
+* **A demoted or disabled maintainer** loses their sessions at once, so they stop triaging at once.
+
+Tested by `tests/unit/test_feedback_service.py` (the rules, with ten deliberate breakages of them confirmed to be caught),
+`tests/api/test_feedback_api.py` and `tests/security/test_feedback_security.py` (every operation classified, another person's
+submission by every spelling of its identifier, going through the numbers, hostile text, injection in every filter, secrets in the
+store, the responses and the log, and credentials that may not act).
+
+What it does not promise: masking is best effort like all redaction here, so do not paste credentials; every maintainer can read
+every other person's non-private submission and, with the role, every private one; there are no attachments yet, so nothing is
+scanned; and there is no e-mail.
 
 ## What this does not promise
 

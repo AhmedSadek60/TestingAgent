@@ -109,6 +109,14 @@ def require_auth(request: Request) -> Principal:
     return principal
 
 
+def require_staff(request: Request) -> Principal:
+    """A caller that may triage submissions: an operator (a maintainer, an admin, the shared token, the local machine)."""
+    principal = require_user(request)
+    if not principal.is_operator:
+        raise HTTPException(status_code=403, detail="only maintainers may do this")
+    return principal
+
+
 def require_admin(request: Request) -> Principal:
     """A caller that may manage accounts."""
     principal = require_user(request)

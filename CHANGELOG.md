@@ -11,6 +11,12 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Feedback & Support, core** ([feedback-support.md](docs/feedback-support.md)): feature requests and issue reports through the
+  API, with numbers (`FR-2026-00042`, `IR-2026-00042`), a configurable workflow and status history, comments and internal notes,
+  assigned priority and severity kept apart from what the reporter asked for, labels, assignment, links between submissions,
+  an unread marker, duplicate suggestions, private security reports, daily allowances, optimistic concurrency on triage and an
+  audit trail. A reporter sees only their own and nothing of the triage. Migration `0003`. The web pages come in a later slice.
+
 * **Accounts** beside the shared API token ([accounts.md](docs/accounts.md), [ADR 0011](docs/decisions/0011-accounts-beside-the-shared-token.md)):
   registration, sign-in with a password, server-side sessions with CSRF protection, the roles `reporter`, `maintainer` and `admin`,
   account administration in the web interface and API, `agentlab users` on the server, and an audit trail. A reporter reaches

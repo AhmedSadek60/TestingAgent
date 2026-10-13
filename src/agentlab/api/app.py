@@ -19,11 +19,12 @@ from fastapi.staticfiles import StaticFiles
 from agentlab import __version__
 from agentlab.accounts import AccountService
 from agentlab.api import errors, openapi_docs
-from agentlab.api.routes import accounts, catalog, projects, reports, runs
+from agentlab.api.routes import accounts, catalog, feedback, projects, reports, runs
 from agentlab.api.security import UI_CSP, RequestGuard, TokenGuard, is_loopback, resolve_token
 from agentlab.api.state import ApiState
 from agentlab.core.config import AgentLabConfig, ServerConfig
 from agentlab.core.errors import PolicyBlocked
+from agentlab.feedback import SubmissionService
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
 from agentlab.jobs.runner import reap_forever
 from agentlab.jobs.worker import Worker
@@ -38,6 +39,10 @@ TAGS = [
     {
         "name": "Accounts",
         "description": "Registration, sign-in with a password, the signed-in person, and account administration.",
+    },
+    {
+        "name": "Feedback & Support",
+        "description": "Feature requests and issue reports: make one, follow it, and (for maintainers) triage it.",
     },
     {"name": "Projects", "description": "Projects group targets, documents and runs."},
     {"name": "Targets", "description": "The agents under test."},
@@ -154,6 +159,7 @@ def create_app(
             queue=q,
             guard=TokenGuard(api_token),
             accounts=AccountService(svc.store.db, svc.config.accounts),
+            feedback=SubmissionService(svc.store.db, svc.config.feedback),
             worker=worker,
             uploads_dir=uploads,
             allowed_roots=[Path(p if Path(p).is_absolute() else svc.base_dir / p) for p in scfg.allowed_paths],
@@ -225,7 +231,7 @@ def create_app(
     app.include_router(catalog.public)
     app.include_router(accounts.public)
     app.include_router(reports.public)
-    for module in (projects, runs, reports, catalog, accounts):
+    for module in (projects, runs, reports, catalog, accounts, feedback):
         app.include_router(module.router)
 
     resolved_ui = (
