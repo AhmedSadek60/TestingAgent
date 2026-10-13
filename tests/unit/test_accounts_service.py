@@ -254,3 +254,40 @@ def test_no_password_or_hash_or_token_reaches_the_audit_trail_or_any_view(make) 
         dump = "".join(str(r) for r in s.execute(text("select * from users")).all())
     assert PASSWORD not in dump
     assert {e["event"] for e in svc.events(500)} >= {"registered", "sign_in_failed", "locked", "password_reset"}
+
+
+def test_a_name_with_a_nul_byte_is_an_unknown_name_and_never_reaches_the_database(make) -> None:  # type: ignore[no-untyped-def]
+    """PostgreSQL refuses a NUL byte in text, so looking one up would be a server error: it is answered like any unknown name."""
+    from sqlalchemy import event
+
+    svc = make()
+    svc.create_user("test", "alice", role="reporter", password=PASSWORD)
+    sent: list[object] = []
+
+    @event.listens_for(svc.db.engine, "before_cursor_execute")
+    def spy(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        sent.append(parameters)
+
+    for name in ("ali\x00ce", "\x00", "alice\x00"):
+        with pytest.raises(SignInFailed, match="wrong user name or password"):
+            svc.authenticate(name, PASSWORD)
+        assert svc.by_username(name) is None
+    assert sent and not any("\x00" in repr(p) for p in sent), "no statement carried the NUL byte"
+    events = [e for e in svc.events() if e["event"] == "sign_in_failed"]
+    assert len(events) == 3 and all("\x00" not in e["actor"] for e in events)
+
+
+def test_a_display_name_and_an_address_are_one_line_without_control_characters(make) -> None:  # type: ignore[no-untyped-def]
+    """PostgreSQL refuses a NUL byte in text, and no name needs a line break or an escape character."""
+    svc = make()
+    user, _ = svc.create_user(
+        "test",
+        "bruno",
+        role="reporter",
+        password=PASSWORD,
+        display_name="Bru\x00no\n\x1b[31mDias\x7f",
+        email="b\x00@example.org",
+    )
+    assert user.display_name == "Bruno [31mDias" and user.email == "b@example.org"
+    changed = svc.update("test", user.id, display_name="Br\x00uno\r\nD")
+    assert changed.display_name == "Bruno D"
