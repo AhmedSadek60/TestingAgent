@@ -110,6 +110,79 @@ def test_a_publish_needs_room_for_the_build_and_says_how_to_make_it(ship: Module
     assert ship.room_to_build(2 * gb, needed_gb=1) is None, "the amount needed can be given"
 
 
+def test_a_redirect_to_another_host_does_not_carry_the_token(ship: ModuleType, monkeypatch) -> None:
+    """GitHub answers a job's log with a redirect to signed storage, which refuses a request that carries a GitHub token."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen: dict[str, str | None] = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            seen[f"{self.server.server_port}{self.path}"] = self.headers.get("Authorization")
+            if self.path == "/redirect-elsewhere":
+                self.send_response(302)
+                self.send_header("Location", f"http://127.0.0.1:{other.server_port}/log")
+                self.end_headers()
+            elif self.path == "/redirect-here":
+                self.send_response(302)
+                self.send_header("Location", "/log")
+                self.end_headers()
+            else:
+                body = b"the log"
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        def log_message(self, *args: object) -> None:
+            pass
+
+    first, other = HTTPServer(("127.0.0.1", 0), Handler), HTTPServer(("127.0.0.1", 0), Handler)
+    threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in (first, other)]
+    for t in threads:
+        t.start()
+    monkeypatch.setattr(ship, "token", lambda: "test-token-value")
+    try:
+        assert ship.github("GET", f"http://127.0.0.1:{first.server_port}/redirect-elsewhere", raw=True) == "the log"
+        assert seen[f"{first.server_port}/redirect-elsewhere"] == "Bearer test-token-value"
+        assert seen[f"{other.server_port}/log"] is None, "the other host is not given the token"
+        assert ship.github("GET", f"http://127.0.0.1:{first.server_port}/redirect-here", raw=True) == "the log"
+        assert seen[f"{first.server_port}/log"] == "Bearer test-token-value", "the same host still is"
+    finally:
+        for s in (first, other):
+            s.shutdown()
+            s.server_close()
+
+
+def test_a_pull_request_that_has_not_caught_up_with_a_push_is_given_a_moment(ship: ModuleType, monkeypatch) -> None:
+    """Right after `pr` pushed, GitHub's record of the pull request can still name the commit before it."""
+    from types import SimpleNamespace
+
+    clock = {"now": 0.0}
+    monkeypatch.setattr(
+        ship,
+        "time",
+        SimpleNamespace(monotonic=lambda: clock["now"], sleep=lambda s: clock.update(now=clock["now"] + s)),
+    )
+    monkeypatch.setattr(ship, "head", lambda: "new")
+    answers = iter([{"head": {"sha": "old"}}, {"head": {"sha": "old"}}, {"head": {"sha": "new"}}])
+    monkeypatch.setattr(ship, "find_pull_request", lambda: next(answers))
+    assert ship.pull_request_at_head(60)["head"]["sha"] == "new"
+    assert clock["now"] == 10.0, "it asked again every five seconds, and stopped as soon as it matched"
+
+    monkeypatch.setattr(ship, "find_pull_request", lambda: {"head": {"sha": "old"}})
+    clock["now"] = 0.0
+    assert ship.pull_request_at_head(12)["head"]["sha"] == "old", "after its patience it hands over what GitHub says"
+    assert 12 <= clock["now"] <= 17
+    clock["now"] = 0.0
+    assert ship.pull_request_at_head(0)["head"]["sha"] == "old" and clock["now"] == 0.0, "a merge does not wait"
+
+    monkeypatch.setattr(ship, "find_pull_request", lambda: None)
+    with pytest.raises(SystemExit):
+        ship.pull_request_at_head(60)
+
+
 def test_the_credential_file_must_exist_and_be_private(ship: ModuleType, tmp_path: Path, monkeypatch, capsys) -> None:
     secret = "ghp_" + "a1B2c3D4e5F6g7H8i9J0"  # made up
     path = tmp_path / "token"

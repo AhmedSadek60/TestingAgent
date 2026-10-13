@@ -32,6 +32,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -195,6 +196,17 @@ def token() -> str:
     return TOKEN_FILE.read_text(encoding="utf-8").strip()
 
 
+class SameHostRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect, but never hand the Authorization header to another host. GitHub answers a job's log with a redirect to
+    signed storage, which refuses a request that also carries a GitHub token."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urllib.parse.urlsplit(newurl).netloc != urllib.parse.urlsplit(req.full_url).netloc:
+            new.remove_header("Authorization")
+        return new
+
+
 def github(method: str, path: str, body: dict[str, Any] | None = None, *, raw: bool = False) -> Any:
     request = urllib.request.Request(  # noqa: S310 - https only, the host is fixed
         API + path if path.startswith("/") else path,
@@ -208,7 +220,7 @@ def github(method: str, path: str, body: dict[str, Any] | None = None, *, raw: b
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        with urllib.request.build_opener(SameHostRedirects).open(request, timeout=60) as response:  # noqa: S310
             data = response.read()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")[:300]
@@ -405,11 +417,22 @@ def failing_logs(checks: Iterable[CheckRun]) -> None:
             say(f"\n--- {c.name}: the end of its log\n" + "\n".join("  " + line[:200] for line in tail))
 
 
+def pull_request_at_head(patience: float) -> dict[str, Any]:
+    """The open pull request of this branch, once GitHub reports it at this checkout's commit. Right after a push its record
+    can lag a few seconds behind the branch; after ``patience`` seconds whatever it says is returned."""
+    deadline = time.monotonic() + patience
+    while True:
+        pr = find_pull_request()
+        if pr is None:
+            die("wait", "no open pull request for this branch: run `pr` first")
+        if pr["head"]["sha"] == head() or time.monotonic() >= deadline:
+            return pr
+        time.sleep(5)
+
+
 def cmd_wait(args: argparse.Namespace, *, poll: bool = True) -> dict[str, Any]:
     say("== 4-5  wait for the checks, then verify they are green")
-    pr = find_pull_request()
-    if pr is None:
-        die("wait", "no open pull request for this branch: run `pr` first")
+    pr = pull_request_at_head(60 if poll else 0)  # a merge verifies what is there right now
     sha = pr["head"]["sha"]
     if sha != head():
         die("wait", f"the pull request is at {sha[:7]} but this checkout is at {head()[:7]}: run `pr` to push")
