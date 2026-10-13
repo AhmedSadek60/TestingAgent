@@ -585,6 +585,23 @@ a small one, and that is a new store of data about people's activity, so it is b
 Tested by `tests/unit/test_feedback_logcapture.py`, `tests/unit/test_feedback_diagnostics.py`,
 `tests/api/test_feedback_diagnostics_api.py` and `tests/security/test_feedback_diagnostics_security.py`.
 
+### The web interface of Feedback & Support
+
+It runs in a stranger's browser and sees what they see, so it is built to keep little and to share nothing unreviewed
+([ADR 0016](decisions/0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md)).
+
+* **Drafts** are form text in the tab's session storage, offered back with a way to start again, and gone when the tab closes,
+  when the submission is saved and at sign-out. Files, diagnostics and tokens are never kept there.
+* **What the tab saw** (the last 50 console errors and warnings and failed requests: method, path without its query, status,
+  request id; never a body) is in memory only, forgotten at sign-out, and sent only if the person ticks the browser category and
+  agrees to the masked preview.
+* **No diagnostic information is attached on the person's behalf**: nothing is pre-ticked, "select all" still needs collecting
+  and reviewing, and a report with diagnostics chosen and not reviewed is not sent.
+* **Identifiers in a link** that opens the issue form are checked like typed ones and listed, each removable.
+* **Everything written by a person or a system is a text node**, set apart; nothing is rendered as HTML or Markdown.
+
+Tested by `web/src/feedback.test.tsx`, `web/src/lib/browserErrors.test.ts` and `tests/e2e/test_feedback_ui.py`.
+
 ### The engineering handoff
 
 A package is built so that it can be given to a model, which makes it the place where what a stranger wrote is most likely to be

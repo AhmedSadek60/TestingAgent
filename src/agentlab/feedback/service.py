@@ -214,6 +214,10 @@ class SubmissionService:
             security_category=cfg.security_category,
             max_text_chars=TEXT,
             can_triage=actor.is_staff,
+            attachment_extensions=list(cfg.attachments.allowed_extensions),
+            attachment_max_files=cfg.attachments.max_files,
+            attachment_max_file_mb=cfg.attachments.max_file_mb,
+            attachment_max_total_mb=cfg.attachments.max_total_mb,
         )
 
     # ---------------------------------------------------------------------------------------------------- helpers

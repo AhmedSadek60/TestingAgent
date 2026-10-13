@@ -11,6 +11,13 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **The Feedback & Support web interface** ([feedback-support.md](docs/feedback-support.md#the-web-interface),
+  [ADR 0016](docs/decisions/0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md)): the feature
+  request and issue report forms, My submissions, a submission's page (what was sent, the discussion, files, diagnostic
+  information, history), and for a maintainer the queue, triage, links, the engineering handoff and the audit trail. Diagnostic
+  information is chosen, collected, reviewed and agreed to, never pre-ticked; the browser's own errors are a bounded in-memory
+  buffer sent only on request; drafts live in the tab and go with it; "Report an issue" links on a run, a result and a trace carry
+  identifiers only. A reporter's whole interface is Feedback & Support and their account.
 * **Engineering handoff** ([feedback-support.md](docs/feedback-support.md#engineering-handoff),
   [ADR 0015](docs/decisions/0015-handoff-is-a-package-for-a-person-to-take.md)): a maintainer can turn a submission into a
   sanitized, reproducible ZIP with a manifest of hashes, the masked diagnostics and the attachments that may go in, context

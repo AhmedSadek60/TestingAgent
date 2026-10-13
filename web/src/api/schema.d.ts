@@ -4299,6 +4299,26 @@ export interface components {
              * @description True when the caller is a maintainer and may change status and priority
              */
             can_triage: boolean;
+            /**
+             * Attachment Extensions
+             * @description The file types that may be attached
+             */
+            attachment_extensions: string[];
+            /**
+             * Attachment Max Files
+             * @description The most files one submission may have
+             */
+            attachment_max_files: number;
+            /**
+             * Attachment Max File Mb
+             * @description The largest single file, in megabytes
+             */
+            attachment_max_file_mb: number;
+            /**
+             * Attachment Max Total Mb
+             * @description What the files of one submission may add up to, in megabytes
+             */
+            attachment_max_total_mb: number;
         };
         /**
          * Finding

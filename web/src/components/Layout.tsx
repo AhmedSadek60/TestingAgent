@@ -32,6 +32,13 @@ const NAV: { heading: string; items: { to: string; label: string; icon: IconName
       { to: "/credentials", label: "Credentials", icon: "key" },
     ],
   },
+  {
+    heading: "Support",
+    items: [
+      { to: "/feedback", label: "Feedback & Support", icon: "info", end: true },
+      { to: "/feedback/submissions", label: "Submissions", icon: "list" },
+    ],
+  },
   { heading: "Admin", items: [{ to: "/settings", label: "Settings", icon: "gear" }] },
 ];
 

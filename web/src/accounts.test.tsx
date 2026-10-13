@@ -121,12 +121,14 @@ describe("signing in with a user name and password", () => {
 });
 
 describe("registering", () => {
-  it("makes an account, signs in, and shows a reporter only their account", async () => {
+  it("makes an account, signs in, and shows a reporter only Feedback & Support and their account", async () => {
     const reporter = ME({ role: "reporter", username: "newbie", display_name: "newbie", operator: false, csrf_token: "c2" });
     const server = fakeServer({
       "GET /health": HEALTH_PROTECTED,
       "GET /auth/options": OPTIONS,
       "POST /auth/register": { account: account({ role: "reporter", username: "newbie" }), signed_in: true, me: reporter },
+      "GET /submissions/summary": { total: 0, open: 0, unread: 0, unassigned: null, by_status: {}, by_type: {} },
+      "GET /submissions/options": { can_triage: false },
     });
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Create an account" }));
@@ -134,12 +136,18 @@ describe("registering", () => {
     await userEvent.type(screen.getByLabelText("Password"), "correct-horse-battery-7");
     await userEvent.type(screen.getByLabelText("Password again"), "correct-horse-battery-7");
     await userEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(await screen.findByRole("heading", { name: "Your account" })).toBeInTheDocument();
-    expect(screen.getByText(/Feedback & Support: feature requests and issue reports/)).toBeInTheDocument();
-    expect(screen.getByText(/not in this interface yet/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Feedback & Support" })).toBeInTheDocument();
+    const main = within(screen.getByRole("main"));
+    expect(main.getByRole("link", { name: /Request a feature/ })).toBeInTheDocument();
+    expect(main.getByRole("link", { name: /Report an issue/ })).toBeInTheDocument();
+    expect(main.getByRole("link", { name: /My submissions/ })).toBeInTheDocument();
     expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
     expect(server.to("GET /projects"), "a reporter's interface never asks for what a reporter may not read").toHaveLength(0);
     expect(server.to("POST /auth/register")[0]!.body).toMatchObject({ username: "newbie", password: "correct-horse-battery-7" });
+    // and their account is one click away, saying what the role is for
+    await userEvent.click(screen.getByRole("link", { name: "Your account" }));
+    expect(await screen.findByRole("heading", { name: "Your account" })).toBeInTheDocument();
+    expect(screen.getByText(/you can request features, report issues and follow your own submissions/)).toBeInTheDocument();
   });
 
   it("will not send two passwords that differ", async () => {

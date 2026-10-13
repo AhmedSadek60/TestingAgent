@@ -26,3 +26,4 @@ accepted by human review, not by an agent.
 [0013](0013-attachments-are-private-evidence-with-a-sanitized-copy.md) — Attachments are private evidence; a text file also has a sanitized copy — Proposed
 [0014](0014-diagnostics-from-a-small-log-by-whose-they-are.md) — Diagnostics come from a small, masked log, selected by whose lines they are — Proposed
 [0015](0015-handoff-is-a-package-for-a-person-to-take.md) — A handoff is a quoted, masked package for a person to take; AgentLab never runs it — Proposed
+[0016](0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md) — The feedback interface keeps little in the tab, and shares nothing the person has not reviewed — Proposed

@@ -446,6 +446,10 @@ class FeedbackOptions(Model):
     security_category: str = Field(description="An issue in this category is kept private")
     max_text_chars: int = Field(description="The longest any text field may be")
     can_triage: bool = Field(description="True when the caller is a maintainer and may change status and priority")
+    attachment_extensions: list[str] = Field(description="The file types that may be attached")
+    attachment_max_files: int = Field(description="The most files one submission may have")
+    attachment_max_file_mb: int = Field(description="The largest single file, in megabytes")
+    attachment_max_total_mb: int = Field(description="What the files of one submission may add up to, in megabytes")
 
 
 # =========================================================================================================== attachments

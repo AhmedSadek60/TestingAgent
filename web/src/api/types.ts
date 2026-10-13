@@ -108,3 +108,56 @@ export type Role = Account["role"];
 export type RegisterRequest = S["RegisterRequest"];
 export type CreateUserRequest = S["CreateUserRequest"];
 export type UpdateUserRequest = S["UpdateUserRequest"];
+
+
+// ----------------------------------------------------------------------------------------------- feedback & support
+export type FeedbackOptions = Resp<S["FeedbackOptions"]>;
+export type SubmissionSummary = Resp<S["SubmissionSummary"]>;
+export type SubmissionDetail = Resp<S["SubmissionDetail"]>;
+export type SubmissionPage = Resp<S["SubmissionPage"]>;
+export type SubmissionCounts = Resp<S["SubmissionCounts"]>;
+export type SimilarSubmission = Resp<S["SimilarOut"]>;
+export type SubmissionComment = Resp<S["CommentOut"]>;
+export type StatusChange = Resp<S["StatusChangeOut"]>;
+export type SubmissionRelation = Resp<S["RelationOut"]>;
+export type AuditEvent = Resp<S["AuditEventOut"]>;
+export type Assignee = Resp<S["AssigneeOut"]>;
+export type Attachment = Resp<S["AttachmentOut"]>;
+export type AttachmentPreview = Resp<S["AttachmentPreview"]>;
+export type DiagnosticsAvailable = Resp<S["DiagnosticsAvailable"]>;
+export type DiagnosticSource = Resp<S["DiagnosticSource"]>;
+export type DiagnosticCollection = Resp<S["DiagnosticCollectionOut"]>;
+export type DiagnosticItem = Resp<S["DiagnosticItemOut"]>;
+export type RedactionSummary = Resp<S["RedactionSummary"]>;
+export type Handoff = Resp<S["HandoffOut"]>;
+export type HandoffFile = Resp<S["HandoffFile"]>;
+export type SubmissionRequest = S["SubmissionIn"];
+export type SubmissionChange = S["SubmissionPatch"];
+export type CommentRequest = S["CommentIn"];
+export type RelationRequest = S["RelationIn"];
+export type DiagnosticsRequest = S["DiagnosticsRequest"];
+export type HandoffRequest = S["HandoffIn"];
+export type BrowserDiagnostics = S["BrowserDiagnostics"];
+export type SubmissionType = SubmissionSummary["type"];
+
+/** The filters of the list of submissions, as the API takes them. */
+export interface SubmissionQuery {
+  type?: SubmissionType | "";
+  status?: string[];
+  category?: string;
+  requested_priority?: string;
+  priority?: string;
+  severity?: string;
+  assignee?: string;
+  label?: string;
+  visibility?: string;
+  version?: string;
+  run?: string;
+  q?: string;
+  mine?: boolean;
+  unread?: boolean;
+  sort?: "activity" | "created" | "priority";
+  order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}

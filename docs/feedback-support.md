@@ -12,6 +12,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [The discussion](#the-discussion)
 * [Finding submissions](#finding-submissions)
 * [Attachments](#attachments)
+* [The web interface](#the-web-interface)
 * [Diagnostics](#diagnostics)
 * [Engineering handoff](#engineering-handoff)
 * [Private submissions](#private-submissions)
@@ -24,7 +25,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 | Part | State |
 |---|---|
 | Feature requests and issue reports, numbers, workflow, status history, comments and internal notes, labels, priority, severity, assignment, links between submissions, unread marker, duplicate suggestions, audit trail, allowances, private security reports | **Built** (this page) |
-| The web pages (request and report forms, My Submissions, the maintainer queue) | **Not yet built.** Everything is reachable through the API; the web interface comes in a later slice |
+| The web pages: the request and report forms, My Submissions, a submission's page with its discussion, files and history, the maintainer's queue and triage, and the handoff | **Built** ([The web interface](#the-web-interface)) |
 | File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
 | Diagnostics collected from AgentLab: environment, application and backend logs, errors, the run's metadata, a test's result and trace, and what the browser saw; preview, masking, consent, a downloadable bundle | **Built** ([Diagnostics](#diagnostics)) |
 | An engineering handoff package (a sanitized ZIP and `CLAUDE_CODE_TASK.md`) for an authorised engineer | **Built** ([Engineering handoff](#engineering-handoff)) |
@@ -174,6 +175,54 @@ Every download is recorded in the submission's audit trail. A download is always
 
 **Removal.** `DELETE` makes a file unavailable at once and deletes its stored bytes unless another attachment uses them. A
 reporter removes what they attached; a maintainer anything. The record stays, for the audit trail.
+
+## The web interface
+
+Everything above is reachable through the API; the web interface puts it in front of people. **Feedback & Support** is in the
+side menu of a maintainer, and is the whole interface of a person with the role *reporter*.
+
+| Page | What it is for |
+|---|---|
+| `#/feedback` | The ways in: request a feature, report an issue, My submissions (with how many have an answer waiting), and for a maintainer, what needs triage |
+| `#/feedback/feature` | The feature request form. A title, a category and the problem are required; everything else is under "More detail" |
+| `#/feedback/issue` | The issue report form. A title, the kind of problem, what happened and how it affects the work are required |
+| `#/feedback/submissions` | A reporter's own submissions, or a maintainer's queue, with search, filters, sorting and pages |
+| `#/feedback/submissions/<number>` | One submission: what was sent, the discussion, files, diagnostic information, the history; and, for a maintainer, triage, links, the engineering handoff and the audit trail |
+
+**Forms that do not get in the way.** Required fields say what is missing next to the field, in words; nothing else is
+required, and a person who cannot reproduce a problem says so instead of inventing steps. Similar earlier submissions are
+suggested while a title is typed and are only suggestions: sending is never blocked and nothing is merged.
+Choosing the security category shows a warning that the report is private. A confirmation with the number appears **only after the
+server has kept the submission**; a file that fails shows why and can be tried again, and the submission itself stays saved.
+
+**Context, shown and removable.** A "Report an issue" link on a run, a result or a trace opens the form with identifiers only
+(the run, the test, the result, the trace and the screen). The form lists exactly what will be sent and each can be taken out.
+Nothing else about the project, and no diagnostic information, is attached on the person's behalf.
+
+**Diagnostic information, chosen, reviewed, agreed to.** Nothing is ticked. A source AgentLab cannot supply is shown with the
+reason and cannot be ticked; a screenshot says it must be attached as a file. "Select all available diagnostics" is a convenience
+that still requires pressing *Collect and review*, looking at each item (source, period, size, what was masked and where, and the
+masked text) and agreeing. A report cannot be sent with diagnostics chosen and not reviewed, and a failure to collect never
+stops the report: it is sent without them and says so.
+
+**What this tab saw.** The web interface keeps the last 50 console errors and warnings and the last 50 failed requests of the
+tab, in memory only: the method, the path without its query, the status and the server's request id, never a body. They are sent
+only if the person ticks "browser console and network errors" and agrees to the preview; closing the tab or signing out forgets them.
+
+**Drafts and leaving.** What a person has typed in a form is kept in the tab (session storage: gone when the tab is closed or
+they sign out) and offered back after a reload, with a button to start again; files and diagnostics are not kept. Following a link
+inside the interface or pressing *Cancel* with unsent text asks first, and closing the tab asks through the browser.
+The browser's own back button cannot be asked in a hash-routed page: the draft is why nothing is lost by it.
+
+**Text is text.** Everything a person or a system wrote (titles, descriptions, comments, logs, file names) is shown as text,
+set apart from the page's own words; nothing is rendered as HTML or Markdown. Internal notes are set apart in colour and in
+words ("Internal note: maintainers only") and a maintainer is told, before sending, who will see what they write.
+
+**Accessibility.** Every control has a label; a status is always a word and never a colour alone; the list is a table with a
+caption; the progress of an upload is announced; everything is reachable by keyboard.
+
+Tested by `web/src/feedback.test.tsx`, `web/src/lib/feedback.test.ts`, `web/src/lib/browserErrors.test.ts`,
+`web/src/api/upload.test.ts` and, in a real browser against a real server, `tests/e2e/test_feedback_ui.py`.
 
 ## Diagnostics
 
@@ -348,7 +397,7 @@ requests that change something.
 
 | Call | Who | What |
 |---|---|---|
-| `GET /submissions/options` | anyone signed in | Categories, statuses, priorities and limits as configured, and whether the caller may triage |
+| `GET /submissions/options` | anyone signed in | Categories, statuses, priorities, the attachment limits and the other limits as configured, and whether the caller may triage |
 | `GET /submissions/summary` | anyone signed in | Counts of what the caller can see, and how many are unread |
 | `GET /submissions/similar` | anyone signed in | Submissions that look like a title |
 | `GET /submissions/assignees` | maintainers | Accounts a submission can be assigned to |

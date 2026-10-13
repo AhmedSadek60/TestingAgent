@@ -13340,6 +13340,29 @@
             "type": "boolean",
             "title": "Can Triage",
             "description": "True when the caller is a maintainer and may change status and priority"
+          },
+          "attachment_extensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attachment Extensions",
+            "description": "The file types that may be attached"
+          },
+          "attachment_max_files": {
+            "type": "integer",
+            "title": "Attachment Max Files",
+            "description": "The most files one submission may have"
+          },
+          "attachment_max_file_mb": {
+            "type": "integer",
+            "title": "Attachment Max File Mb",
+            "description": "The largest single file, in megabytes"
+          },
+          "attachment_max_total_mb": {
+            "type": "integer",
+            "title": "Attachment Max Total Mb",
+            "description": "What the files of one submission may add up to, in megabytes"
           }
         },
         "additionalProperties": false,
@@ -13358,7 +13381,11 @@
           "relation_kinds",
           "security_category",
           "max_text_chars",
-          "can_triage"
+          "can_triage",
+          "attachment_extensions",
+          "attachment_max_files",
+          "attachment_max_file_mb",
+          "attachment_max_total_mb"
         ],
         "title": "FeedbackOptions",
         "description": "The choices of the forms and the workflow, as this server is configured."
