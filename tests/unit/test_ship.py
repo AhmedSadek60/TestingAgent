@@ -99,6 +99,17 @@ def test_a_published_system_must_answer_health_refuse_anonymous_calls_and_serve_
     assert any("web interface" in w for w in ship.smoke_verdict(200, 401, 200, 502))
 
 
+def test_a_publish_needs_room_for_the_build_and_says_how_to_make_it(ship: ModuleType) -> None:
+    gb = 1024**3
+    assert ship.room_to_build(12 * gb) is None
+    assert ship.room_to_build(8 * gb) is None, "exactly what is needed is enough"
+    said = ship.room_to_build(5 * gb + gb // 2)
+    assert said and "5.5 GB is free" in said and "8 GB are needed" in said
+    assert "docker image prune" in said and "docker builder prune" in said, "it names what frees space"
+    assert "Nothing was changed" in said
+    assert ship.room_to_build(2 * gb, needed_gb=1) is None, "the amount needed can be given"
+
+
 def test_the_credential_file_must_exist_and_be_private(ship: ModuleType, tmp_path: Path, monkeypatch, capsys) -> None:
     secret = "ghp_" + "a1B2c3D4e5F6g7H8i9J0"  # made up
     path = tmp_path / "token"
