@@ -6,10 +6,10 @@
   uploads from untrusted users, secret handling, a new store of data about people's activity, deletion of data, an optional
   external integration)
 - Date: 2026-10-12 (approved); updated 2026-10-13
-- Status: **decisions answered by the owner on 2026-10-12; all six slices and slice 0 are built and tested locally.** The
-  branches are stacked in this repository and **nothing has been pushed**: the server has no GitHub credential, so no pull
-  request has been opened, no GitHub check has run, nothing is merged and nothing is published. Five questions are open for
-  the owner: see "Open questions".
+- Status: **delivered and live (2026-10-13).** Every slice went through the staged process, pull requests #6 to
+  #16, each merged only on four green GitHub checks and published with a backup and a smoke test; the owner then found two
+  defects on the live site (a layout and an unhelpful message), which are fixed. Decisions and one observation wait for the
+  owner: see "Open questions".
 
 ## Objective
 
@@ -22,18 +22,21 @@ Code. Nothing runs Claude Code or changes the repository automatically.
 
 | Slice | What | Branch | Migration | ADR | State |
 |---|---|---|---|---|---|
-| 0 | Accounts: registration, password sign-in, sessions, roles, `agentlab users`, the account pages | `feat/accounts-and-roles` | `0002` | 0011 | **Built and tested locally.** Also here: a request-size limit, the visitor's address behind Caddy, `PATCH` in CORS, and names that PostgreSQL can store |
-| 1 | Core: submissions, workflow, comments and internal notes, history, labels, links, unread marker, duplicate suggestions, audit, allowances | `feat/feedback-core` | `0003` | 0012 | **Built and tested locally** |
-| 2 | Attachments, `DiagnosticRedactor`, sanitized copies, scanner hook | `feat/feedback-attachments` | `0004` | 0013 | **Built and tested locally** |
-| 3 | Diagnostics: the small log, the collector, preview, consent, bundle, request ids | `feat/feedback-diagnostics` | `0005` | 0014 | **Built and tested locally** |
-| 4 | Engineering handoff: package, `CLAUDE_CODE_TASK.md`, export, audit | `feat/feedback-handoff` | `0006` | 0015 | **Built and tested locally** |
-| 5 | Web interface: the forms, My Submissions, a submission's page, triage, handoff, entry points, drafts, browser-error buffer | `feat/feedback-ui` | none | 0016 | **Built and tested locally**, including both workflows in a real browser |
-| 6 | Retention and deletion; the issue-tracker interface and GitHub, off by default | `feat/feedback-ui` (same branch, its own commit) | `0007`, `0008` | 0017, 0018 | **Built and tested locally** |
-| – | Existing defect: the agent adapter reused HTTP connections a server may have closed | `fix/agent-adapter-fresh-connections` | none | | **Fixed and tested locally**; its own pull request |
-| – | The staged release process and the removal of the single-hosted-service path | `chore/staging-pipeline-and-remove-railway` | none | 0010 | **Built; the first pull request, to be merged by the owner** (it amends the merge rule) |
+| 0 | Accounts: registration, password sign-in, sessions, roles, `agentlab users`, the account pages | `feat/accounts-and-roles` | `0002` | 0011 | **Merged (#8, `e719147`) and published.** Also here: a request-size limit, the visitor's address behind Caddy, `PATCH` in CORS, and names that PostgreSQL can store |
+| 1 | Core: submissions, workflow, comments and internal notes, history, labels, links, unread marker, duplicate suggestions, audit, allowances | `feat/feedback-core` | `0003` | 0012 | **Merged (#9, `955457b`) and published** |
+| 2 | Attachments, `DiagnosticRedactor`, sanitized copies, scanner hook | `feat/feedback-attachments` | `0004` | 0013 | **Merged (#10, `1301268`) and published** |
+| 3 | Diagnostics: the small log, the collector, preview, consent, bundle, request ids | `feat/feedback-diagnostics` | `0005` | 0014 | **Merged (#11, `8d7e733`) and published** |
+| 4 | Engineering handoff: package, `CLAUDE_CODE_TASK.md`, export, audit | `feat/feedback-handoff` | `0006` | 0015 | **Merged (#12, `4d7548b`) and published** |
+| 5 | Web interface: the forms, My Submissions, a submission's page, triage, handoff, entry points, drafts, browser-error buffer | `feat/feedback-ui` | none | 0016 | **Merged (#13, `202bcfd`) and published**; both workflows were also run in a real browser before |
+| 6 | Retention and deletion; the issue-tracker interface and GitHub, off by default | `feat/feedback-ui` (same branch, its own commit) | `0007`, `0008` | 0017, 0018 | **Merged and published with slice 5 (#13)** |
+| – | Existing defect: the agent adapter reused HTTP connections a server may have closed | `fix/agent-adapter-fresh-connections` | none | | **Merged (#7, `a87d82a`) and published** |
+| – | The staged release process and the removal of the single-hosted-service path | `chore/staging-pipeline-and-remove-railway` | none | 0010 | **Merged (#6, `8aaf599`) and published**, by the pipeline, on the owner's decision to amend the merge rule |
+| – | Found by the owner on the live site: a reporter's page filled only the sidebar's column on a wide window | `fix/reporter-layout-single-column` | none | | **Merged (#14, `98a8f22`) and published** |
+| – | Found by the owner on the live site: a refused image did not say what the file was or what to do | `fix/attachment-refusal-says-what-the-file-is` | none | | **Merged (#15, `9e4c6ec`) and published** |
+| – | Findings of the first real run of the pipeline: a test with too little margin (a commit on the diagnostics branch), and three defects in `scripts/ship.py` | `fix/release-publish-disk-and-tags` | none | | **Merged (#16, `5ec6a28`)** |
 
 The branches are stacked in this order, and so are the pull requests: pipeline, adapter fix, accounts, core, attachments,
-diagnostics, handoff, then the web interface with retention and publication, and **this plan last**. Each branch has the
+diagnostics, handoff, then the web interface with retention and publication, the fixes to the release script that the run itself called for, and **this plan last**. Each branch has the
 previous one merged into it. The plan is last because it names files that the slices add (the documentation tests check
 that every path a document names exists in the tree it ships in), and because it is then a record of what was built.
 Slices 5 and 6 share a branch to save a pull request; they are separate commits and can be split.
@@ -221,6 +224,12 @@ every check on the exact head is green; a merged slice is published automaticall
 | A numbering scheme of `max + 1` reuses a deleted number | designing deletion | slice 6 (`submission_counters`) |
 | **Three inputs answered 500 on PostgreSQL, which refuses a NUL byte in text**: a user name at sign-in, a display name or an e-mail address at registration, and the reason for a deletion. Nothing on SQLite showed it | running the feedback and account suites against a throwaway PostgreSQL 16 for the first time | slice 0 (`accounts/service.py`: a name with a NUL is an unknown name; names and addresses are one line without control characters) and slice 6 (the reason) |
 | A zip entry was written without file-type bits, so unpacking tools show it as `?rw-r--r--` | a test that the archive is safe to unpack | slice 4 |
+| **`test_a_server_that_is_stopped_in_the_middle_of_a_run_...` failed on GitHub only**: after a SIGTERM a server lets a run finish for 5 s, and the quick plan left about 9 s after the third test, a margin a stall of a busy runner ate (the run was `completed`, not `cancelled`). Local runs passed 6 of 6 | the first red check on GitHub (#11); reproduced every time by a 4-second stall between the third test and the signal, which the thorough plan (about 14 s left) survives | commit on `feat/feedback-diagnostics` (the test only) |
+| **The first publish on a nearly full disk stopped half way through the image build and left the `agentlab:local` tag on a partial image**, which the next publish would have taken as its rollback target | the publish of the attachments slice: `no space left on device`, 99% used by images and build cache from the day's builds | the tag was put back by hand and superseded images were pruned; the script now checks for room first, restores the tag, and removes the superseded image (`fix/release-publish-disk-and-tags`) |
+| **`wait` could not show why a check was red**: the job log is a redirect to signed storage and the token was passed on to it (401) | the same red check | `fix/release-publish-disk-and-tags` (a redirect to another host does not carry the token) |
+| **`wait` right after `pr` stopped with "the pull request is at <old commit>"**: GitHub's record of the pull request lags the pushed branch by seconds | the second push to the same pull request | `fix/release-publish-disk-and-tags` (it asks again for up to a minute) |
+| **A reporter's page filled only the sidebar's column on every window wider than 920px** (the whole page squeezed into 244px, the top bar stacked above it, the rest of the window empty): the frame had no sidebar but used the two-column grid made for one | **the owner, on the live site, from a screenshot.** No test saw it: the width checks ran where the grid has one column anyway, and none asserted how wide the page was | `fix/reporter-layout-single-column` (#14, `98a8f22`): one column for a frame without a sidebar; a unit test pins the class and the rule, and the browser workflow asserts the page has the width of the window |
+| An image refused for not being what its name says told a person nothing they could act on ("its content does not match its name") | the owner, attaching a `.jpg` that was not a JPEG, on the live site | `fix/attachment-refusal-says-what-the-file-is` (#15): it names what the file is and what to do; the rule itself is unchanged, as the specification requires |
 
 Not root-caused: the intermittent end-to-end failure of scenario 11 (a clean run reported as insecure) was not reproduced in 78
 further runs; its assertion prints the findings if it recurs. It is probably the same family as the adapter defect, which is
@@ -256,23 +265,35 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
 
 **Run so far** (and what each does and does not show):
 
-* **`scripts/ship.py check` is green on every head of the stack at its final commit** (lint, format, types, the API description,
-  governance, the tests CI selects, the web job with its schema, tests and build, and the image build). The heads, in the order
-  of the pull requests:
+* **Each pull request went through the staged process, on the exact commit, one after another** (2026-10-13). For every head,
+  `scripts/ship.py check` (lint, format, types, the API description, governance, the tests CI selects, the web job with its
+  schema, tests and build, the image build) was green locally before the pull request was opened; GitHub then ran its four
+  checks on the same commit (`python (lint, types, tests)`, `web (types, tests, build)`, `image (docker build)`,
+  `validate-governance`); the script merged only when all four were green on that head and the pull request was mergeable;
+  `publish` then took a backup, built the image, replaced the API and worker and passed its smoke test.
 
-  | Branch | Head | `scripts/ship.py check` |
-  |---|---|---|
-  | `chore/staging-pipeline-and-remove-railway` | `f0f1f47` | green |
-  | `fix/agent-adapter-fresh-connections` | `3d74128` | green |
-  | `feat/accounts-and-roles` | `3d053de` | green |
-  | `feat/feedback-core` | `e5ba323` | green |
-  | `feat/feedback-attachments` | `d3a87f1` | green |
-  | `feat/feedback-diagnostics` | `8c795b5` | green |
-  | `feat/feedback-handoff` | `51af99e` | green |
-  | `feat/feedback-ui` (slices 5 and 6) | `6f2ae00` | green |
+  | Pull request | Branch | Head | GitHub, first attempt | Merged as | Published |
+  |---|---|---|---|---|---|
+  | #6 | `chore/staging-pipeline-and-remove-railway` | `efa4ca9` | green | `8aaf599` | yes |
+  | #7 | `fix/agent-adapter-fresh-connections` | `ae9cc9c` | green | `a87d82a` | yes |
+  | #8 | `feat/accounts-and-roles` | `b37000c` | green | `e719147` | yes |
+  | #9 | `feat/feedback-core` | `2b19b7e` | green | `955457b` | yes |
+  | #10 | `feat/feedback-attachments` | `152b9a6` | green | `1301268` | yes, on the second attempt (the first stopped at the build: no space left on the device) |
+  | #11 | `feat/feedback-diagnostics` | `bad898b` | **red** at `4877902` (one timing-dependent test), green after the test was fixed | `8d7e733` | yes |
+  | #12 | `feat/feedback-handoff` | `bf2b3f3` | green | `4d7548b` | yes |
+  | #13 | `feat/feedback-ui` | `5d7de54` | green; the local check was **not** repeated on this head, on the owner's instruction to publish at once (the tree is that of `6f2ae00`, which passed the full check, plus one test-only commit already green in #11 and #12) | `202bcfd` | yes |
+  | #14 | `fix/reporter-layout-single-column` | `f5fb47c` | green; the full local check was **not** run (a web-only change, asked for at once): the web job (377 tests and the build) and both browser workflows ran locally | `98a8f22` | yes |
+  | #15 | `fix/attachment-refusal-says-what-the-file-is` | `0455273` | green; the full local check was **not** run (a one-file change, asked for at once): its unit tests and three mutations ran locally | `9e4c6ec` | yes |
+  | #16 | `fix/release-publish-disk-and-tags` | `013fdae` | green; its first head (`958e2b7`) was cleared locally but `pr` refused it because `main` had moved (#15), so `main` was merged in and the full check run again | `5ec6a28` | yes (scripts, tests and documents only: the image was unchanged) |
 
-  The check prints a count only when something fails, so none is given here; the last head's test stage took 26 minutes. The
-  plan's own head differs from the last one by this document and a merge only.
+  What the real run showed, beyond "green": **one red check** (the stopped-mid-run test, see the defects above), fixed with a
+  test-only commit and re-checked locally before the same pull request was updated; **one publish stopped by a full disk** at
+  the image build, with the running system untouched, then repeated after the tags and the superseded images were put right;
+  and **three defects in the release script**, each found by a real situation and fixed with a test. **Three pull requests
+  (#13, #14, #15) were published without the full local check, on the owner's
+  instruction to have them at once**; for those, GitHub's four checks on the exact head were the gate, and the table says what
+  was run locally instead. Two of them were defects the owner found on the live site, and no test had caught either. The
+  checks that were not exercised for real: the rollback after a failed smoke test, and a merge the script refuses.
 * Focused suites with CI's marker selection over the API, security and feedback tests, the documentation tests and the new
   command-line tests: **895 passed** (at `a824380`, before the last commits of that branch, which `scripts/ship.py check`
   above covers).
@@ -293,10 +314,13 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
   the feedback API tests (31 passing), the account API and the security suites (99 tests: 97 passing, one reading `sqlite_master`,
   one finding the NUL-byte defect in the table above, which is fixed and passes) were run against it. **The standard suite in CI still runs on SQLite only**; the
   PostgreSQL run is a procedure, not yet a CI job.
-* The migrations were also tested up and down on SQLite (`0002` to `0008`). **Not run:** Redis, Ollama, the Docker-marked
-  tests, **anything on GitHub**, and the browser tests in CI (it does not run them).
-* **Not verified at all:** that a real GitHub accepts what the GitHub client sends (the client is tested against a fake that
-  keeps its own issues), and the behaviour of any of this on the live server, which does not have it.
+* The migrations were also tested up and down on SQLite (`0002` to `0008`) and were applied to the live PostgreSQL by `publish`
+  (the system came up and passed its smoke test after each). **Not run:** Redis, Ollama, the Docker-marked tests, and the
+  browser tests in CI (it does not run them; they ran in the worker image).
+* **Not verified at all:** that a real GitHub issue tracker accepts what the GitHub client sends (publication is off, and the
+  client is tested against a fake that keeps its own issues); the two workflows end to end on the live server (the routes, the
+  interface bundle and the layout were checked there, but no test submission was written to the live database, on purpose);
+  and the forged-address observation (question 7).
 
 ## Risks, rollback, migrations
 
@@ -327,20 +351,21 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
 
 ## Irreversible steps and human approval point
 
-Approval of decisions 1 to 4 was given on 2026-10-12. The remaining human gates are: **opening the pull requests** (needs a GitHub
-credential the server does not have), **merging the first pull request** (the pipeline's own, which changes the merge rule and
-so is merged by the owner), and **the first publish of accounts**, which makes registration reachable from the internet.
-Applying a migration to the live database happens only in `publish`, after a backup, and only after the slice's pull request is
-green. **Setting a retention period or switching on GitHub publication** are the owner's configuration, not a step of this work.
+Approval of decisions 1 to 4 was given on 2026-10-12, and the owner asked for the staged process to be carried through,
+including the merge and the publish (on 2026-10-11 the owner decided that the pipeline may merge its own pull request and
+publishes after a merge). The credential was supplied on 2026-10-13 as a fine-grained token file on the server. Every
+migration was applied by `publish` after a backup and only after the pull request's checks on GitHub were green. **The first
+publish of accounts made registration reachable from the internet** (open, as the owner decided, with reporter accounts that reach
+Feedback & Support only). **Setting a retention period, switching on GitHub publication, creating the first administrator and
+choosing the registration mode** are the owner's, not steps of this work.
 
 ## Open questions
 
-1. **A GitHub credential.** Nothing can be pushed, opened, merged or published until the owner creates the token file described
-   in `docs/development.md#the-staged-release-process` (a fine-grained token for this repository only, with pull requests and
-   contents read and write and actions read, expiring soon; never pasted into a conversation).
-2. **Registration on the live server until the first publish.** With the default `open`, anyone can register as a reporter
-   once this is published. Recommended for the first publish: `accounts.registration: approval`, then `open` when the owner
-   has looked at it. This is a configuration of the server, not code.
+1. ~~A GitHub credential~~ Supplied; **revoke the token when the work is merged** (and delete the file on the server). The token
+   that was pasted into a conversation earlier, and the deploy key `agentlab-vps`, are the owner's to revoke and delete.
+2. **Registration on the live server is `open`** (the default and the owner's decision) since the accounts publish. Reporters
+   reach Feedback & Support only. Recommended until the owner has looked at it: `accounts.registration: approval`
+   (a server configuration, not code).
 3. **Confirm the safeguard**: self-registered accounts are feedback-only until an admin promotes them
    (`accounts.default_role: maintainer` would give them today's full access; read the risks first).
 4. **Retention periods.** The mechanism is built and every period is empty. Proposal to approve, or change: closed
@@ -349,14 +374,23 @@ green. **Setting a retention period or switching on GitHub publication** are the
    `agentlab feedback purge --dry-run` after setting them.
 5. **GitHub publication**: whether to switch it on, for which repository, with which roles. Until then it does nothing. Whether
    `service_token_sees_security` stays false (it does today).
+6. **The first administrator**, which only the owner can make (a password at a hidden prompt on the server); the shared token is
+   refused by the account routes on purpose.
+7. **One observation not made**: that a forged `X-Forwarded-For` through Caddy shows the real address in the account audit
+   trail. A failed sign-in for `nobody-live-check` with a forged address was sent to the live server once; the trail (the Accounts
+   page, card *What happened*) needs an administrator to read it (the shared token is refused), and reading the database
+   directly was not done.
 
 ## Next steps, in order
 
-1. ~~Run `scripts/ship.py check` on each branch head in stack order~~ Done; see "Verification". A head that is changed again
-   (a fix after a red check on GitHub, a merge of `main`) has to be checked again before its pull request is updated.
-2. With the credential: `pr`, `wait`, `merge` and `publish` for each pull request in order; after the accounts publish, create
-   the first administrator on the server with `agentlab users create NAME --role admin` and verify that a forged
-   `X-Forwarded-For` through Caddy shows the real client address in `account_events.client`. **Back up before the first publish
-   of this feature**: it adds seven migrations.
-3. Decide whether PostgreSQL should be a CI job for the feedback suites (the procedure used here is a short plugin that points
+1. **Create the first administrator** on the server (`docs/accounts.md`), sign in, open the Accounts page (`#/accounts`) and
+   find the failed sign-in for `nobody-live-check` in the card *What happened*: its *From* column must show the visitor's own
+   address, not `203.0.113.77` (question 7).
+2. Decide the registration mode, the retention periods and GitHub publication (questions 2 to 5). Nothing is deleted and nothing is
+   published to GitHub until the owner sets them.
+3. Revoke the token used for this delivery, and the older one that was pasted into a conversation; delete the deploy key; change the
+   root password that was pasted once.
+4. Decide whether PostgreSQL should be a CI job for the feedback suites (the procedure used here is a short plugin that points
    each test's database at a PostgreSQL schema), and whether the browser tests should run in CI (they need Chromium there).
+5. Suggested for the release script, not done: let a check cleared on a tree carry over to a merge commit that did not change the
+   tree (merging `main` into the next branch took a full check each time, about twenty minutes, for an identical tree).
