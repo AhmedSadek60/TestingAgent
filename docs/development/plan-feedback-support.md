@@ -274,7 +274,8 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
   The check prints a count only when something fails, so none is given here; the last head's test stage took 26 minutes. The
   plan's own head differs from the last one by this document and a merge only.
 * Focused suites with CI's marker selection over the API, security and feedback tests, the documentation tests and the new
-  command-line tests: **895 passed** at the same head.
+  command-line tests: **895 passed** (at `a824380`, before the last commits of that branch, which `scripts/ship.py check`
+  above covers).
 * **In a real browser, against a real server** (Chromium of the worker image; neither the host nor CI has one):
   `tests/e2e/test_feedback_ui.py` **2 passed** (a person registers, asks for a feature with a file and follows it while a
   maintainer triages, adds an internal note, asks a question and the person sees the answer and none of the notes; then an issue
