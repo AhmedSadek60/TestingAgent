@@ -11,6 +11,13 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Engineering handoff** ([feedback-support.md](docs/feedback-support.md#engineering-handoff),
+  [ADR 0015](docs/decisions/0015-handoff-is-a-package-for-a-person-to-take.md)): a maintainer can turn a submission into a
+  sanitized, reproducible ZIP with a manifest of hashes, the masked diagnostics and the attachments that may go in, context
+  from the run and test the report names, a masking report and `CLAUDE_CODE_TASK.md`, a briefing for an authorised engineer.
+  Everything a person wrote is quoted and cannot close its own quote; what is missing is said and nothing stands in for it;
+  internal notes and files that cannot be sanitized are out unless chosen; every build and download is recorded. Nothing runs
+  Claude Code or sends the package anywhere. Migration `0006`.
 * **Diagnostics for issue reports** ([feedback-support.md](docs/feedback-support.md#diagnostics)): what AgentLab can really
   supply (environment, application and backend logs, errors, a run's metadata, a test's result and trace, what the browser
   saw), collected only when asked for, from the person's own requests and, for a maintainer, a named run; masked, previewed,

@@ -20,7 +20,7 @@ from agentlab import __version__
 from agentlab.accounts import AccountService
 from agentlab.api import errors, openapi_docs
 from agentlab.api.requestlog import RequestLog, note
-from agentlab.api.routes import accounts, catalog, diagnostics, feedback, projects, reports, runs
+from agentlab.api.routes import accounts, catalog, diagnostics, feedback, handoffs, projects, reports, runs
 from agentlab.api.security import UI_CSP, RequestGuard, TokenGuard, is_loopback, resolve_token
 from agentlab.api.state import ApiState
 from agentlab.core.config import AgentLabConfig, ServerConfig
@@ -28,6 +28,7 @@ from agentlab.core.errors import PolicyBlocked
 from agentlab.feedback import SubmissionService
 from agentlab.feedback.attachments import AttachmentService
 from agentlab.feedback.diagnostics import DiagnosticsService
+from agentlab.feedback.handoff import HandoffService
 from agentlab.feedback.logcapture import install_log_capture, uninstall_log_capture
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
 from agentlab.jobs.runner import reap_forever
@@ -165,14 +166,19 @@ def create_app(
             custom_rules=[(r.name, r.pattern) for r in svc.config.feedback.redaction.rules],
             redact_ip_addresses=svc.config.feedback.redaction.redact_ip_addresses,
         )
+        attachment_service = AttachmentService(feedback_service, svc.artifacts, svc.config.feedback, redactor=masker)
+        diagnostics_service = DiagnosticsService(feedback_service, svc.store, svc.artifacts, svc.config, masker)
         app.state.agentlab = ApiState(
             services=svc,
             queue=q,
             guard=TokenGuard(api_token),
             accounts=AccountService(svc.store.db, svc.config.accounts),
             feedback=feedback_service,
-            attachments=AttachmentService(feedback_service, svc.artifacts, svc.config.feedback, redactor=masker),
-            diagnostics=DiagnosticsService(feedback_service, svc.store, svc.artifacts, svc.config, masker),
+            attachments=attachment_service,
+            diagnostics=diagnostics_service,
+            handoffs=HandoffService(
+                feedback_service, attachment_service, diagnostics_service, svc.artifacts, svc.config, masker
+            ),
             worker=worker,
             uploads_dir=uploads,
             allowed_roots=[Path(p if Path(p).is_absolute() else svc.base_dir / p) for p in scfg.allowed_paths],
@@ -255,7 +261,7 @@ def create_app(
     app.include_router(catalog.public)
     app.include_router(accounts.public)
     app.include_router(reports.public)
-    for module in (projects, runs, reports, catalog, accounts, feedback, diagnostics):
+    for module in (projects, runs, reports, catalog, accounts, feedback, diagnostics, handoffs):
         app.include_router(module.router)
 
     resolved_ui = (

@@ -214,6 +214,8 @@ what a submission moves through; changing them changes the forms and the maintai
 | `diagnostics.max_browser_entries` | `200` | The most console and network entries a browser may report in one collection. |
 | `diagnostics.draft_hours` | `24` | How long a collection that was not attached to a report is kept. |
 | `diagnostics.max_collections_per_hour` | `30` | Collections one person may make in an hour. |
+| `handoff.max_package_mb` | `50` | The largest engineering handoff package that may be built. A larger one is refused before anything is kept, with the advice to leave attachments out. |
+| `handoff.allow_internal_notes` | `true` | Whether a maintainer may choose to put internal notes (and internal files) in a package. They are never put in by default. Off: a request that asks for them is refused. |
 | `redaction.rules` | `[]` | Patterns of your own, each `{name, pattern}`, that attached and collected text is masked by, beyond the built-in ones. They appear in reports as `custom:<name>`. |
 | `redaction.redact_ip_addresses` | `false` | Mask IPv4 addresses. They help to diagnose a network problem, so they are kept unless you turn this on. |
 | `notify_reporter_on` | `comment`, `information_request`, `status_change` | What makes a submission unread for its reporter: a maintainer's public comment, a request for information or another attempt, or a status change. Remove one to stop that notification; an empty list turns the marker off. |

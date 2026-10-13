@@ -1560,6 +1560,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/submissions/{submission_id}/handoffs/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview an engineering handoff
+         * @description Every file the package would hold with its hash, what is left out and why, the warnings, and the text of `CLAUDE_CODE_TASK.md`, without building or keeping anything. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.
+         */
+        post: operations["preview_submissions__submission_id__handoffs_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submission_id}/handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The handoffs built from a submission
+         * @description The packages built from this submission, newest first, each with what it holds, what was left out and its task file. Maintainers only.
+         */
+        get: operations["of_submission_submissions__submission_id__handoffs_get"];
+        put?: never;
+        /**
+         * Build an engineering handoff
+         * @description Builds the package: the structured record, the reproduction, the masked diagnostics, the attachments that may go in, context from the run the report names, a masking report and a privacy summary, a README, a manifest of SHA-256 hashes, and `CLAUDE_CODE_TASK.md` for Claude Code. Only what is available and authorised is put in, and what is not is listed with the reason. The export is recorded. Maintainers only. Nothing here runs Claude Code, changes a repository or sends the package anywhere: it only builds a file for a person to take.
+         */
+        post: operations["generate_submissions__submission_id__handoffs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a handoff
+         * @description What a built package holds, what was left out, and the task text. Maintainers only, and only for a submission they may see.
+         */
+        get: operations["read_handoffs__handoff_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an engineering handoff as an archive
+         * @description The ZIP. Every download is recorded in the submission's audit trail. Maintainers only.
+         */
+        get: operations["download_handoffs__handoff_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download CLAUDE_CODE_TASK.md on its own
+         * @description The task file as Markdown, without the rest of the package. Recorded like the archive. Maintainers only.
+         */
+        get: operations["task_handoffs__handoff_id__task_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4359,6 +4463,169 @@ export interface components {
              * @default false
              */
             is_security?: boolean;
+        };
+        /**
+         * HandoffFile
+         * @description One file of a package.
+         */
+        HandoffFile: {
+            /**
+             * Path
+             * @description Where it is in the package
+             */
+            path: string;
+            /**
+             * Kind
+             * @description generated: written by AgentLab for this package; diagnostic: a collected, masked item; sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded
+             * @enum {string}
+             */
+            kind: "generated" | "diagnostic" | "sanitized_copy" | "original_evidence";
+            /**
+             * Size
+             * @description Its size in bytes
+             */
+            size: number;
+            /**
+             * Sha256
+             * @description Its SHA-256
+             */
+            sha256: string;
+            /**
+             * Source
+             * @description What it was made from
+             */
+            source: string;
+            /**
+             * Note
+             * @description What to know about it (for example, that it is unsanitized)
+             */
+            note: string;
+        };
+        /**
+         * HandoffIn
+         * @description What goes into an engineering handoff package, beyond what goes in by default.
+         */
+        HandoffIn: {
+            /**
+             * Exclude Attachments
+             * @description Attachment ids to leave out of the package
+             */
+            exclude_attachments?: string[];
+            /**
+             * Include Originals
+             * @description Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in as they were uploaded. Each is marked as unsanitized in the package
+             */
+            include_originals?: string[];
+            /**
+             * Include Internal Notes
+             * @description Put the maintainers' internal notes in the package (they are not by default). Must be the JSON value true or false, not a string or a number
+             * @default false
+             */
+            include_internal_notes?: boolean;
+            /**
+             * Include Diagnostics
+             * @description Put in the diagnostics attached to the submission, when there are any. Must be the JSON value true or false
+             * @default true
+             */
+            include_diagnostics?: boolean;
+        };
+        /**
+         * HandoffLeftOut
+         * @description Something that is not in the package, and why. Nothing stands in for it.
+         */
+        HandoffLeftOut: {
+            /**
+             * What
+             * @description What it is
+             */
+            what: string;
+            /**
+             * Reason
+             * @description Why it is not in the package
+             */
+            reason: string;
+        };
+        /**
+         * HandoffOut
+         * @description A package, or a preview of one.
+         */
+        HandoffOut: {
+            /**
+             * Id
+             * @description Its id, or null for a preview that was not built
+             */
+            id: string | null;
+            /**
+             * Status
+             * @description preview: nothing was built or kept
+             * @enum {string}
+             */
+            status: "preview" | "generated";
+            /**
+             * Submission Id
+             * @description The submission it was made from
+             */
+            submission_id: string;
+            /**
+             * Number
+             * @description The submission's number
+             */
+            number: string;
+            /**
+             * Submission Version
+             * @description The version of the submission it reflects
+             */
+            submission_version: number;
+            /**
+             * Created At
+             * @description When it was built
+             */
+            created_at: string | null;
+            /**
+             * Created By
+             * @description Who asked for it
+             */
+            created_by: string | null;
+            /**
+             * Files
+             * @description Every file in the package, with its hash
+             */
+            files: components["schemas"]["HandoffFile"][];
+            /**
+             * Left Out
+             * @description What was not put in, and why
+             */
+            left_out: components["schemas"]["HandoffLeftOut"][];
+            /**
+             * Warnings
+             * @description What the engineer and the maintainer should know before using it
+             */
+            warnings: string[];
+            /**
+             * Size
+             * @description The size of the ZIP in bytes (0 for a preview)
+             */
+            size: number;
+            /**
+             * Sha256
+             * @description The SHA-256 of the ZIP
+             */
+            sha256: string | null;
+            /**
+             * External Sharing Blocked
+             * @description True when something in it still needs a person's review before it leaves AgentLab
+             */
+            external_sharing_blocked: boolean;
+            /**
+             * Includes Unsanitized
+             * @description True when it holds a file that was put in as uploaded
+             */
+            includes_unsanitized: boolean;
+            /**
+             * Task
+             * @description The text of CLAUDE_CODE_TASK.md, for review before it is downloaded
+             */
+            task: string;
         };
         /**
          * Health
@@ -14879,6 +15146,422 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiagnosticCollectionOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_submissions__submission_id__handoffs_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    of_submission_submissions__submission_id__handoffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"][];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_submissions__submission_id__handoffs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The submission's id, or its number such as `FR-2026-00042` or `IR-2026-00042` */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_handoffs__handoff_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_handoffs__handoff_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+            /** @description The API token is missing or wrong */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not allowed (policy, origin or restricted evidence) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The thing does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is invalid; the message says what to change */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed authentication attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    task_handoffs__handoff_id__task_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of a handoff package */
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The task file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": unknown;
                 };
             };
             /** @description The API token is missing or wrong */

@@ -13,6 +13,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [Finding submissions](#finding-submissions)
 * [Attachments](#attachments)
 * [Diagnostics](#diagnostics)
+* [Engineering handoff](#engineering-handoff)
 * [Private submissions](#private-submissions)
 * [Limits and protections](#limits-and-protections)
 * [The API](#the-api)
@@ -26,7 +27,7 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 | The web pages (request and report forms, My Submissions, the maintainer queue) | **Not yet built.** Everything is reachable through the API; the web interface comes in a later slice |
 | File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
 | Diagnostics collected from AgentLab: environment, application and backend logs, errors, the run's metadata, a test's result and trace, and what the browser saw; preview, masking, consent, a downloadable bundle | **Built** ([Diagnostics](#diagnostics)) |
-| An engineering handoff package (`CLAUDE_CODE_TASK.md` and a ZIP) | Not yet built |
+| An engineering handoff package (a sanitized ZIP and `CLAUDE_CODE_TASK.md`) for an authorised engineer | **Built** ([Engineering handoff](#engineering-handoff)) |
 | Publishing to GitHub, retention and purging | Not yet built |
 
 Nothing here runs Claude Code, changes the repository or sends a submission anywhere outside this server.
@@ -226,6 +227,89 @@ says external sharing is blocked until a person has looked. Downloads of an atta
 A collection is its owner's until it is attached; then it is visible to the people who may see the submission, and to no one
 else (the same rule as the submission: a private submission's diagnostics are private).
 
+## Engineering handoff
+
+A maintainer can turn a submission into a **package** that an authorised engineer (or Claude Code, run by that engineer) can
+work from: a ZIP with the record, what the reporter said, the diagnostics that were attached, the attachments that may go
+in, context from the run and test the report names, a masking report, a manifest of SHA-256 hashes and a briefing,
+`CLAUDE_CODE_TASK.md`. **Nothing here runs Claude Code, changes a repository or sends the package anywhere**: AgentLab builds a
+file and a person takes it. Building one is for maintainers (and the shared token and the local machine); a reporter is refused,
+and a package of a private report is as hidden as the report.
+
+```
+agentlab-handoff-IR-2026-00042/
+  README.md                       what is in it, what is not, privacy warnings, what is missing
+  CLAUDE_CODE_TASK.md             the briefing, sections A to K
+  manifest.json                   every file, its SHA-256 and what it is made from; when, which version, how masked
+  submission/                     submission.json, description.md, status-history.json, related-links.json,
+                                  discussion.json (public lines), internal-notes.json (only when asked for)
+  reproduction/                   steps.md, expected-vs-actual.md, reproduction-metadata.json   (issue reports)
+  feature/requirements.md                                                                       (feature requests)
+  diagnostics/                    manifest.json, environment.json, sanitized-application.log, sanitized-backend.log,
+                                  sanitized-errors.txt, relevant-trace.json, browser-console-errors.json,
+                                  browser-network-errors.json, run-summary.json, test-summary.json
+  evidence/                       attachment-manifest.json, selected-attachments/
+  context/                        target-version.json, related-run-summary.json, related-test-summary.json
+  security/                       redaction-report.json, privacy-summary.json
+```
+
+**Only what is available and authorised goes in, and nothing stands in for what is not.** A file is there because its
+content exists. What was not put in is listed with the reason in `left_out`, in the README, in `privacy-summary.json`, and, for
+attachments, as a line under *Missing information* in the task file.
+
+**What goes in by default.**
+
+| | Default | To change it |
+|---|---|---|
+| The submission's own record and what the reporter wrote | in, masked | |
+| Public comments | in | |
+| **Internal notes and internal files** | **out** | `include_internal_notes: true` (and the server must allow it: `feedback.handoff.allow_internal_notes`) |
+| Diagnostics that were attached with consent | in, as the masked copies that were kept | `include_diagnostics: false` |
+| A text attachment that had secrets | in, **as its sanitized copy** (the original stays private) | |
+| A text attachment where none were recognised | in, as uploaded | `exclude_attachments` |
+| A text attachment that was not inspected (too large) | **out** | `include_originals`, which marks it unsanitized |
+| An image, a PDF, a Word document or an archive | **out**, with the reason | `include_originals`, which marks it **unsanitized** |
+| Any attachment named in `exclude_attachments` | out (this wins over `include_originals`) | |
+
+An id in `exclude_attachments` or `include_originals` that is not an attachment of this submission is refused.
+
+**Three kinds of statement, kept apart.** What the **reporter claims** (the description, the steps, what they expected and
+saw, how they rate the impact), what the **system observed** (logs, errors, run and test results, the environment) and what
+is **generated or decided** (the maintainers' priority and severity, and everything AgentLab wrote for this package). The
+evidence table of the task file says which each file is. Every file written by AgentLab is marked `generated` in the
+manifest and is never presented as original evidence; a sanitized copy is marked as a copy.
+
+**Everything a person or a system wrote is untrusted.** In the package it is quoted in blocks that cannot be closed from
+inside (the fence is longer than any run of backticks in the text), a version, a build or a file name is shown as a quoted,
+escaped one-line string or made safe, and the stated acceptance criteria are quoted one to a line. The task file says in its
+own words that this is evidence and not instruction (section I). That reduces the risk of a model obeying a report; it does
+not remove it, which is why the package is for an authorised engineer and not for a public place.
+
+**The task file** has the sections the specification lists: A role, B objective (bug investigation, performance
+investigation, test/evaluation issue, security investigation or feature implementation), C the submission as the reporter
+wrote it, D what is known about the environment and **what is missing**, E the evidence and what each file may help
+establish, F reproduction (with a note to investigate rather than assume when the steps are incomplete), G the sixteen
+engineering instructions, H the ten extra ones for a feature request, I the trust boundaries, J the acceptance criteria
+(**stated** ones as the reporter wrote them; when there are none, **proposed** ones, labelled as not approved by anyone) and K
+the response expected. Nothing in D is inferred: a fact is given with where it comes from, or it is "unknown".
+
+**Masking.** Everything a person wrote goes through the same masking as a diagnostic, once, and what was masked is recorded
+by place and kind, never by value, in `security/redaction-report.json`. If the second inspection still doubts a text, the
+package says `external_sharing_blocked` and `redaction_status: needs_review`, and a warning says a person must look before it
+leaves AgentLab. Masking reduces risk and does not guarantee that nothing sensitive remains.
+
+**Preview, build, take.** `POST /submissions/{id}/handoffs/preview` returns every file with its hash, what is left out and
+the task file as it would read, and keeps nothing. `POST /submissions/{id}/handoffs` builds and keeps the package (restricted
+artifact) with a record of who and when and which version of the submission it reflects; it does not change when the
+submission does, and building twice at the same moment gives the same bytes (no clock is stored in the archive).
+`GET /handoffs/{id}/download` is the ZIP and `GET /handoffs/{id}/task` the task file alone. **Building and every download is
+recorded** in the submission's audit trail (`handoff_generated`, `handoff_downloaded`) with counts, never with text.
+
+**Limits.** `feedback.handoff.max_package_mb` (50): a package that would be larger is refused before anything is kept, and
+the attachments are read only until the limit is passed. A package is a file in the restricted artifact area under its
+hash, mode `0600`; it is served with `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and a sandboxing
+`Content-Security-Policy`.
+
 ## Private submissions
 
 An issue report in the **security category** (`feedback.security_category`), or one the reporter marks
@@ -247,8 +331,10 @@ the visibility back explicitly.
 * **Identifiers** in a URL are an id or a number; anything else is refused before it is looked up.
 * **Audit trail.** One record for each thing that was done, with who and when: `created`, `status_changed`, `closed`,
   `priority_changed`, `severity_changed`, `assigned`, `category_changed`, `visibility_changed`, `labels_changed`, `commented`,
-  `related`, `unrelated`, `viewed` (a maintainer opened someone else's private submission) and `access_denied`. It records which
-  fields and which statuses, **never the text**.
+  `related`, `unrelated`, `viewed` (a maintainer opened someone else's private submission), `access_denied`,
+  `attachment_added`, `attachment_removed`, `attachment_downloaded`, `attachment_rejected`, `diagnostics_collected`,
+  `diagnostics_attached`, `diagnostics_downloaded`, `handoff_generated` and `handoff_downloaded`. It records which fields and
+  which statuses and how many files, **never the text**.
 * **Changing someone's role or disabling their account** ends their sessions at once ([accounts.md](accounts.md)), so a
   demoted maintainer stops triaging immediately.
 
@@ -287,6 +373,12 @@ requests that change something.
 | `GET /diagnostics/{collection_id}/download` | the same | The bundle as a ZIP |
 | `POST /submissions/{id}/diagnostics` | anyone signed in | Attach a draft, with consent |
 | `GET /submissions/{id}/diagnostics` | anyone who may see the submission | What is attached |
+| `POST /submissions/{id}/handoffs/preview` | maintainers | What a package would hold, with the task file; keeps nothing |
+| `POST /submissions/{id}/handoffs` | maintainers | Build a package |
+| `GET /submissions/{id}/handoffs` | maintainers | The packages built from a submission, newest first |
+| `GET /handoffs/{handoff_id}` | maintainers | What a built package holds and its task file |
+| `GET /handoffs/{handoff_id}/download` | maintainers | The ZIP (recorded) |
+| `GET /handoffs/{handoff_id}/task` | maintainers | `CLAUDE_CODE_TASK.md` on its own (recorded) |
 | `POST /submissions/{id}/seen` | anyone signed in | Mark the answers seen |
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |

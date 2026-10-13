@@ -349,7 +349,7 @@ async def test_the_api_description_lists_every_feedback_operation_with_its_error
             if path.startswith("/submissions")
             for method, op in methods.items()
         }
-        assert len(found) == 23, sorted(found)
+        assert len(found) == 26, sorted(found)
         for (method, path), op in found.items():
             assert op["tags"] == ["Feedback & Support"], (method, path)
             assert op["summary"] and len(op["description"]) > 40, (method, path)
