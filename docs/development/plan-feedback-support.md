@@ -22,7 +22,7 @@ Code. Nothing runs Claude Code or changes the repository automatically.
 
 | Slice | What | Branch | Migration | ADR | State |
 |---|---|---|---|---|---|
-| 0 | Accounts: registration, password sign-in, sessions, roles, `agentlab users`, the account pages | `feat/accounts-and-roles` | `0002` | 0011 | **Built and tested locally.** Also here: a request-size limit, the visitor's address behind Caddy, `PATCH` in CORS |
+| 0 | Accounts: registration, password sign-in, sessions, roles, `agentlab users`, the account pages | `feat/accounts-and-roles` | `0002` | 0011 | **Built and tested locally.** Also here: a request-size limit, the visitor's address behind Caddy, `PATCH` in CORS, and names that PostgreSQL can store |
 | 1 | Core: submissions, workflow, comments and internal notes, history, labels, links, unread marker, duplicate suggestions, audit, allowances | `feat/feedback-core` | `0003` | 0012 | **Built and tested locally** |
 | 2 | Attachments, `DiagnosticRedactor`, sanitized copies, scanner hook | `feat/feedback-attachments` | `0004` | 0013 | **Built and tested locally** |
 | 3 | Diagnostics: the small log, the collector, preview, consent, bundle, request ids | `feat/feedback-diagnostics` | `0005` | 0014 | **Built and tested locally** |
@@ -219,6 +219,7 @@ every check on the exact head is green; a merged slice is published automaticall
 | A very long file name lost its extension when shortened, so a legitimate file was refused | a hostile-name test | slice 2 |
 | **Slice 0 broke a browser test without anyone seeing it**: the sign-in page puts the password form first, and `test_a_server_that_wants_a_token_...` looked for the token field | running the whole browser suite in the worker image for slice 5 (CI and the host cannot run it) | slice 5 (the test now asks for the token form) |
 | A numbering scheme of `max + 1` reuses a deleted number | designing deletion | slice 6 (`submission_counters`) |
+| **Three inputs answered 500 on PostgreSQL, which refuses a NUL byte in text**: a user name at sign-in, a display name or an e-mail address at registration, and the reason for a deletion. Nothing on SQLite showed it | running the feedback and account suites against a throwaway PostgreSQL 16 for the first time | slice 0 (`accounts/service.py`: a name with a NUL is an unknown name; names and addresses are one line without control characters) and slice 6 (the reason) |
 | A zip entry was written without file-type bits, so unpacking tools show it as `?rw-r--r--` | a test that the archive is safe to unpack | slice 4 |
 
 Not root-caused: the intermittent end-to-end failure of scenario 11 (a clean run reported as insecure) was not reproduced in 78
@@ -255,10 +256,23 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
 
 **Run so far** (and what each does and does not show):
 
-* **`scripts/ship.py check` is green on `feat/feedback-ui` at `d2d1173`** (the stack up to and including slices 5 and 6):
-  lint, format, types, the API description, governance, **the tests CI selects (1,964 passed in 20 minutes)**, the web job
-  (schema current, 375 tests, type-check, build) and the image build. It has **not** been run on the other heads of the stack at
-  their final commits, nor on the plan's own head (which differs by this document only); each is run before its pull request.
+* **`scripts/ship.py check` is green on every head of the stack at its final commit** (lint, format, types, the API description,
+  governance, the tests CI selects, the web job with its schema, tests and build, and the image build). The heads, in the order
+  of the pull requests:
+
+  | Branch | Head | `scripts/ship.py check` |
+  |---|---|---|
+  | `chore/staging-pipeline-and-remove-railway` | `f0f1f47` | green |
+  | `fix/agent-adapter-fresh-connections` | `3d74128` | green |
+  | `feat/accounts-and-roles` | `3d053de` | green |
+  | `feat/feedback-core` | `e5ba323` | green |
+  | `feat/feedback-attachments` | `d3a87f1` | green |
+  | `feat/feedback-diagnostics` | `8c795b5` | green |
+  | `feat/feedback-handoff` | `51af99e` | green |
+  | `feat/feedback-ui` (slices 5 and 6) | `6f2ae00` | green |
+
+  The check prints a count only when something fails, so none is given here; the last head's test stage took 26 minutes. The
+  plan's own head differs from the last one by this document and a merge only.
 * Focused suites with CI's marker selection over the API, security and feedback tests, the documentation tests and the new
   command-line tests: **895 passed** at the same head.
 * **In a real browser, against a real server** (Chromium of the worker image; neither the host nor CI has one):
@@ -272,8 +286,14 @@ diagnostics and redaction: 2 and 3; security: all; handoff: 4; end to end: 5).
   survivor being equivalent (a button that is disabled until the second yes already makes the value the same). Retention
   and publication: 23 of 24 caught, the survivor being equivalent (the storage layer masks the same text a second time). Earlier
   slices: 10, 10 and 9 caught for slices 1, 2 and 3. That is evidence the tests can fail, not that nothing is missing.
-* The migrations were tested up and down on SQLite (`0002` to `0008`). **Not run: PostgreSQL**, Redis, Ollama, the
-  Docker-marked tests, **anything on GitHub**, and the browser tests in CI (it does not run them).
+* **PostgreSQL 16** (a throwaway container; the production stack uses PostgreSQL): the migrations to `0008` apply and match the
+  models (`test_migrations_and_store_on_postgres`); the feedback unit suites (service, attachments, diagnostics,
+  handoff, retention, publication: 168 tests, 166 passing; the two that failed expect the database to be called `sqlite`) and
+  the feedback API tests (31 passing), the account API and the security suites (99 tests: 97 passing, one reading `sqlite_master`,
+  one finding the NUL-byte defect in the table above, which is fixed and passes) were run against it. **The standard suite in CI still runs on SQLite only**; the
+  PostgreSQL run is a procedure, not yet a CI job.
+* The migrations were also tested up and down on SQLite (`0002` to `0008`). **Not run:** Redis, Ollama, the Docker-marked
+  tests, **anything on GitHub**, and the browser tests in CI (it does not run them).
 * **Not verified at all:** that a real GitHub accepts what the GitHub client sends (the client is tested against a fake that
   keeps its own issues), and the behaviour of any of this on the live server, which does not have it.
 
@@ -331,8 +351,11 @@ green. **Setting a retention period or switching on GitHub publication** are the
 
 ## Next steps, in order
 
-1. Run `scripts/ship.py check` on each branch head in stack order and fix what is red (the final head is below).
+1. ~~Run `scripts/ship.py check` on each branch head in stack order~~ Done; see "Verification". A head that is changed again
+   (a fix after a red check on GitHub, a merge of `main`) has to be checked again before its pull request is updated.
 2. With the credential: `pr`, `wait`, `merge` and `publish` for each pull request in order; after the accounts publish, create
    the first administrator on the server with `agentlab users create NAME --role admin` and verify that a forged
-   `X-Forwarded-For` through Caddy shows the real client address in `account_events.client`.
-3. Enable the browser tests in CI if the owner wants them there.
+   `X-Forwarded-For` through Caddy shows the real client address in `account_events.client`. **Back up before the first publish
+   of this feature**: it adds seven migrations.
+3. Decide whether PostgreSQL should be a CI job for the feedback suites (the procedure used here is a short plugin that points
+   each test's database at a PostgreSQL schema), and whether the browser tests should run in CI (they need Chromium there).
