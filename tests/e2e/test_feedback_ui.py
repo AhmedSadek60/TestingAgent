@@ -269,3 +269,17 @@ def test_a_person_reports_an_issue_with_reviewed_diagnostics_and_a_maintainer_bu
     expect(staff.get_by_text("handoff_generated")).to_be_visible()
     expect(staff.get_by_text("handoff_downloaded").first).to_be_visible()
     assert SECRET not in staff.content()
+
+    # ---- the maintainer resolves it, and the person sees the new status and what they were told with it
+    triage = staff.get_by_role("heading", name="Triage").locator("xpath=ancestor::section")
+    triage.get_by_label("Status", exact=True).select_option("Resolved")
+    triage.get_by_label("Message with the status change").fill("Fixed in the next release")
+    triage.get_by_role("button", name="Save changes").click()
+    expect(triage.get_by_text("Saved.")).to_be_visible()
+    page.goto(support.base + "/#/feedback/submissions")
+    row = page.get_by_role("row").filter(has_text=number)
+    expect(row.get_by_text("Resolved")).to_be_visible()
+    expect(row.get_by_text("Answer waiting")).to_be_visible()
+    row.get_by_role("link", name=number).first.click()
+    expect(page.get_by_text("Fixed in the next release")).to_be_visible()
+    assert SECRET not in page.content(), "the reporter's own secret is masked even on their own page"

@@ -16,6 +16,8 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [Diagnostics](#diagnostics)
 * [Engineering handoff](#engineering-handoff)
 * [Private submissions](#private-submissions)
+* [Publishing to an issue tracker](#publishing-to-an-issue-tracker)
+* [Retention and deletion](#retention-and-deletion)
 * [Limits and protections](#limits-and-protections)
 * [The API](#the-api)
 * [Configuration](#configuration)
@@ -29,7 +31,8 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 | File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
 | Diagnostics collected from AgentLab: environment, application and backend logs, errors, the run's metadata, a test's result and trace, and what the browser saw; preview, masking, consent, a downloadable bundle | **Built** ([Diagnostics](#diagnostics)) |
 | An engineering handoff package (a sanitized ZIP and `CLAUDE_CODE_TASK.md`) for an authorised engineer | **Built** ([Engineering handoff](#engineering-handoff)) |
-| Publishing to GitHub, retention and purging | Not yet built |
+| Retention and deletion: periods that are empty until the owner sets them, `agentlab feedback purge`, and deleting one submission | **Built** ([Retention and deletion](#retention-and-deletion)) |
+| Publishing a sanitized summary to GitHub, off until switched on, previewed and confirmed, never twice, never a private report | **Built** ([Publishing](#publishing-to-an-issue-tracker)) |
 
 Nothing here runs Claude Code, changes the repository or sends a submission anywhere outside this server.
 
@@ -371,6 +374,102 @@ open one they may not see (at most once every ten minutes for the same person an
 table). Moving a submission into the security category makes it private and never the other way round; a maintainer can set
 the visibility back explicitly.
 
+## Publishing to an issue tracker
+
+AgentLab's own record is the source of truth, and nothing here is needed for it to work. A maintainer can, **on purpose**,
+publish a sanitized summary of a submission as an issue in a GitHub repository, so that work can be tracked where engineers
+already look. It is **off** until the owner switches it on (`feedback.integrations.github`), and while it is off no call to GitHub
+is ever made.
+
+```yaml
+feedback:
+  integrations:
+    github:
+      enabled: true
+      repository: acme/agentlab-feedback
+      token_ref: env:GITHUB_TOKEN        # or secret:NAME; a token that may create issues in that repository and nothing else
+      labels: [from-agentlab]
+      assignee: octocat                  # optional
+      internal_url: https://agentlab.example.org/#/feedback/submissions/{number}   # optional link back
+      publish_roles: [admin]             # who may publish: admin (the default), or maintainer too
+      status_sync: false                 # allow pushing a status to the issue, on request
+```
+
+**What is sent, and what never is.** The number, type, category and status, the title, and what the reporter wrote (the
+description; for an issue what they expected, what happened, the steps and the impact; for a request the problem, the expected
+behavior, the use case and the acceptance criteria), masked for secrets and **quoted** so that nothing in it can mention a
+person, close another issue or pull in a picture. Never: files and screenshots, diagnostic information and logs, handoff
+packages, the reporter's name, internal notes, the maintainers' priority, severity and assignee, or the ids of runs. A private
+security report is **never** published, by anyone, and the shared token cannot even see one.
+
+**Preview, then publish exactly that.** `POST /submissions/{id}/publications/preview` returns the title, the text, the labels,
+the assignee, what is left out, the warnings and a `content_hash`. Publishing needs that hash back
+(`POST /submissions/{id}/publications`), so nothing is sent that was not read; if the submission changed in between (its
+status is in the text), the answer is `409` and the preview is read again. A text the second inspection still doubts needs
+`acknowledge_unreviewed: true` as well, after reading it. The web page asks for both separately.
+
+**Never twice.** There is one record per submission and provider, and the issue carries a key. If an attempt made the issue and
+its answer was lost, the retry **finds it by the key** and records it instead of making another; a publication that is
+already there is returned; one that is in progress for less than two minutes is waited for (`409`). The look for an issue
+that was made before covers the newest 50 issues of the repository, which is far more than can appear between an attempt
+and its retry on any repository this is meant for; on a very busy one a retry after a long delay could miss it.
+
+**When GitHub says no**, the answer says what to do and the submission is left exactly as it was: the rate limit says how long
+to wait (`429` with `Retry-After`), a refused or missing token and a missing permission say so, and a repository that cannot be
+seen or has issues switched off says that. The record keeps the reason, so a person can see why it is not published.
+
+**Status.** With `status_sync` on, a maintainer can push a submission's status to its issue (a comment with the status's name,
+and closing the issue when the submission is closed). It is never done automatically and sends none of the submission's text.
+
+**Limits, said plainly.** AgentLab cannot take an issue back: a person has to delete it on GitHub, and deleting a submission here
+does not (the audit trail records that it was published). The token is read when a call is made, is never stored by AgentLab,
+logged or returned, and is not in the audit trail. Calls go only to the configured `api_url` (https), with no redirects followed.
+Anything on GitHub is subject to GitHub's own retention and visibility.
+
+Tested by `tests/unit/test_feedback_publication.py` and `tests/api/test_feedback_publication_api.py`.
+
+## Retention and deletion
+
+**Nothing is removed unless the owner says how long.** Every period in `feedback.retention` is empty by default, because removal
+cannot be undone. Periods are counted from the day a submission **closed** (a status in `feedback.closed_statuses`), and a
+submission that is not closed is never touched by the policy: an open investigation, a private security report above all, keeps
+its evidence however old it is. A submission that is reopened is not due again until it closes again.
+
+| Setting | What goes, that long after the submission closed | What stays |
+|---|---|---|
+| `retention.attachments_days` | The attached files: the original and the masked copy | The record of each (name, type, size, hash, who removed it), marked removed |
+| `retention.diagnostics_days` | The diagnostic information attached | The collection, each item marked "removed by the retention policy" |
+| `retention.handoffs_days` | The packages and their task files | The record of what each held (files, hashes, who built it), marked purged |
+| `retention.internal_notes_days` | The internal notes | The reporter's and the maintainers' public discussion |
+| `retention.submissions_days` | The whole submission and everything attached to it | Only the audit record below |
+
+The shortest period that applies wins: a submission deleted after 90 days takes its files with it whatever
+`attachments_days` says. `agentlab feedback purge` applies the policy now (`--dry-run` says what would go and changes nothing;
+`--json` prints it); the server also applies it by itself every `retention.interval_hours` while any period is set
+(`retention.automatic`). A pass that fails is logged and tried again; it never stops the server.
+
+**What is left when something is removed** is what the audit trail needs and nothing a person wrote: that a submission with that
+number existed, its type, when it was removed, by what (the policy, or an account), why (the reason is masked like any text),
+and how many files, items and packages it had. The number is not given out again (`submission_counters`).
+
+**Stored files are shared by content.** The same bytes can be used by more than one record, so a file is deleted only when no
+record that is still there refers to it. A failure to delete a file is logged and the pass goes on.
+
+**Deleting one submission on purpose.** `DELETE /submissions/{id}?reason=...` is for administrators (a maintainer and the
+shared token are refused). The reason is required (3 to 300 characters) and is kept, masked, in the audit trail. A private
+security report that is **not closed** is refused unless `acknowledge_open_security_report=true` says the administrator knows
+its evidence may still be needed; the audit record notes that it was open. The answer gives counts, and `exported_copies`: how
+many times a package of it was downloaded.
+
+**Limits, said plainly.**
+
+* A package or a file that was **downloaded** is a copy AgentLab cannot recall. Deleting a submission records how many
+  downloads there were; it does not reach into someone's disk, a ticket, a chat or an issue tracker.
+* A backup taken before a deletion still holds what was deleted until the backup itself is removed.
+* The captured log (`diagnostics.log_retention_hours`) and unattached drafts (`diagnostics.draft_hours`) have their own, short,
+  periods.
+* Removing a person's account does not delete their submissions: that is a decision for an administrator, per submission.
+
 ## Limits and protections
 
 * **Allowances.** A person with the role reporter may make `feedback.max_submissions_per_day` submissions and write
@@ -432,6 +531,12 @@ requests that change something.
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |
 | `GET /submissions/{id}/audit` | maintainers | The audit trail |
+| `GET /integrations` | maintainers | The issue trackers, whether each is switched on and ready, and whether the caller may publish |
+| `POST /submissions/{id}/publications/preview` | maintainers who may publish | Exactly what would be published; sends nothing |
+| `POST /submissions/{id}/publications` | maintainers who may publish | Publish what was previewed (`content_hash` required) |
+| `GET /submissions/{id}/publications` | maintainers | Where it was published |
+| `POST /submissions/{id}/publications/{provider}/sync` | maintainers who may publish | Push the status to the issue (only when `status_sync` is on) |
+| `DELETE /submissions/{id}` | administrators | Delete a submission and everything attached to it (`reason` required) |
 
 The full contract is in the generated API description (`web/openapi.json`, or `/docs` on a running server).
 

@@ -384,7 +384,7 @@ class HandoffService:
             task = ""
         return HandoffOut(
             id=row.id,
-            status="generated",
+            status="purged" if row.status == "purged" else "generated",
             submission_id=row.submission_id,
             number=str(row.manifest.get("number", "")),
             submission_version=row.submission_version,

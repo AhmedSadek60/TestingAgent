@@ -782,8 +782,10 @@ describe("the ways in", () => {
       <Gate>
         <Shell />
       </Gate>,
+      { route: "/feedback/feature" }, // an address typed or bookmarked leads to the account page too
     );
     expect(await screen.findByText("Choose your own password")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Feature title")).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Feedback & Support" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Request a feature/ })).not.toBeInTheDocument();
   });
@@ -801,5 +803,216 @@ describe("leaving a form", () => {
     const after = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(after);
     expect(after.defaultPrevented).toBe(true);
+  });
+});
+
+// ================================================================================ publishing, and deleting
+const INTEGRATION = {
+  provider: "github",
+  enabled: true,
+  ready: true,
+  reason: null,
+  repository: "acme/agentlab-feedback",
+  may_publish: true,
+  status_sync: true,
+};
+const PREVIEW = {
+  provider: "github",
+  repository: "acme/agentlab-feedback",
+  title: "[IR-2026-00001] A run stays on Processing forever",
+  body: "> Published from AgentLab submission **IR-2026-00001**\n\n### Description\n\n```text\nIt never finishes.\n```\n",
+  labels: ["from-agentlab"],
+  assignees: ["octocat"],
+  content_hash: "a".repeat(64),
+  needs_review: false,
+  warnings: ["This will be visible to everyone who can see acme/agentlab-feedback on github.com."],
+  left_out: ["attachments and screenshots", "internal notes"],
+  already: null,
+};
+const PUBLICATION = {
+  id: "p1",
+  provider: "github",
+  repository: "acme/agentlab-feedback",
+  state: "published",
+  url: "https://github.com/acme/agentlab-feedback/issues/1",
+  number: 1,
+  external_state: "open",
+  error_kind: "",
+  error_detail: "",
+  submission_version: 1,
+  published_by: "maria",
+  published_at: "2026-10-13T10:00:00Z",
+  synced_status: "",
+};
+
+describe("publishing to an issue tracker", () => {
+  const staffRoutes = (extra: Record<string, Handler> = {}) =>
+    detailRoutes(
+      {
+        "GET /integrations": [INTEGRATION],
+        [`GET /submissions/${IDENT}/publications`]: [],
+        ...extra,
+      },
+      "staff",
+    );
+
+  it("shows exactly what would be public, and publishes that and nothing else, after the person says they read it", async () => {
+    let made = false;
+    const server = staffRoutes({
+      [`POST /submissions/${IDENT}/publications/preview`]: PREVIEW,
+      [`POST /submissions/${IDENT}/publications`]: () => {
+        made = true;
+        return jsonResponse(PUBLICATION, 201);
+      },
+      [`GET /submissions/${IDENT}/publications`]: () => (made ? [PUBLICATION] : []),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    const section = (await screen.findByRole("heading", { name: "Publish to an issue tracker" })).closest("section")!;
+    const panel = within(section);
+    expect(panel.getByText(/Files, diagnostic information, handoff packages, the reporter's name, internal notes/)).toBeInTheDocument();
+    await user.click(await panel.findByRole("button", { name: "Preview what would be published" }));
+    expect(await panel.findByText("Read it: this is exactly what will be public")).toBeInTheDocument();
+    expect(panel.getByText("[IR-2026-00001] A run stays on Processing forever")).toBeInTheDocument();
+    expect(panel.getByText(/Published from AgentLab submission \*\*IR-2026-00001\*\*/)).toBeInTheDocument();
+    expect(panel.getByText(/Left out on purpose: attachments and screenshots; internal notes/)).toBeInTheDocument();
+    const publish = panel.getByRole("button", { name: "Publish it" });
+    expect(publish).toBeDisabled();
+    await user.click(panel.getByLabelText(/I have read what will be published in acme\/agentlab-feedback/));
+    await user.click(publish);
+    const link = await panel.findByRole("link", { name: "acme/agentlab-feedback#1" });
+    expect(link).toHaveAttribute("href", "https://github.com/acme/agentlab-feedback/issues/1");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(server.to(`POST /submissions/${IDENT}/publications`)[0]!.body).toEqual({
+      provider: "github",
+      content_hash: "a".repeat(64),
+      acknowledge_unreviewed: false,
+    });
+    expect(panel.queryByRole("button", { name: "Preview what would be published" })).not.toBeInTheDocument();
+  });
+
+  it("asks for a second, separate yes when a text still looks like a secret", async () => {
+    const server = staffRoutes({
+      [`POST /submissions/${IDENT}/publications/preview`]: { ...PREVIEW, needs_review: true, warnings: ["A text in it still looks like a secret after masking."] },
+      [`POST /submissions/${IDENT}/publications`]: () => jsonResponse(PUBLICATION, 201),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    const panel = within((await screen.findByRole("heading", { name: "Publish to an issue tracker" })).closest("section")!);
+    await user.click(await panel.findByRole("button", { name: "Preview what would be published" }));
+    await user.click(await panel.findByLabelText(/I have read what will be published/));
+    expect(panel.getByRole("button", { name: "Publish it" })).toBeDisabled();
+    await user.click(panel.getByLabelText(/something in it still looks like a secret after masking/));
+    await user.click(panel.getByRole("button", { name: "Publish it" }));
+    await waitFor(() => expect(server.to(`POST /submissions/${IDENT}/publications`)).toHaveLength(1));
+    expect(server.to(`POST /submissions/${IDENT}/publications`)[0]!.body).toMatchObject({ acknowledge_unreviewed: true });
+  });
+
+  it("says why when GitHub refused, and what to do, and offers the preview again", async () => {
+    staffRoutes({
+      [`POST /submissions/${IDENT}/publications/preview`]: PREVIEW,
+      [`POST /submissions/${IDENT}/publications`]: () =>
+        errorResponse(429, "rate_limited", "GitHub's rate limit was reached: try again in about 10 minute(s). Nothing was published."),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    const panel = within((await screen.findByRole("heading", { name: "Publish to an issue tracker" })).closest("section")!);
+    await user.click(await panel.findByRole("button", { name: "Preview what would be published" }));
+    await user.click(await panel.findByLabelText(/I have read what will be published/));
+    await user.click(panel.getByRole("button", { name: "Publish it" }));
+    expect(await panel.findByText(/try again in about 10 minute\(s\)/)).toBeInTheDocument();
+    expect(panel.getByRole("button", { name: "Publish it" })).toBeEnabled();
+  });
+
+  it("is not offered when it is off, to a role that may not publish, or for a private report", async () => {
+    detailRoutes({ "GET /integrations": [{ ...INTEGRATION, ready: false, enabled: false, reason: "it is switched off" }] }, "staff");
+    const first = renderAt(`/feedback/submissions/${IDENT}`);
+    await screen.findByRole("heading", { name: "Triage" });
+    expect(screen.queryByRole("heading", { name: "Publish to an issue tracker" })).not.toBeInTheDocument();
+    first.unmount();
+
+    staffRoutes({ "GET /integrations": [{ ...INTEGRATION, may_publish: false }] });
+    const second = renderAt(`/feedback/submissions/${IDENT}`);
+    expect(await screen.findByText(/Your role may not publish to acme\/agentlab-feedback/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview what would be published" })).not.toBeInTheDocument();
+    second.unmount();
+
+    staffRoutes({
+      [`GET /submissions/${IDENT}`]: detail({ type: "issue", number: "IR-2026-00001", visibility: "security" }),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    expect(await screen.findByText("A private security report is never published to an external service.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview what would be published" })).not.toBeInTheDocument();
+  });
+
+  it("pushes the status to the issue when the owner allowed it and the person asks", async () => {
+    const server = staffRoutes({
+      [`GET /submissions/${IDENT}/publications`]: [PUBLICATION],
+      [`POST /submissions/${IDENT}/publications/github/sync`]: () => jsonResponse({ ...PUBLICATION, synced_status: "Submitted" }),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Push the status to the issue" }));
+    await waitFor(() => expect(server.to(`POST /submissions/${IDENT}/publications/github/sync`)).toHaveLength(1));
+  });
+});
+
+describe("deleting a submission", () => {
+  const adminRoutes = (extra: Record<string, Handler> = {}) =>
+    detailRoutes({ "GET /integrations": [], ...extra }, "staff"); // the base server's account is the local administrator
+
+  it("is for an administrator only: a maintainer is not offered it", async () => {
+    detailRoutes(
+      {
+        "GET /integrations": [],
+        "GET /auth/me": { kind: "user", role: "maintainer", username: "maria", display_name: "maria", must_change_password: false, csrf_token: "c", operator: true, can_manage_accounts: false },
+      },
+      "staff",
+    );
+    renderAt(`/feedback/submissions/${IDENT}`);
+    await screen.findByRole("heading", { name: "Triage" });
+    expect(screen.queryByRole("heading", { name: "Delete this submission" })).not.toBeInTheDocument();
+  });
+
+  it("needs a reason and a confirmation, says what stays, and goes back to the list when it is done", async () => {
+    const server = adminRoutes({
+      [`DELETE /submissions/${IDENT}`]: () => jsonResponse({ number: "IR-2026-00001", attachments: 1, diagnostic_items: 1, handoffs: 1, files_deleted: 3, exported_copies: 2 }),
+      "GET /submissions": { items: [], total: 0, limit: 25, offset: 0 },
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    const panel = within((await screen.findByRole("heading", { name: "Delete this submission" })).closest("section")!);
+    expect(panel.getByText(/A package or a file that was downloaded, and an issue published elsewhere, cannot be recalled/)).toBeInTheDocument();
+    const button = panel.getByRole("button", { name: "Delete this submission" });
+    expect(button).toBeDisabled();
+    await user.type(panel.getByLabelText("Why it is being deleted"), "erasure requested by the reporter");
+    await user.click(button);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/cannot be undone/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Delete it for good" }));
+    await waitFor(() => expect(server.to(`DELETE /submissions/${IDENT}`)).toHaveLength(1));
+    const call = server.to(`DELETE /submissions/${IDENT}`)[0]!;
+    expect(call.query.get("reason")).toBe("erasure requested by the reporter");
+    expect(call.query.get("acknowledge_open_security_report")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Submissions" })).toBeInTheDocument();
+    expect(screen.getByText(/IR-2026-00001 was deleted with 1 file\(s\) and 1 package\(s\)\. 2 download\(s\) of its packages cannot be recalled/)).toBeInTheDocument();
+  });
+
+  it("needs the administrator to say they know when the report is an open private one", async () => {
+    const server = adminRoutes({
+      [`GET /submissions/${IDENT}`]: detail({ type: "issue", number: "IR-2026-00001", visibility: "security", closed_at: null }),
+      [`DELETE /submissions/${IDENT}`]: () => jsonResponse({ number: "IR-2026-00001", attachments: 0, diagnostic_items: 0, handoffs: 0, files_deleted: 0, exported_copies: 0 }),
+    });
+    renderAt(`/feedback/submissions/${IDENT}`);
+    const user = userEvent.setup();
+    const panel = within((await screen.findByRole("heading", { name: "Delete this submission" })).closest("section")!);
+    expect(panel.getByText("This is a private security report that is not closed")).toBeInTheDocument();
+    await user.type(panel.getByLabelText("Why it is being deleted"), "requested by the reporter");
+    expect(panel.getByRole("button", { name: "Delete this submission" })).toBeDisabled();
+    await user.click(panel.getByLabelText(/I know this report is open/));
+    await user.click(panel.getByRole("button", { name: "Delete this submission" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete it for good" }));
+    await waitFor(() => expect(server.to(`DELETE /submissions/${IDENT}`)).toHaveLength(1));
+    expect(server.to(`DELETE /submissions/${IDENT}`)[0]!.query.get("acknowledge_open_security_report")).toBe("true");
   });
 });

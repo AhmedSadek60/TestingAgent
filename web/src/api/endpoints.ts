@@ -3,6 +3,10 @@ import type {
   Account,
   AccountEvent,
   Assignee,
+  Deletion,
+  Integration,
+  Publication,
+  PublicationPreview,
   Attachment,
   AttachmentPreview,
   AuditEvent,
@@ -224,6 +228,20 @@ export function createApi(client: ApiClient) {
     submissionDiagnostics: (ident: string, signal?: AbortSignal) =>
       client.get<DiagnosticCollection[]>(`/submissions/${id(ident)}/diagnostics`, { signal }),
     diagnosticBundle: (collectionId: string) => client.blob(`/diagnostics/${id(collectionId)}/download`),
+
+    integrations: (signal?: AbortSignal) => client.get<Integration[]>("/integrations", { signal }),
+    previewPublication: (ident: string, provider: string) =>
+      client.post<PublicationPreview>(`/submissions/${id(ident)}/publications/preview`, { provider }),
+    publish: (ident: string, body: { provider: string; content_hash: string; acknowledge_unreviewed?: boolean }) =>
+      client.post<Publication>(`/submissions/${id(ident)}/publications`, body),
+    publications: (ident: string, signal?: AbortSignal) =>
+      client.get<Publication[]>(`/submissions/${id(ident)}/publications`, { signal }),
+    syncPublication: (ident: string, provider: string) =>
+      client.post<Publication>(`/submissions/${id(ident)}/publications/${id(provider)}/sync`),
+    deleteSubmission: (ident: string, reason: string, acknowledgeOpenSecurityReport = false) =>
+      client.delete<Deletion>(`/submissions/${id(ident)}`, {
+        query: { reason, acknowledge_open_security_report: acknowledgeOpenSecurityReport || undefined },
+      }),
 
     previewHandoff: (ident: string, body: HandoffRequest) => client.post<Handoff>(`/submissions/${id(ident)}/handoffs/preview`, body),
     createHandoff: (ident: string, body: HandoffRequest) => client.post<Handoff>(`/submissions/${id(ident)}/handoffs`, body),

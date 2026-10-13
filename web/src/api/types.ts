@@ -139,6 +139,10 @@ export type DiagnosticsRequest = S["DiagnosticsRequest"];
 export type HandoffRequest = S["HandoffIn"];
 export type BrowserDiagnostics = S["BrowserDiagnostics"];
 export type SubmissionType = SubmissionSummary["type"];
+export type Integration = Resp<S["IntegrationOut"]>;
+export type Publication = Resp<S["PublicationOut"]>;
+export type PublicationPreview = Resp<S["PublicationPreview"]>;
+export type Deletion = Resp<S["DeletionOut"]>;
 
 /** The filters of the list of submissions, as the API takes them. */
 export interface SubmissionQuery {

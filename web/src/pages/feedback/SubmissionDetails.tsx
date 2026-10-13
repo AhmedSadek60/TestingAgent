@@ -11,7 +11,9 @@ import {
   type DiagnosticChoice,
 } from "../../components/feedback/DiagnosticCollectionPanel";
 import { DiagnosticPreview } from "../../components/feedback/DiagnosticPreview";
+import { DeleteSubmissionPanel } from "../../components/feedback/DeleteSubmissionPanel";
 import { EngineeringHandoff } from "../../components/feedback/EngineeringHandoff";
+import { PublishPanel } from "../../components/feedback/PublishPanel";
 import { MaintainerTriagePanel } from "../../components/feedback/MaintainerTriagePanel";
 import { RelationsPanel } from "../../components/feedback/RelationsPanel";
 import { PrivateBadge, Section, TypeBadge, UserText, WorkflowBadge } from "../../components/feedback/shared";
@@ -114,10 +116,12 @@ function Reported({ s }: { s: SubmissionDetail }) {
  * and, for a maintainer, the triage, the links, the audit trail and the engineering handoff. */
 export function SubmissionDetails() {
   const { ident = "" } = useParams();
-  const { api } = useSession();
+  const { api, me } = useSession();
   const toast = useToast();
   const options = useAsync((signal) => api.feedbackOptions(signal), [api]);
   const staff = options.data?.can_triage === true;
+  const integrations = useAsync((signal) => api.integrations(signal), [api], { enabled: staff });
+  const tracker = (integrations.data ?? []).find((i) => i.ready);
   const sub = useAsync((signal) => api.submission(ident, signal), [api, ident]);
   const s = sub.data;
   const attachments = useAsync((signal) => api.attachments(s!.id, signal), [api, s?.id], { enabled: !!s });
@@ -338,6 +342,16 @@ export function SubmissionDetails() {
             <Card title="Engineering handoff">
               <EngineeringHandoff submission={s} attachments={stored} />
             </Card>
+            {tracker && (
+              <Card title="Publish to an issue tracker">
+                <PublishPanel submission={s} integration={tracker} />
+              </Card>
+            )}
+            {me?.role === "admin" && (
+              <Card title="Delete this submission">
+                <DeleteSubmissionPanel submission={s} />
+              </Card>
+            )}
             <Card title="Audit trail">
               <details onToggle={(event) => event.currentTarget.open && audit.reload()}>
                 <summary>What was done to this submission, and by whom (never the text)</summary>
