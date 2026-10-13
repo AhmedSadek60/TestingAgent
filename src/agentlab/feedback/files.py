@@ -119,7 +119,7 @@ def inspect_upload(name: str, data: bytes, config: AttachmentsConfig) -> Inspect
     media_type, kind = TYPES[extension]
     inspected = Inspected(extension=extension, media_type=media_type, kind=kind, size=len(data))
     if kind == "image":
-        _image(extension, data)
+        _image(extension, data, config.allowed_extensions)
     elif kind == "pdf":
         if data[:1024].find(b"%PDF-") == -1:
             raise UserError("the file is not a PDF document (it has no PDF header)")
@@ -130,16 +130,56 @@ def inspect_upload(name: str, data: bytes, config: AttachmentsConfig) -> Inspect
     return inspected
 
 
-def _image(extension: str, data: bytes) -> None:
+def _looks_like(data: bytes) -> tuple[str, str | None] | None:
+    """What a file's first bytes say it is: a phrase for a person, and the extension that names it when AgentLab knows
+    that type. ``None`` when the bytes are none of the kinds worth naming."""
+    head = data[:16]
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "a PNG image", "png"
+    if head[:3] == b"\xff\xd8\xff":
+        return "a JPEG image", "jpg"
+    if head[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "a WebP image", "webp"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "a GIF image", None
+    if data[4:8] == b"ftyp":
+        if data[8:12] in (b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"mif1", b"msf1"):
+            return "a HEIC image (the format many phones keep photos in)", None
+        if data[8:12] in (b"avif", b"avis"):
+            return "an AVIF image", None
+    if head[:2] == b"BM":
+        return "a BMP image", None
+    if head[:4] in (b"II*\x00", b"MM\x00*"):
+        return "a TIFF image", None
+    if b"%PDF-" in data[:1024]:
+        return "a PDF document", "pdf"
+    if head[:4] in (b"PK\x03\x04", b"PK\x05\x06"):
+        return "a ZIP archive (an Office document is one too)", "zip"
+    return None
+
+
+def _image(extension: str, data: bytes, allowed: list[str]) -> None:
     ok = {
         "png": data.startswith(b"\x89PNG\r\n\x1a\n"),
         "jpg": data[:3] == b"\xff\xd8\xff",
         "jpeg": data[:3] == b"\xff\xd8\xff",
         "webp": data[:4] == b"RIFF" and data[8:12] == b"WEBP",
     }[extension]
-    if not ok:
-        label = {"png": "PNG", "jpg": "JPEG", "jpeg": "JPEG", "webp": "WebP"}[extension]
-        raise UserError(f"the file is not a {label} image (its content does not match its name)")
+    if ok:
+        return
+    label = {"png": "PNG", "jpg": "JPEG", "jpeg": "JPEG", "webp": "WebP"}[extension]
+    found = _looks_like(data)
+    if found is None:
+        what = "its content does not look like an image at all"
+        advice = "Open it in an image viewer, save it again as a JPEG or PNG, and attach that."
+    else:
+        phrase, real = found
+        what = f"its content is {phrase}, whatever its name says"
+        if real is not None and real in allowed:
+            advice = f"Rename it to '.{real}' (or save it again as a {label} image) and attach it again."
+        else:
+            advice = "Save it again as a JPEG or PNG image and attach that."
+    raise UserError(f"the file is not a {label} image: {what}. {advice}")
 
 
 def _text(data: bytes, extension: str) -> str:
