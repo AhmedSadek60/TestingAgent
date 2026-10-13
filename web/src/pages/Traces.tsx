@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { Artifact, RunEvent, TraceSummary } from "../api/types";
 import { describeError } from "../api/errors";
 import { SearchBox, SelectFilter } from "../components/controls";
@@ -7,6 +7,7 @@ import { JsonView, RedactedText } from "../components/JsonView";
 import { Icon } from "../components/Icon";
 import { Async, Badge, Card, Empty, ErrorNote, Loading, saveBlob, useToast } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
+import { reportLink } from "../lib/feedback";
 import { formatNumber } from "../lib/format";
 import { ALERT_TYPES, describeEvent } from "../lib/live";
 import { isActive } from "../lib/runs";
@@ -61,7 +62,17 @@ function TraceView({ runId, traceId }: { runId: string; traceId: string }) {
               </span>
             }
             padded={false}
-            actions={<span className="muted small">{formatNumber(t.events.length)} events</span>}
+            actions={
+              <span className="row">
+                <span className="muted small">{formatNumber(t.events.length)} events</span>
+                <Link
+                  className="btn small"
+                  to={reportLink({ related_run_id: runId, related_test_id: t.test_id, related_trace_id: traceId, ui_screen: "Trace" })}
+                >
+                  Report an issue with this trace
+                </Link>
+              </span>
+            }
           >
             <div className="table-tools">
               <SearchBox value={q} onChange={setQ} label="Search the trace" placeholder="Search events" />

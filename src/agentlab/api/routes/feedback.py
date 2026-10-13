@@ -33,6 +33,7 @@ from agentlab.feedback.models import (
     AttachmentPreview,
     AuditEventOut,
     CommentOut,
+    DeletionOut,
     FeedbackOptions,
     SimilarOut,
     StatusChangeOut,
@@ -524,3 +525,37 @@ def remove_attachment(submission_id: SUBMISSION, attachment_id: ATTACHMENT, requ
     st = state_of(request)
     _attachments(st).remove(_actor(request, st), submission_id, attachment_id, client=client_of(request))
     return Response(status_code=204)
+
+
+@router.delete(
+    "/submissions/{submission_id}",
+    response_model=DeletionOut,
+    summary="Delete a submission",
+    description="Deletes the submission and everything attached to it: its discussion, history, files, diagnostic information "
+    "and handoff packages, and the stored files nothing else uses. Administrators only, and the reason is kept in the audit "
+    "trail (masked), with counts and never text. A private security report that is not closed is deleted only when "
+    "`acknowledge_open_security_report` is true, because its evidence may still be needed. A package that was downloaded "
+    "before cannot be recalled: the answer says how many times that happened.",
+    dependencies=[Depends(require_staff)],
+)
+async def delete_submission(
+    submission_id: SUBMISSION,
+    request: Request,
+    reason: Annotated[
+        str, Query(min_length=3, max_length=300, description="Why it is being deleted; kept in the audit trail")
+    ],
+    acknowledge_open_security_report: Annotated[
+        bool, Query(description="Required to delete a private security report that is not closed")
+    ] = False,
+) -> DeletionOut:
+    st = state_of(request)
+    if st.retention is None:  # only a server built without a database could be here
+        raise UserError("deleting submissions is not available on this server")
+    return await run_in_threadpool(
+        st.retention.delete_submission,
+        _actor(request, st),
+        submission_id,
+        reason=reason,
+        acknowledge_open_security_report=acknowledge_open_security_report,
+        client=client_of(request),
+    )

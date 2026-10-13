@@ -1118,3 +1118,16 @@ table.table {
 .signin .card {
   width: min(100%, 440px);
 }
+
+/* Feedback & Support */
+a.choice {
+  text-decoration: none;
+  color: inherit;
+}
+.topbar .btn.ghost.active {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.topbar nav.row {
+  flex-wrap: wrap;
+}

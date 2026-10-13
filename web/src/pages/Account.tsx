@@ -6,7 +6,7 @@ import { useSession } from "../session";
 
 const ROLE_TEXT: Record<Role, string> = {
   reporter:
-    "Your role is for Feedback & Support: feature requests and issue reports, and following your own submissions. Those pages are not in this interface yet.",
+    "Your role is for Feedback & Support: you can request features, report issues and follow your own submissions. The rest of AgentLab is not open to this role.",
   maintainer: "You can use everything the shared API token can, and triage submissions.",
   admin: "You can use everything a maintainer can, and manage accounts.",
 };

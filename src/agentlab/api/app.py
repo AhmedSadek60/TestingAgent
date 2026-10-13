@@ -20,7 +20,17 @@ from agentlab import __version__
 from agentlab.accounts import AccountService
 from agentlab.api import errors, openapi_docs
 from agentlab.api.requestlog import RequestLog, note
-from agentlab.api.routes import accounts, catalog, diagnostics, feedback, projects, reports, runs
+from agentlab.api.routes import (
+    accounts,
+    catalog,
+    diagnostics,
+    feedback,
+    handoffs,
+    projects,
+    publications,
+    reports,
+    runs,
+)
 from agentlab.api.security import UI_CSP, RequestGuard, TokenGuard, is_loopback, resolve_token
 from agentlab.api.state import ApiState
 from agentlab.core.config import AgentLabConfig, ServerConfig
@@ -28,7 +38,10 @@ from agentlab.core.errors import PolicyBlocked
 from agentlab.feedback import SubmissionService
 from agentlab.feedback.attachments import AttachmentService
 from agentlab.feedback.diagnostics import DiagnosticsService
+from agentlab.feedback.handoff import HandoffService
 from agentlab.feedback.logcapture import install_log_capture, uninstall_log_capture
+from agentlab.feedback.publication import PublicationService, secret_from, tracker_for
+from agentlab.feedback.retention import RetentionService
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
 from agentlab.jobs.runner import reap_forever
 from agentlab.jobs.worker import Worker
@@ -122,6 +135,35 @@ def get_openapi_schema(app: FastAPI) -> dict[str, Any]:
     )
 
 
+async def retention_forever(service: RetentionService, interval_seconds: float, *, first_after: float = 300.0) -> None:
+    """Apply the retention policy now and then, for as long as the server runs. A pass that fails is logged and the next one
+    tries again; it never takes the server down."""
+    delay = first_after
+    while True:
+        await asyncio.sleep(delay)
+        delay = interval_seconds
+        try:
+            report = await asyncio.to_thread(service.run)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - logged, and tried again next time
+            log.warning("the retention policy could not be applied", exc_info=True)
+            continue
+        removed = (
+            report.submissions + report.attachments + report.diagnostic_items + report.handoffs + report.internal_notes
+        )
+        if removed:
+            log.info(
+                "retention policy: %d submission(s), %d file(s), %d diagnostic item(s), %d package(s) and %d internal "
+                "note(s) removed",
+                report.submissions,
+                report.attachments,
+                report.diagnostic_items,
+                report.handoffs,
+                report.internal_notes,
+            )
+
+
 def create_app(
     services: Services | None = None,
     *,
@@ -165,14 +207,26 @@ def create_app(
             custom_rules=[(r.name, r.pattern) for r in svc.config.feedback.redaction.rules],
             redact_ip_addresses=svc.config.feedback.redaction.redact_ip_addresses,
         )
+        attachment_service = AttachmentService(feedback_service, svc.artifacts, svc.config.feedback, redactor=masker)
+        diagnostics_service = DiagnosticsService(feedback_service, svc.store, svc.artifacts, svc.config, masker)
         app.state.agentlab = ApiState(
             services=svc,
             queue=q,
             guard=TokenGuard(api_token),
             accounts=AccountService(svc.store.db, svc.config.accounts),
             feedback=feedback_service,
-            attachments=AttachmentService(feedback_service, svc.artifacts, svc.config.feedback, redactor=masker),
-            diagnostics=DiagnosticsService(feedback_service, svc.store, svc.artifacts, svc.config, masker),
+            attachments=attachment_service,
+            diagnostics=diagnostics_service,
+            handoffs=HandoffService(
+                feedback_service, attachment_service, diagnostics_service, svc.artifacts, svc.config, masker
+            ),
+            retention=RetentionService(feedback_service, svc.artifacts, svc.config.feedback),
+            publications=PublicationService(
+                feedback_service,
+                tracker_for(svc.config.feedback, lambda ref: secret_from(ref, svc.credentials)),
+                svc.config.feedback,
+                masker,
+            ),
             worker=worker,
             uploads_dir=uploads,
             allowed_roots=[Path(p if Path(p).is_absolute() else svc.base_dir / p) for p in scfg.allowed_paths],
@@ -184,11 +238,22 @@ def create_app(
             worker.start()  # a worker also watches for runs that were abandoned
         else:
             reaper = asyncio.create_task(reap_forever(svc, q), name="agentlab-api-reaper")
+        retention_task: asyncio.Task[None] | None = None
+        retention_config = svc.config.feedback.retention
+        if retention_config.active and retention_config.automatic and app.state.agentlab.retention is not None:
+            retention_task = asyncio.create_task(
+                retention_forever(app.state.agentlab.retention, retention_config.interval_hours * 3600.0),
+                name="agentlab-api-retention",
+            )
         for warning in svc.startup_warnings:
             log.warning("%s", warning)
         try:
             yield
         finally:
+            if retention_task is not None:
+                retention_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await retention_task
             if reaper is not None:
                 reaper.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -255,7 +320,7 @@ def create_app(
     app.include_router(catalog.public)
     app.include_router(accounts.public)
     app.include_router(reports.public)
-    for module in (projects, runs, reports, catalog, accounts, feedback, diagnostics):
+    for module in (projects, runs, reports, catalog, accounts, feedback, diagnostics, handoffs, publications):
         app.include_router(module.router)
 
     resolved_ui = (

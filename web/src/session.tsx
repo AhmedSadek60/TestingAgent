@@ -3,6 +3,8 @@ import { ApiClient } from "./api/client";
 import { createApi, type Api } from "./api/endpoints";
 import { ApiError, describeError } from "./api/errors";
 import type { AuthOptions, Health, Me, RegisterRequest } from "./api/types";
+import { clearBrowserBuffer, recordFailure } from "./lib/browserErrors";
+import { clearFeedbackDrafts } from "./lib/feedback";
 import { PROJECT_KEY, readStored, TOKEN_KEY, writeStored } from "./lib/storage";
 
 export type AuthPhase = "connecting" | "unreachable" | "needs-token" | "ready";
@@ -78,6 +80,7 @@ export function SessionProvider({ children, base = "" }: { children: ReactNode; 
         base,
         getToken: () => tokenRef.current,
         getCsrf: () => csrfRef.current,
+        onFailure: recordFailure,
         onUnauthorized: () => {
           const bySession = sessionRef.current && !tokenRef.current;
           forget();
@@ -242,6 +245,8 @@ export function SessionProvider({ children, base = "" }: { children: ReactNode; 
   const signOut = useCallback(() => {
     if (sessionRef.current && !tokenRef.current) void api.logout().catch(() => undefined); // end it on the server too
     forget();
+    clearBrowserBuffer(); // what this tab saw go wrong belongs to the person who was signed in
+    clearFeedbackDrafts();
     setProblem(null);
     setNotice(null);
     setPhase("needs-token");

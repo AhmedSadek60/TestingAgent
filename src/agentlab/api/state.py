@@ -12,6 +12,9 @@ from agentlab.api.security import LinkSigner, TokenGuard
 from agentlab.feedback import SubmissionService
 from agentlab.feedback.attachments import AttachmentService
 from agentlab.feedback.diagnostics import DiagnosticsService
+from agentlab.feedback.handoff import HandoffService
+from agentlab.feedback.publication import PublicationService
+from agentlab.feedback.retention import RetentionService
 from agentlab.jobs.queue import JobQueue
 from agentlab.jobs.worker import Worker
 from agentlab.services import Services
@@ -26,6 +29,9 @@ class ApiState:
     feedback: SubmissionService | None = None
     attachments: AttachmentService | None = None
     diagnostics: DiagnosticsService | None = None
+    handoffs: HandoffService | None = None
+    retention: RetentionService | None = None
+    publications: PublicationService | None = None
     worker: Worker | None = None
     uploads_dir: Path = field(default_factory=lambda: Path(".agentlab/uploads"))
     allowed_roots: list[Path] = field(default_factory=list)

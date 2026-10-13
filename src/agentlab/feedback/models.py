@@ -446,6 +446,10 @@ class FeedbackOptions(Model):
     security_category: str = Field(description="An issue in this category is kept private")
     max_text_chars: int = Field(description="The longest any text field may be")
     can_triage: bool = Field(description="True when the caller is a maintainer and may change status and priority")
+    attachment_extensions: list[str] = Field(description="The file types that may be attached")
+    attachment_max_files: int = Field(description="The most files one submission may have")
+    attachment_max_file_mb: int = Field(description="The largest single file, in megabytes")
+    attachment_max_total_mb: int = Field(description="What the files of one submission may add up to, in megabytes")
 
 
 # =========================================================================================================== attachments
@@ -708,4 +712,179 @@ class AttachDiagnosticsIn(_Clean):
     consent: StrictBool = Field(
         description="Must be the JSON value true (not a string or a number): the person has read the consent text and "
         "agrees to share what is attached"
+    )
+
+
+# ============================================================================================================ handoff
+class HandoffIn(_Clean):
+    """What goes into an engineering handoff package, beyond what goes in by default."""
+
+    exclude_attachments: list[str] = Field(
+        default_factory=list, max_length=50, description="Attachment ids to leave out of the package"
+    )
+    include_originals: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Ids of attachments that cannot be sanitized (screenshots, documents, archives) and are to be put in "
+        "as they were uploaded. Each is marked as unsanitized in the package",
+    )
+    include_internal_notes: StrictBool = Field(
+        default=False,
+        description="Put the maintainers' internal notes in the package (they are not by default). Must be the JSON "
+        "value true or false, not a string or a number",
+    )
+    include_diagnostics: StrictBool = Field(
+        default=True,
+        description="Put in the diagnostics attached to the submission, when there are any. Must be the JSON value "
+        "true or false",
+    )
+
+
+class HandoffFile(Model):
+    """One file of a package."""
+
+    path: str = Field(description="Where it is in the package")
+    kind: Literal["generated", "diagnostic", "sanitized_copy", "original_evidence"] = Field(
+        description="generated: written by AgentLab for this package; diagnostic: a collected, masked item; "
+        "sanitized_copy: a text attachment with secrets masked; original_evidence: an attachment as it was uploaded"
+    )
+    size: int = Field(description="Its size in bytes")
+    sha256: str = Field(description="Its SHA-256")
+    source: str = Field(description="What it was made from")
+    note: str = Field(description="What to know about it (for example, that it is unsanitized)")
+
+
+class HandoffLeftOut(Model):
+    """Something that is not in the package, and why. Nothing stands in for it."""
+
+    what: str = Field(description="What it is")
+    reason: str = Field(description="Why it is not in the package")
+
+
+class HandoffOut(Model):
+    """A package, or a preview of one."""
+
+    id: str | None = Field(description="Its id, or null for a preview that was not built")
+    status: Literal["preview", "generated", "purged"] = Field(
+        description="preview: nothing was built or kept; generated: built and kept; purged: removed by the retention policy "
+        "(the record of what it held stays, the files are gone)"
+    )
+    submission_id: str = Field(description="The submission it was made from")
+    number: str = Field(description="The submission's number")
+    submission_version: int = Field(description="The version of the submission it reflects")
+    created_at: datetime | None = Field(description="When it was built")
+    created_by: str | None = Field(description="Who asked for it")
+    files: list[HandoffFile] = Field(description="Every file in the package, with its hash")
+    left_out: list[HandoffLeftOut] = Field(description="What was not put in, and why")
+    warnings: list[str] = Field(description="What the engineer and the maintainer should know before using it")
+    size: int = Field(description="The size of the ZIP in bytes (0 for a preview)")
+    sha256: str | None = Field(description="The SHA-256 of the ZIP")
+    external_sharing_blocked: bool = Field(
+        description="True when something in it still needs a person's review before it leaves AgentLab"
+    )
+    includes_unsanitized: bool = Field(description="True when it holds a file that was put in as uploaded")
+    task: str = Field(description="The text of CLAUDE_CODE_TASK.md, for review before it is downloaded")
+
+
+# ========================================================================================================== retention
+class RetentionReport(Model):
+    """What the retention policy removed (or, for a dry run, would remove). Counts only: never a title or a text."""
+
+    ran_at: datetime = Field(description="When it was applied")
+    dry_run: bool = Field(description="True when nothing was removed: this is what would be")
+    submissions: int = Field(description="Closed submissions deleted, with everything attached to them")
+    attachments: int = Field(description="Attached files removed from submissions that were kept")
+    diagnostic_items: int = Field(description="Diagnostic items removed from submissions that were kept")
+    handoffs: int = Field(description="Handoff packages removed from submissions that were kept")
+    internal_notes: int = Field(description="Internal notes deleted from submissions that were kept")
+    files_deleted: int = Field(description="Stored files actually deleted (a file another record still uses stays)")
+
+
+class DeletionOut(Model):
+    """What deleting a submission removed. Counts only."""
+
+    number: str = Field(description="The number the submission had; it is not reused")
+    attachments: int = Field(description="Attached files removed")
+    diagnostic_items: int = Field(description="Diagnostic items removed")
+    handoffs: int = Field(description="Handoff packages removed")
+    files_deleted: int = Field(description="Stored files actually deleted (a file another record still uses stays)")
+    exported_copies: int = Field(
+        description="How many times a package or a file of it was downloaded before: those copies cannot be recalled"
+    )
+
+
+# ================================================================================================= publication
+class IntegrationOut(Model):
+    """An issue tracker a submission could be published to, and whether it is switched on."""
+
+    provider: str = Field(description="Its name: github")
+    enabled: bool = Field(description="True when the owner switched it on")
+    ready: bool = Field(description="True when it is enabled and complete, so a publication can be tried")
+    reason: str | None = Field(description="Why it is not ready, in words the owner can act on")
+    repository: str | None = Field(description="Where issues are made")
+    may_publish: bool = Field(description="True when the caller's role is one that may publish")
+    status_sync: bool = Field(description="True when a maintainer may push a submission's status to its issue")
+
+
+class PublicationPreviewIn(_Clean):
+    """Which tracker to look at."""
+
+    provider: Literal["github"] = Field(description="The issue tracker")
+
+
+class PublicationOut(Model):
+    """The issue a submission was published to (or the attempt to)."""
+
+    id: str = Field(description="The record's id")
+    provider: str = Field(description="The issue tracker")
+    repository: str = Field(description="Where the issue is")
+    state: Literal["publishing", "published", "failed"] = Field(
+        description="publishing: started and not finished; published: the issue exists; failed: it was not made"
+    )
+    url: str = Field(description="Where to open the issue; empty until it exists")
+    number: int | None = Field(description="Its number in the tracker")
+    external_state: str = Field(description="open or closed, as AgentLab last knew")
+    error_kind: str = Field(description="Why it failed, when it did")
+    error_detail: str = Field(description="What to do about it, when it failed")
+    submission_version: int = Field(description="The version of the submission that was published")
+    published_by: str = Field(description="Who published it")
+    published_at: datetime | None = Field(description="When")
+    synced_status: str = Field(description="The status last pushed to the issue, when status sync is on")
+
+
+class PublicationPreview(Model):
+    """Exactly what would be sent, and why it might not be. Nothing has been sent."""
+
+    provider: str = Field(description="The issue tracker")
+    repository: str = Field(description="Where the issue would be made")
+    title: str = Field(description="The issue's title")
+    body: str = Field(description="The issue's text, as it would be sent")
+    labels: list[str] = Field(description="Labels that would be put on it")
+    assignees: list[str] = Field(description="Who it would be assigned to")
+    content_hash: str = Field(description="Send this back to publish exactly this and nothing else")
+    needs_review: bool = Field(
+        description="True when the second inspection still doubts a text: publishing then needs `acknowledge_unreviewed`"
+    )
+    warnings: list[str] = Field(description="What the person should know before it is public")
+    left_out: list[str] = Field(
+        description="What is deliberately not in it: files, diagnostics, packages, names, notes"
+    )
+    already: PublicationOut | None = Field(
+        description="The publication that already exists for this submission, if any"
+    )
+
+
+class PublishIn(_Clean):
+    """Publish what was previewed."""
+
+    provider: Literal["github"] = Field(description="The issue tracker")
+    content_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+        description="The `content_hash` of the preview that was read",
+    )
+    acknowledge_unreviewed: StrictBool = Field(
+        default=False,
+        description="Must be the JSON value true to publish text the second inspection still doubts, after reading it",
     )

@@ -11,6 +11,32 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Publishing to an issue tracker** ([feedback-support.md](docs/feedback-support.md#publishing-to-an-issue-tracker),
+  [ADR 0018](docs/decisions/0018-publication-is-off-by-default-previewed-and-never-twice.md)): an interface for issue
+  trackers and a GitHub implementation. Off until the owner switches it on; a maintainer previews exactly what would be
+  published (a sanitized, masked and quoted summary: never files, diagnostics, packages, names or notes), publishes exactly
+  that, and cannot make a second issue; a private security report is never published; GitHub's rate limit and errors are said
+  in words and leave the submission as it was; a status can be pushed on request. Migration `0008`.
+* **Retention and deletion** ([feedback-support.md](docs/feedback-support.md#retention-and-deletion),
+  [ADR 0017](docs/decisions/0017-retention-counts-from-closing-and-removes-content-not-the-record.md)): periods, counted from the
+  day a submission closed and empty until the owner sets them, for the whole submission, its files, its diagnostic information,
+  its handoff packages and its internal notes; `agentlab feedback purge [--dry-run]`; the server applies the policy by itself
+  while any period is set; an administrator can delete one submission with a reason, and an open private security report only
+  when they acknowledge it. An audit record of counts stays. Submission numbers are never given out again. Migration `0007`.
+* **The Feedback & Support web interface** ([feedback-support.md](docs/feedback-support.md#the-web-interface),
+  [ADR 0016](docs/decisions/0016-the-feedback-interface-keeps-little-in-the-tab-and-shares-nothing-unreviewed.md)): the feature
+  request and issue report forms, My submissions, a submission's page (what was sent, the discussion, files, diagnostic
+  information, history), and for a maintainer the queue, triage, links, the engineering handoff and the audit trail. Diagnostic
+  information is chosen, collected, reviewed and agreed to, never pre-ticked; the browser's own errors are a bounded in-memory
+  buffer sent only on request; drafts live in the tab and go with it; "Report an issue" links on a run, a result and a trace carry
+  identifiers only. A reporter's whole interface is Feedback & Support and their account.
+* **Engineering handoff** ([feedback-support.md](docs/feedback-support.md#engineering-handoff),
+  [ADR 0015](docs/decisions/0015-handoff-is-a-package-for-a-person-to-take.md)): a maintainer can turn a submission into a
+  sanitized, reproducible ZIP with a manifest of hashes, the masked diagnostics and the attachments that may go in, context
+  from the run and test the report names, a masking report and `CLAUDE_CODE_TASK.md`, a briefing for an authorised engineer.
+  Everything a person wrote is quoted and cannot close its own quote; what is missing is said and nothing stands in for it;
+  internal notes and files that cannot be sanitized are out unless chosen; every build and download is recorded. Nothing runs
+  Claude Code or sends the package anywhere. Migration `0006`.
 * **Diagnostics for issue reports** ([feedback-support.md](docs/feedback-support.md#diagnostics)): what AgentLab can really
   supply (environment, application and backend logs, errors, a run's metadata, a test's result and trace, what the browser
   saw), collected only when asked for, from the person's own requests and, for a maintainer, a named run; masked, previewed,

@@ -23,6 +23,11 @@ import { Skills } from "./pages/Skills";
 import { TargetDetail } from "./pages/TargetDetail";
 import { Targets } from "./pages/Targets";
 import { Traces } from "./pages/Traces";
+import { FeatureRequestForm } from "./pages/feedback/FeatureRequestForm";
+import { FeedbackHome } from "./pages/feedback/FeedbackHome";
+import { IssueReportForm } from "./pages/feedback/IssueReportForm";
+import { SubmissionDetails } from "./pages/feedback/SubmissionDetails";
+import { Submissions } from "./pages/feedback/Submissions";
 import { SessionProvider, useSession } from "./session";
 
 function NotFound() {
@@ -30,6 +35,19 @@ function NotFound() {
     <Empty title="There is nothing here">
       <Link to="/">Back to the dashboard</Link>
     </Empty>
+  );
+}
+
+/** Feedback & Support: the same pages for everyone who may use them, whatever else they may use. */
+function feedbackRoutes() {
+  return (
+    <>
+      <Route path="feedback" element={<FeedbackHome />} />
+      <Route path="feedback/feature" element={<FeatureRequestForm />} />
+      <Route path="feedback/issue" element={<IssueReportForm />} />
+      <Route path="feedback/submissions" element={<Submissions />} />
+      <Route path="feedback/submissions/:ident" element={<SubmissionDetails />} />
+    </>
   );
 }
 
@@ -62,6 +80,7 @@ export function AppRoutes() {
         <Route path="settings" element={<Settings />} />
         <Route path="account" element={<Account />} />
         <Route path="accounts" element={<Accounts />} />
+        {feedbackRoutes()}
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
@@ -71,11 +90,15 @@ export function AppRoutes() {
 /** A person whose role reaches only Feedback & Support (or who has still to change a temporary password) gets a small interface
  * of their own: the rest of AgentLab would answer every call with a refusal. */
 function ReporterRoutes() {
+  const { me } = useSession();
+  // a temporary password has to be changed first: until then the account page is the only one there is
+  const locked = me?.must_change_password === true;
   return (
     <Routes>
       <Route element={<ReporterLayout />}>
-        <Route index element={<Account />} />
+        <Route index element={locked ? <Account /> : <FeedbackHome />} />
         <Route path="account" element={<Account />} />
+        {!locked && feedbackRoutes()}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

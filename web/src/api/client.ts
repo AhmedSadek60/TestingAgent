@@ -14,6 +14,8 @@ export interface ClientOptions {
   /** The CSRF token of a cookie session, sent on requests that change something. `null` when there is none. */
   getCsrf?: () => string | null;
   fetchImpl?: typeof fetch;
+  /** Told about every request that failed or was answered with an error (a 401 asked for on purpose is not one). */
+  onFailure?: (failure: FailedRequest) => void;
 }
 
 export interface RequestOptions {
@@ -23,6 +25,19 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   /** A 401 to this call is an answer, not a reason to ask for the token again (for example "who am I" before signing in). */
   silentUnauthorized?: boolean;
+  /** For an upload: told how many bytes have gone, as the browser reports it. Giving it makes the upload use XMLHttpRequest,
+   * which is the only way a page can see an upload's progress. */
+  onProgress?: (loaded: number, total: number) => void;
+}
+
+/** What the page can tell about a request that did not work, for a report of a problem: never a body, never a query. */
+export interface FailedRequest {
+  method: string;
+  path: string;
+  status: number | null;
+  error: string | null;
+  requestId: string | null;
+  durationMs: number;
 }
 
 export function withQuery(path: string, query?: Query): string {
@@ -43,6 +58,7 @@ export class ApiClient {
   private readonly onUnauthorized: () => void;
   private readonly getCsrf: () => string | null;
   private readonly fetchImpl: typeof fetch;
+  private readonly onFailure: (failure: FailedRequest) => void;
 
   constructor(options: ClientOptions) {
     this.base = (options.base ?? "").replace(/\/$/, "");
@@ -50,6 +66,7 @@ export class ApiClient {
     this.onUnauthorized = options.onUnauthorized ?? (() => undefined);
     this.getCsrf = options.getCsrf ?? (() => null);
     this.fetchImpl = options.fetchImpl ?? ((...args) => fetch(...args));
+    this.onFailure = options.onFailure ?? (() => undefined);
   }
 
   private headers(extra?: Record<string, string>, json = false, method = "GET"): Headers {
@@ -66,6 +83,7 @@ export class ApiClient {
 
   private async send(method: string, path: string, options: RequestOptions, raw: BodyInit | null = null): Promise<Response> {
     const hasJson = options.body !== undefined && raw === null;
+    const started = Date.now();
     let response: Response;
     try {
       response = await this.fetchImpl(this.base + withQuery(path, options.query), {
@@ -78,9 +96,22 @@ export class ApiClient {
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
+      this.onFailure({ method, path, status: null, error: "network error", requestId: null, durationMs: Date.now() - started });
       throw new NetworkError("Cannot reach the AgentLab server. Is it running?");
     }
-    if (!response.ok) throw await this.failure(response, options.silentUnauthorized === true);
+    if (!response.ok) {
+      if (!(response.status === 401 && options.silentUnauthorized === true)) {
+        this.onFailure({
+          method,
+          path,
+          status: response.status,
+          error: null,
+          requestId: response.headers.get("X-Request-Id"),
+          durationMs: Date.now() - started,
+        });
+      }
+      throw await this.failure(response, options.silentUnauthorized === true);
+    }
     return response;
   }
 
@@ -124,10 +155,59 @@ export class ApiClient {
     return this.request<T>("DELETE", path, options);
   }
 
-  /** Multipart upload (the browser sets the boundary). */
+  /** Multipart upload (the browser sets the boundary). With `onProgress` it is sent with XMLHttpRequest so that the page can
+   * show how much has gone; otherwise with fetch. */
   async upload<T>(path: string, form: FormData, options: RequestOptions = {}): Promise<T> {
+    if (options.onProgress) return this.uploadWithProgress<T>(path, form, options);
     const response = await this.send("POST", path, options, form);
     return (await response.json()) as T;
+  }
+
+  private uploadWithProgress<T>(path: string, form: FormData, options: RequestOptions): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const started = Date.now();
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", this.base + withQuery(path, options.query));
+      this.headers(options.headers, false, "POST").forEach((value, key) => xhr.setRequestHeader(key, value));
+      xhr.responseType = "text";
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) options.onProgress?.(event.loaded, event.total);
+      };
+      const onAbort = () => xhr.abort();
+      options.signal?.addEventListener("abort", onAbort, { once: true });
+      const done = () => options.signal?.removeEventListener("abort", onAbort);
+      xhr.onerror = () => {
+        done();
+        this.onFailure({ method: "POST", path, status: null, error: "network error", requestId: null, durationMs: Date.now() - started });
+        reject(new NetworkError("Cannot reach the AgentLab server. Is it running?"));
+      };
+      xhr.onabort = () => {
+        done();
+        reject(new DOMException("The upload was cancelled.", "AbortError"));
+      };
+      xhr.onload = () => {
+        done();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as T);
+          } catch {
+            reject(new ApiError(xhr.status, "error", "The server's answer could not be read.", []));
+          }
+          return;
+        }
+        const response = new Response(xhr.responseText, { status: xhr.status, headers: { "X-Request-Id": xhr.getResponseHeader("X-Request-Id") ?? "" } });
+        this.onFailure({
+          method: "POST",
+          path,
+          status: xhr.status,
+          error: null,
+          requestId: xhr.getResponseHeader("X-Request-Id"),
+          durationMs: Date.now() - started,
+        });
+        void this.failure(response, options.silentUnauthorized === true).then(reject);
+      };
+      xhr.send(form);
+    });
   }
 
   /** A file: a report, an artifact. */

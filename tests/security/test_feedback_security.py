@@ -27,6 +27,14 @@ STAFF_ONLY = {
     ("POST", "/submissions/{submission_id}/relations"),
     ("DELETE", "/submissions/{submission_id}/relations/{relation_id}"),
     ("GET", "/submissions/{submission_id}/audit"),
+    ("POST", "/submissions/{submission_id}/handoffs/preview"),
+    ("POST", "/submissions/{submission_id}/handoffs"),
+    ("GET", "/submissions/{submission_id}/handoffs"),
+    ("DELETE", "/submissions/{submission_id}"),
+    ("POST", "/submissions/{submission_id}/publications/preview"),
+    ("POST", "/submissions/{submission_id}/publications"),
+    ("GET", "/submissions/{submission_id}/publications"),
+    ("POST", "/submissions/{submission_id}/publications/{provider}/sync"),
 }
 
 

@@ -12,8 +12,12 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 * [The discussion](#the-discussion)
 * [Finding submissions](#finding-submissions)
 * [Attachments](#attachments)
+* [The web interface](#the-web-interface)
 * [Diagnostics](#diagnostics)
+* [Engineering handoff](#engineering-handoff)
 * [Private submissions](#private-submissions)
+* [Publishing to an issue tracker](#publishing-to-an-issue-tracker)
+* [Retention and deletion](#retention-and-deletion)
 * [Limits and protections](#limits-and-protections)
 * [The API](#the-api)
 * [Configuration](#configuration)
@@ -23,11 +27,12 @@ today and who can see what. It is delivered in slices; [Status](#status) says wh
 | Part | State |
 |---|---|
 | Feature requests and issue reports, numbers, workflow, status history, comments and internal notes, labels, priority, severity, assignment, links between submissions, unread marker, duplicate suggestions, audit trail, allowances, private security reports | **Built** (this page) |
-| The web pages (request and report forms, My Submissions, the maintainer queue) | **Not yet built.** Everything is reachable through the API; the web interface comes in a later slice |
+| The web pages: the request and report forms, My Submissions, a submission's page with its discussion, files and history, the maintainer's queue and triage, and the handoff | **Built** ([The web interface](#the-web-interface)) |
 | File attachments, with the type checked from the content, hostile archives refused, private storage, a sanitized copy of text files, and a malware scan when the owner has a scanner | **Built** ([Attachments](#attachments)) |
 | Diagnostics collected from AgentLab: environment, application and backend logs, errors, the run's metadata, a test's result and trace, and what the browser saw; preview, masking, consent, a downloadable bundle | **Built** ([Diagnostics](#diagnostics)) |
-| An engineering handoff package (`CLAUDE_CODE_TASK.md` and a ZIP) | Not yet built |
-| Publishing to GitHub, retention and purging | Not yet built |
+| An engineering handoff package (a sanitized ZIP and `CLAUDE_CODE_TASK.md`) for an authorised engineer | **Built** ([Engineering handoff](#engineering-handoff)) |
+| Retention and deletion: periods that are empty until the owner sets them, `agentlab feedback purge`, and deleting one submission | **Built** ([Retention and deletion](#retention-and-deletion)) |
+| Publishing a sanitized summary to GitHub, off until switched on, previewed and confirmed, never twice, never a private report | **Built** ([Publishing](#publishing-to-an-issue-tracker)) |
 
 Nothing here runs Claude Code, changes the repository or sends a submission anywhere outside this server.
 
@@ -174,6 +179,54 @@ Every download is recorded in the submission's audit trail. A download is always
 **Removal.** `DELETE` makes a file unavailable at once and deletes its stored bytes unless another attachment uses them. A
 reporter removes what they attached; a maintainer anything. The record stays, for the audit trail.
 
+## The web interface
+
+Everything above is reachable through the API; the web interface puts it in front of people. **Feedback & Support** is in the
+side menu of a maintainer, and is the whole interface of a person with the role *reporter*.
+
+| Page | What it is for |
+|---|---|
+| `#/feedback` | The ways in: request a feature, report an issue, My submissions (with how many have an answer waiting), and for a maintainer, what needs triage |
+| `#/feedback/feature` | The feature request form. A title, a category and the problem are required; everything else is under "More detail" |
+| `#/feedback/issue` | The issue report form. A title, the kind of problem, what happened and how it affects the work are required |
+| `#/feedback/submissions` | A reporter's own submissions, or a maintainer's queue, with search, filters, sorting and pages |
+| `#/feedback/submissions/<number>` | One submission: what was sent, the discussion, files, diagnostic information, the history; and, for a maintainer, triage, links, the engineering handoff and the audit trail |
+
+**Forms that do not get in the way.** Required fields say what is missing next to the field, in words; nothing else is
+required, and a person who cannot reproduce a problem says so instead of inventing steps. Similar earlier submissions are
+suggested while a title is typed and are only suggestions: sending is never blocked and nothing is merged.
+Choosing the security category shows a warning that the report is private. A confirmation with the number appears **only after the
+server has kept the submission**; a file that fails shows why and can be tried again, and the submission itself stays saved.
+
+**Context, shown and removable.** A "Report an issue" link on a run, a result or a trace opens the form with identifiers only
+(the run, the test, the result, the trace and the screen). The form lists exactly what will be sent and each can be taken out.
+Nothing else about the project, and no diagnostic information, is attached on the person's behalf.
+
+**Diagnostic information, chosen, reviewed, agreed to.** Nothing is ticked. A source AgentLab cannot supply is shown with the
+reason and cannot be ticked; a screenshot says it must be attached as a file. "Select all available diagnostics" is a convenience
+that still requires pressing *Collect and review*, looking at each item (source, period, size, what was masked and where, and the
+masked text) and agreeing. A report cannot be sent with diagnostics chosen and not reviewed, and a failure to collect never
+stops the report: it is sent without them and says so.
+
+**What this tab saw.** The web interface keeps the last 50 console errors and warnings and the last 50 failed requests of the
+tab, in memory only: the method, the path without its query, the status and the server's request id, never a body. They are sent
+only if the person ticks "browser console and network errors" and agrees to the preview; closing the tab or signing out forgets them.
+
+**Drafts and leaving.** What a person has typed in a form is kept in the tab (session storage: gone when the tab is closed or
+they sign out) and offered back after a reload, with a button to start again; files and diagnostics are not kept. Following a link
+inside the interface or pressing *Cancel* with unsent text asks first, and closing the tab asks through the browser.
+The browser's own back button cannot be asked in a hash-routed page: the draft is why nothing is lost by it.
+
+**Text is text.** Everything a person or a system wrote (titles, descriptions, comments, logs, file names) is shown as text,
+set apart from the page's own words; nothing is rendered as HTML or Markdown. Internal notes are set apart in colour and in
+words ("Internal note: maintainers only") and a maintainer is told, before sending, who will see what they write.
+
+**Accessibility.** Every control has a label; a status is always a word and never a colour alone; the list is a table with a
+caption; the progress of an upload is announced; everything is reachable by keyboard.
+
+Tested by `web/src/feedback.test.tsx`, `web/src/lib/feedback.test.ts`, `web/src/lib/browserErrors.test.ts`,
+`web/src/api/upload.test.ts` and, in a real browser against a real server, `tests/e2e/test_feedback_ui.py`.
+
 ## Diagnostics
 
 An issue report is much easier to act on with the evidence next to it, and much riskier to share with it. Diagnostics are
@@ -226,6 +279,89 @@ says external sharing is blocked until a person has looked. Downloads of an atta
 A collection is its owner's until it is attached; then it is visible to the people who may see the submission, and to no one
 else (the same rule as the submission: a private submission's diagnostics are private).
 
+## Engineering handoff
+
+A maintainer can turn a submission into a **package** that an authorised engineer (or Claude Code, run by that engineer) can
+work from: a ZIP with the record, what the reporter said, the diagnostics that were attached, the attachments that may go
+in, context from the run and test the report names, a masking report, a manifest of SHA-256 hashes and a briefing,
+`CLAUDE_CODE_TASK.md`. **Nothing here runs Claude Code, changes a repository or sends the package anywhere**: AgentLab builds a
+file and a person takes it. Building one is for maintainers (and the shared token and the local machine); a reporter is refused,
+and a package of a private report is as hidden as the report.
+
+```
+agentlab-handoff-IR-2026-00042/
+  README.md                       what is in it, what is not, privacy warnings, what is missing
+  CLAUDE_CODE_TASK.md             the briefing, sections A to K
+  manifest.json                   every file, its SHA-256 and what it is made from; when, which version, how masked
+  submission/                     submission.json, description.md, status-history.json, related-links.json,
+                                  discussion.json (public lines), internal-notes.json (only when asked for)
+  reproduction/                   steps.md, expected-vs-actual.md, reproduction-metadata.json   (issue reports)
+  feature/requirements.md                                                                       (feature requests)
+  diagnostics/                    manifest.json, environment.json, sanitized-application.log, sanitized-backend.log,
+                                  sanitized-errors.txt, relevant-trace.json, browser-console-errors.json,
+                                  browser-network-errors.json, run-summary.json, test-summary.json
+  evidence/                       attachment-manifest.json, selected-attachments/
+  context/                        target-version.json, related-run-summary.json, related-test-summary.json
+  security/                       redaction-report.json, privacy-summary.json
+```
+
+**Only what is available and authorised goes in, and nothing stands in for what is not.** A file is there because its
+content exists. What was not put in is listed with the reason in `left_out`, in the README, in `privacy-summary.json`, and, for
+attachments, as a line under *Missing information* in the task file.
+
+**What goes in by default.**
+
+| | Default | To change it |
+|---|---|---|
+| The submission's own record and what the reporter wrote | in, masked | |
+| Public comments | in | |
+| **Internal notes and internal files** | **out** | `include_internal_notes: true` (and the server must allow it: `feedback.handoff.allow_internal_notes`) |
+| Diagnostics that were attached with consent | in, as the masked copies that were kept | `include_diagnostics: false` |
+| A text attachment that had secrets | in, **as its sanitized copy** (the original stays private) | |
+| A text attachment where none were recognised | in, as uploaded | `exclude_attachments` |
+| A text attachment that was not inspected (too large) | **out** | `include_originals`, which marks it unsanitized |
+| An image, a PDF, a Word document or an archive | **out**, with the reason | `include_originals`, which marks it **unsanitized** |
+| Any attachment named in `exclude_attachments` | out (this wins over `include_originals`) | |
+
+An id in `exclude_attachments` or `include_originals` that is not an attachment of this submission is refused.
+
+**Three kinds of statement, kept apart.** What the **reporter claims** (the description, the steps, what they expected and
+saw, how they rate the impact), what the **system observed** (logs, errors, run and test results, the environment) and what
+is **generated or decided** (the maintainers' priority and severity, and everything AgentLab wrote for this package). The
+evidence table of the task file says which each file is. Every file written by AgentLab is marked `generated` in the
+manifest and is never presented as original evidence; a sanitized copy is marked as a copy.
+
+**Everything a person or a system wrote is untrusted.** In the package it is quoted in blocks that cannot be closed from
+inside (the fence is longer than any run of backticks in the text), a version, a build or a file name is shown as a quoted,
+escaped one-line string or made safe, and the stated acceptance criteria are quoted one to a line. The task file says in its
+own words that this is evidence and not instruction (section I). That reduces the risk of a model obeying a report; it does
+not remove it, which is why the package is for an authorised engineer and not for a public place.
+
+**The task file** has the sections the specification lists: A role, B objective (bug investigation, performance
+investigation, test/evaluation issue, security investigation or feature implementation), C the submission as the reporter
+wrote it, D what is known about the environment and **what is missing**, E the evidence and what each file may help
+establish, F reproduction (with a note to investigate rather than assume when the steps are incomplete), G the sixteen
+engineering instructions, H the ten extra ones for a feature request, I the trust boundaries, J the acceptance criteria
+(**stated** ones as the reporter wrote them; when there are none, **proposed** ones, labelled as not approved by anyone) and K
+the response expected. Nothing in D is inferred: a fact is given with where it comes from, or it is "unknown".
+
+**Masking.** Everything a person wrote goes through the same masking as a diagnostic, once, and what was masked is recorded
+by place and kind, never by value, in `security/redaction-report.json`. If the second inspection still doubts a text, the
+package says `external_sharing_blocked` and `redaction_status: needs_review`, and a warning says a person must look before it
+leaves AgentLab. Masking reduces risk and does not guarantee that nothing sensitive remains.
+
+**Preview, build, take.** `POST /submissions/{id}/handoffs/preview` returns every file with its hash, what is left out and
+the task file as it would read, and keeps nothing. `POST /submissions/{id}/handoffs` builds and keeps the package (restricted
+artifact) with a record of who and when and which version of the submission it reflects; it does not change when the
+submission does, and building twice at the same moment gives the same bytes (no clock is stored in the archive).
+`GET /handoffs/{id}/download` is the ZIP and `GET /handoffs/{id}/task` the task file alone. **Building and every download is
+recorded** in the submission's audit trail (`handoff_generated`, `handoff_downloaded`) with counts, never with text.
+
+**Limits.** `feedback.handoff.max_package_mb` (50): a package that would be larger is refused before anything is kept, and
+the attachments are read only until the limit is passed. A package is a file in the restricted artifact area under its
+hash, mode `0600`; it is served with `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and a sandboxing
+`Content-Security-Policy`.
+
 ## Private submissions
 
 An issue report in the **security category** (`feedback.security_category`), or one the reporter marks
@@ -238,6 +374,102 @@ open one they may not see (at most once every ten minutes for the same person an
 table). Moving a submission into the security category makes it private and never the other way round; a maintainer can set
 the visibility back explicitly.
 
+## Publishing to an issue tracker
+
+AgentLab's own record is the source of truth, and nothing here is needed for it to work. A maintainer can, **on purpose**,
+publish a sanitized summary of a submission as an issue in a GitHub repository, so that work can be tracked where engineers
+already look. It is **off** until the owner switches it on (`feedback.integrations.github`), and while it is off no call to GitHub
+is ever made.
+
+```yaml
+feedback:
+  integrations:
+    github:
+      enabled: true
+      repository: acme/agentlab-feedback
+      token_ref: env:GITHUB_TOKEN        # or secret:NAME; a token that may create issues in that repository and nothing else
+      labels: [from-agentlab]
+      assignee: octocat                  # optional
+      internal_url: https://agentlab.example.org/#/feedback/submissions/{number}   # optional link back
+      publish_roles: [admin]             # who may publish: admin (the default), or maintainer too
+      status_sync: false                 # allow pushing a status to the issue, on request
+```
+
+**What is sent, and what never is.** The number, type, category and status, the title, and what the reporter wrote (the
+description; for an issue what they expected, what happened, the steps and the impact; for a request the problem, the expected
+behavior, the use case and the acceptance criteria), masked for secrets and **quoted** so that nothing in it can mention a
+person, close another issue or pull in a picture. Never: files and screenshots, diagnostic information and logs, handoff
+packages, the reporter's name, internal notes, the maintainers' priority, severity and assignee, or the ids of runs. A private
+security report is **never** published, by anyone, and the shared token cannot even see one.
+
+**Preview, then publish exactly that.** `POST /submissions/{id}/publications/preview` returns the title, the text, the labels,
+the assignee, what is left out, the warnings and a `content_hash`. Publishing needs that hash back
+(`POST /submissions/{id}/publications`), so nothing is sent that was not read; if the submission changed in between (its
+status is in the text), the answer is `409` and the preview is read again. A text the second inspection still doubts needs
+`acknowledge_unreviewed: true` as well, after reading it. The web page asks for both separately.
+
+**Never twice.** There is one record per submission and provider, and the issue carries a key. If an attempt made the issue and
+its answer was lost, the retry **finds it by the key** and records it instead of making another; a publication that is
+already there is returned; one that is in progress for less than two minutes is waited for (`409`). The look for an issue
+that was made before covers the newest 50 issues of the repository, which is far more than can appear between an attempt
+and its retry on any repository this is meant for; on a very busy one a retry after a long delay could miss it.
+
+**When GitHub says no**, the answer says what to do and the submission is left exactly as it was: the rate limit says how long
+to wait (`429` with `Retry-After`), a refused or missing token and a missing permission say so, and a repository that cannot be
+seen or has issues switched off says that. The record keeps the reason, so a person can see why it is not published.
+
+**Status.** With `status_sync` on, a maintainer can push a submission's status to its issue (a comment with the status's name,
+and closing the issue when the submission is closed). It is never done automatically and sends none of the submission's text.
+
+**Limits, said plainly.** AgentLab cannot take an issue back: a person has to delete it on GitHub, and deleting a submission here
+does not (the audit trail records that it was published). The token is read when a call is made, is never stored by AgentLab,
+logged or returned, and is not in the audit trail. Calls go only to the configured `api_url` (https), with no redirects followed.
+Anything on GitHub is subject to GitHub's own retention and visibility.
+
+Tested by `tests/unit/test_feedback_publication.py` and `tests/api/test_feedback_publication_api.py`.
+
+## Retention and deletion
+
+**Nothing is removed unless the owner says how long.** Every period in `feedback.retention` is empty by default, because removal
+cannot be undone. Periods are counted from the day a submission **closed** (a status in `feedback.closed_statuses`), and a
+submission that is not closed is never touched by the policy: an open investigation, a private security report above all, keeps
+its evidence however old it is. A submission that is reopened is not due again until it closes again.
+
+| Setting | What goes, that long after the submission closed | What stays |
+|---|---|---|
+| `retention.attachments_days` | The attached files: the original and the masked copy | The record of each (name, type, size, hash, who removed it), marked removed |
+| `retention.diagnostics_days` | The diagnostic information attached | The collection, each item marked "removed by the retention policy" |
+| `retention.handoffs_days` | The packages and their task files | The record of what each held (files, hashes, who built it), marked purged |
+| `retention.internal_notes_days` | The internal notes | The reporter's and the maintainers' public discussion |
+| `retention.submissions_days` | The whole submission and everything attached to it | Only the audit record below |
+
+The shortest period that applies wins: a submission deleted after 90 days takes its files with it whatever
+`attachments_days` says. `agentlab feedback purge` applies the policy now (`--dry-run` says what would go and changes nothing;
+`--json` prints it); the server also applies it by itself every `retention.interval_hours` while any period is set
+(`retention.automatic`). A pass that fails is logged and tried again; it never stops the server.
+
+**What is left when something is removed** is what the audit trail needs and nothing a person wrote: that a submission with that
+number existed, its type, when it was removed, by what (the policy, or an account), why (the reason is masked like any text),
+and how many files, items and packages it had. The number is not given out again (`submission_counters`).
+
+**Stored files are shared by content.** The same bytes can be used by more than one record, so a file is deleted only when no
+record that is still there refers to it. A failure to delete a file is logged and the pass goes on.
+
+**Deleting one submission on purpose.** `DELETE /submissions/{id}?reason=...` is for administrators (a maintainer and the
+shared token are refused). The reason is required (3 to 300 characters) and is kept, masked, in the audit trail. A private
+security report that is **not closed** is refused unless `acknowledge_open_security_report=true` says the administrator knows
+its evidence may still be needed; the audit record notes that it was open. The answer gives counts, and `exported_copies`: how
+many times a package of it was downloaded.
+
+**Limits, said plainly.**
+
+* A package or a file that was **downloaded** is a copy AgentLab cannot recall. Deleting a submission records how many
+  downloads there were; it does not reach into someone's disk, a ticket, a chat or an issue tracker.
+* A backup taken before a deletion still holds what was deleted until the backup itself is removed.
+* The captured log (`diagnostics.log_retention_hours`) and unattached drafts (`diagnostics.draft_hours`) have their own, short,
+  periods.
+* Removing a person's account does not delete their submissions: that is a decision for an administrator, per submission.
+
 ## Limits and protections
 
 * **Allowances.** A person with the role reporter may make `feedback.max_submissions_per_day` submissions and write
@@ -247,8 +479,10 @@ the visibility back explicitly.
 * **Identifiers** in a URL are an id or a number; anything else is refused before it is looked up.
 * **Audit trail.** One record for each thing that was done, with who and when: `created`, `status_changed`, `closed`,
   `priority_changed`, `severity_changed`, `assigned`, `category_changed`, `visibility_changed`, `labels_changed`, `commented`,
-  `related`, `unrelated`, `viewed` (a maintainer opened someone else's private submission) and `access_denied`. It records which
-  fields and which statuses, **never the text**.
+  `related`, `unrelated`, `viewed` (a maintainer opened someone else's private submission), `access_denied`,
+  `attachment_added`, `attachment_removed`, `attachment_downloaded`, `attachment_rejected`, `diagnostics_collected`,
+  `diagnostics_attached`, `diagnostics_downloaded`, `handoff_generated` and `handoff_downloaded`. It records which fields and
+  which statuses and how many files, **never the text**.
 * **Changing someone's role or disabling their account** ends their sessions at once ([accounts.md](accounts.md)), so a
   demoted maintainer stops triaging immediately.
 
@@ -262,7 +496,7 @@ requests that change something.
 
 | Call | Who | What |
 |---|---|---|
-| `GET /submissions/options` | anyone signed in | Categories, statuses, priorities and limits as configured, and whether the caller may triage |
+| `GET /submissions/options` | anyone signed in | Categories, statuses, priorities, the attachment limits and the other limits as configured, and whether the caller may triage |
 | `GET /submissions/summary` | anyone signed in | Counts of what the caller can see, and how many are unread |
 | `GET /submissions/similar` | anyone signed in | Submissions that look like a title |
 | `GET /submissions/assignees` | maintainers | Accounts a submission can be assigned to |
@@ -287,10 +521,22 @@ requests that change something.
 | `GET /diagnostics/{collection_id}/download` | the same | The bundle as a ZIP |
 | `POST /submissions/{id}/diagnostics` | anyone signed in | Attach a draft, with consent |
 | `GET /submissions/{id}/diagnostics` | anyone who may see the submission | What is attached |
+| `POST /submissions/{id}/handoffs/preview` | maintainers | What a package would hold, with the task file; keeps nothing |
+| `POST /submissions/{id}/handoffs` | maintainers | Build a package |
+| `GET /submissions/{id}/handoffs` | maintainers | The packages built from a submission, newest first |
+| `GET /handoffs/{handoff_id}` | maintainers | What a built package holds and its task file |
+| `GET /handoffs/{handoff_id}/download` | maintainers | The ZIP (recorded) |
+| `GET /handoffs/{handoff_id}/task` | maintainers | `CLAUDE_CODE_TASK.md` on its own (recorded) |
 | `POST /submissions/{id}/seen` | anyone signed in | Mark the answers seen |
 | `POST /submissions/{id}/relations` | maintainers | Link two submissions |
 | `DELETE /submissions/{id}/relations/{relation_id}` | maintainers | Remove a link |
 | `GET /submissions/{id}/audit` | maintainers | The audit trail |
+| `GET /integrations` | maintainers | The issue trackers, whether each is switched on and ready, and whether the caller may publish |
+| `POST /submissions/{id}/publications/preview` | maintainers who may publish | Exactly what would be published; sends nothing |
+| `POST /submissions/{id}/publications` | maintainers who may publish | Publish what was previewed (`content_hash` required) |
+| `GET /submissions/{id}/publications` | maintainers | Where it was published |
+| `POST /submissions/{id}/publications/{provider}/sync` | maintainers who may publish | Push the status to the issue (only when `status_sync` is on) |
+| `DELETE /submissions/{id}` | administrators | Delete a submission and everything attached to it (`reason` required) |
 
 The full contract is in the generated API description (`web/openapi.json`, or `/docs` on a running server).
 
