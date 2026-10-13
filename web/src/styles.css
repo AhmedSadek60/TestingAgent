@@ -202,6 +202,11 @@ pre {
   grid-template-columns: var(--sidebar) minmax(0, 1fr);
   min-height: 100%;
 }
+/* A frame with no sidebar (a reporter's) has one column. Without this its only child lands in the sidebar's column and
+   the whole page is squeezed into 244px on any screen wider than the breakpoint below. */
+.app.app-single {
+  grid-template-columns: minmax(0, 1fr);
+}
 .sidebar {
   position: sticky;
   top: 0;

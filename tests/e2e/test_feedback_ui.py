@@ -133,6 +133,11 @@ def test_a_person_asks_for_a_feature_with_a_file_and_follows_it_while_a_maintain
     expect(page.get_by_role("heading", name="Feedback & Support", level=1)).to_be_visible()
     expect(page.get_by_role("main").get_by_role("link", name=re.compile("Request a feature"))).to_be_visible()
     expect(page.get_by_label("Project")).to_have_count(0)
+    # the page has the width of the window: this frame has no sidebar, so a two-column grid would put the whole page in 244px
+    content = page.locator("main#content").bounding_box()
+    bar = page.locator("header.topbar").bounding_box()
+    assert content and content["width"] > 900, f"the page is squeezed into {content}"
+    assert bar and bar["height"] < 80, f"the top bar is stacked, not one row: {bar}"
     page.get_by_role("main").get_by_role("link", name=re.compile("Request a feature")).click()
 
     # ---- the form needs only a title, a category and the problem, and says so inline

@@ -142,6 +142,8 @@ describe("registering", () => {
     expect(main.getByRole("link", { name: /Report an issue/ })).toBeInTheDocument();
     expect(main.getByRole("link", { name: /My submissions/ })).toBeInTheDocument();
     expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
+    // there is no sidebar in this frame, so it must be one column: given the sidebar's two, the whole page is squeezed into 244px
+    expect(document.querySelector(".app")).toHaveClass("app-single");
     expect(server.to("GET /projects"), "a reporter's interface never asks for what a reporter may not read").toHaveLength(0);
     expect(server.to("POST /auth/register")[0]!.body).toMatchObject({ username: "newbie", password: "correct-horse-battery-7" });
     // and their account is one click away, saying what the role is for

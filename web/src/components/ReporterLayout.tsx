@@ -8,8 +8,8 @@ export function ReporterLayout() {
   const { me, signOut } = useSession();
   const { theme, setTheme } = useTheme();
   return (
-    <div className="app">
-      <div className="main" style={{ marginLeft: 0 }}>
+    <div className="app app-single">
+      <div className="main">
         <header className="topbar">
           <span className="brand" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <span className="brand-mark" aria-hidden="true">
