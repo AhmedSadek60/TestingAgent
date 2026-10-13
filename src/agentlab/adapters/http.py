@@ -196,7 +196,15 @@ class AgentApiAdapter(AgentAdapter):
                 "document); set api.url or pass --api-url"
             )
         self.ctx.egress.check(self.cfg.url)
-        self._client = httpx.AsyncClient(timeout=self.cfg.timeout_seconds, follow_redirects=False)
+        # Every request gets a connection of its own. A server closes an idle keep-alive connection whenever it likes (uvicorn
+        # after 5 seconds, a load balancer after 60) and a request sent on a connection in the instant it is closed fails
+        # with a ReadError and no reply. That cannot be repeated safely (the request may have arrived: see `Retries`), so
+        # it was recorded as the agent's failure; not reusing a connection leaves nothing to race with.
+        self._client = httpx.AsyncClient(
+            timeout=self.cfg.timeout_seconds,
+            follow_redirects=False,
+            limits=httpx.Limits(max_keepalive_connections=0),
+        )
 
     async def close(self) -> None:
         if self._client:
