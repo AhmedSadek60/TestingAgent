@@ -30,8 +30,10 @@ Code. Nothing runs Claude Code or changes the repository automatically.
 | – | Existing defect: the agent adapter reused HTTP connections a server may have closed | `fix/agent-adapter-fresh-connections` | none | | **Fixed and tested locally**; its own pull request |
 | – | The staged release process and the removal of the single-hosted-service path | `chore/staging-pipeline-and-remove-railway` | none | 0010 | **Built; the first pull request, to be merged by the owner** (it amends the merge rule) |
 
-The branches are stacked in this order, and so are the pull requests: pipeline, adapter fix, plan, accounts, core, attachments,
-diagnostics, handoff, then the web interface and the integrations. Each branch has the previous one merged into it.
+The branches are stacked in this order, and so are the pull requests: pipeline, adapter fix, accounts, core, attachments,
+diagnostics, handoff, then the web interface and the integrations, and **this plan last**. Each branch has the previous one
+merged into it. The plan is last because it names files that the slices add (the documentation tests check that every path a
+document names exists in the tree it ships in), and because it is then a record of what was built rather than a promise.
 
 ## Context and constraints (checked in the repository, not assumed)
 
