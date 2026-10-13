@@ -78,7 +78,7 @@ Where a page describes a decision in full, this one links to it instead of repea
   confirms it with `--api-url`. The document is downloaded without following redirects and is capped at 5 MiB and
   2000 operations.
 - **Documents are read from this machine only.** A URL given as a document is refused with what to do instead.
-- **The reviewer's name is typed in and not verified.** AgentLab has one shared API token and no accounts
+- **The reviewer's name is typed in and not verified.** AgentLab has one shared API token (and optional accounts, whose names are not verified either)
   ([reports.md](reports.md#human-review)).
 - **The instrumented test site of the browser tests listens on loopback only**, so only a target that runs on this
   machine gets those tests; for any other target they are BLOCKED with the reason.
@@ -148,8 +148,8 @@ Where a page describes a decision in full, this one links to it instead of repea
   The field is `running`.
 - **Text that comes from a target, a test or a skill is shown as text** by every command, so markup in it is never
   interpreted.
-- **A server that listens beyond loopback needs an API token** and refuses to start without one; it has no accounts and
-  no TLS ([security.md](security.md#web-interface-and-api)).
+- **A server that listens beyond loopback needs an API token** and refuses to start without one; it has optional accounts
+  ([accounts.md](accounts.md)) and no TLS ([security.md](security.md#web-interface-and-api)).
 - **Only Chromium** is driven. Firefox and WebKit were not verified, and a configuration that names them is refused.
 - `agentlab fixtures verify` refuses a defect name the example agent does not have, with the names it does have.
 

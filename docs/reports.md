@@ -392,7 +392,7 @@ best grade, so the reviewed score is lower.
 What review is not:
 
 * **A review belongs to one run.** A later run is not reviewed, even if it fails the same test.
-* **The reviewer's name is typed in and not verified.** AgentLab has one shared API token and no accounts
+* **The reviewer's name is typed in and not verified.** AgentLab has one shared API token (and optional accounts, whose names are not verified either)
   ([security.md](security.md#web-interface-and-api)). Do not read a name in a report as an identity.
 * **There is no approval workflow**: no sign-off, no second reviewer, no lock.
 

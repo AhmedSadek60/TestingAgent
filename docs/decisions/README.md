@@ -21,3 +21,4 @@ accepted by human review, not by an agent.
 
 [0009](0009-chromium-in-the-worker-with-a-userns-seccomp-profile.md) — Chromium in the worker, with a seccomp profile that allows user namespaces — Proposed
 [0010](0010-staged-release-process.md) — A staged release process, merged and published by a script — Proposed
+[0011](0011-accounts-beside-the-shared-token.md) — Accounts beside the shared token, with roles enforced in the authentication layer — Proposed

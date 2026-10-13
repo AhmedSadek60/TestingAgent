@@ -332,3 +332,46 @@ class ReviewRow(Entity):
     original: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     reviewed: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     comment: Mapped[str] = mapped_column(Text, default="")
+
+
+# =============================================================================================== accounts
+class UserRow(Entity):
+    """A person who signs in. ``status`` is ``active``, ``pending`` (waiting for an admin) or ``disabled``.
+
+    The password is never stored: only a salted, memory-hard hash with its parameters (``accounts/passwords.py``)."""
+
+    __tablename__ = "users"
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(120), default="")
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    role: Mapped[str] = mapped_column(String(20), default="reporter", index=True)
+    password_hash: Mapped[str] = mapped_column(String(300))
+    must_change_password: Mapped[bool] = mapped_column(default=False)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class UserSessionRow(Entity):
+    """A sign-in. The cookie holds a random value; only its SHA-256 is kept here."""
+
+    __tablename__ = "user_sessions"
+    user_id: Mapped[str] = _fk("users")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    csrf_token: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    client: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(200), default="")
+
+
+class AccountEventRow(Entity):
+    """What happened to accounts: who did what to whom, from where. Never a password, a hash or a token."""
+
+    __tablename__ = "account_events"
+    event: Mapped[str] = mapped_column(String(40), index=True)
+    actor: Mapped[str] = mapped_column(String(80), default="")
+    subject: Mapped[str] = mapped_column(String(80), default="", index=True)
+    client: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)

@@ -128,6 +128,15 @@ def _origin_of(value: str) -> str:
     return f"{parts.scheme}://{parts.netloc}".lower() if parts.scheme and parts.netloc else ""
 
 
+class _BodyTooLarge(Exception):
+    """Raised inside the application's ``receive`` when a request body is larger than the guard allows."""
+
+
+#: What a multipart upload carries besides the file: boundaries, field names and the project field.
+UPLOAD_OVERHEAD = 1024 * 1024
+BODY_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
 class RequestGuard:
     """Pure ASGI middleware (it must not buffer the live event stream).
 
@@ -136,13 +145,33 @@ class RequestGuard:
     * An unsafe request (POST, PUT, PATCH, DELETE) that carries an ``Origin`` header must come from this server's own origin
       or one the operator listed: a form on another site can send a request to a loopback server, but it cannot hide its
       origin. Requests without an ``Origin`` (curl, the CLI, other programs) are not browser pages and are not affected.
+    * A request body larger than ``max_body_bytes`` (``max_upload_bytes`` plus a little for a multipart upload) is refused with
+      413 *before it is read*: the framework parses a body before it asks who is calling, so without this one oversized
+      request from anyone who can reach the server could use up its memory. A declared ``Content-Length`` is refused at once;
+      a body without one is counted as it arrives.
     * Security headers on every response.
     """
 
-    def __init__(self, app: ASGIApp, *, allowed_hosts: Sequence[str] | None, allowed_origins: Sequence[str]) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        allowed_hosts: Sequence[str] | None,
+        allowed_origins: Sequence[str],
+        max_body_bytes: int = 0,
+        max_upload_bytes: int = 0,
+    ) -> None:
         self.app = app
         self.allowed_hosts = {h.lower() for h in allowed_hosts} if allowed_hosts is not None else None
         self.allowed_origins = {o.rstrip("/").lower() for o in allowed_origins}
+        self.max_body_bytes = max_body_bytes
+        self.max_upload_bytes = max_upload_bytes
+
+    def _limit_for(self, headers: dict[str, str]) -> int:
+        content_type = headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if content_type == "multipart/form-data" and self.max_upload_bytes:
+            return self.max_upload_bytes + UPLOAD_OVERHEAD
+        return self.max_body_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -165,6 +194,13 @@ class RequestGuard:
                 await self._refuse(send, 403, "origin_not_allowed", "requests from this web origin are not allowed")
                 return
 
+        limit = self._limit_for(headers) if scope["method"] in BODY_METHODS else 0
+        if limit:
+            declared = headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > limit:
+                await self._refuse(send, 413, "too_large", self._too_large(limit))
+                return
+
         async def with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 raw = list(message.get("headers", []))
@@ -175,7 +211,44 @@ class RequestGuard:
                 message["headers"] = raw
             await send(message)
 
-        await self.app(scope, receive, with_headers)
+        if not limit:
+            await self.app(scope, receive, with_headers)
+            return
+
+        seen = 0
+        exceeded = False
+        answered = False
+
+        async def counted_receive() -> Message:
+            nonlocal seen, exceeded
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > limit:
+                    exceeded = True
+                    raise _BodyTooLarge
+            return message
+
+        async def guarded_send(message: Message) -> None:
+            nonlocal answered
+            if exceeded:  # whatever the framework makes of a body we cut short is replaced by the 413 below
+                return
+            if message["type"] == "http.response.start":
+                answered = True
+            await with_headers(message)
+
+        try:
+            await self.app(scope, counted_receive, guarded_send)
+        except _BodyTooLarge:
+            pass
+        if exceeded and not answered:
+            await self._refuse(send, 413, "too_large", self._too_large(limit))
+
+    @staticmethod
+    def _too_large(limit: int) -> str:
+        return (
+            f"the request is larger than {max(1, limit // (1024 * 1024))} MB (server.max_body_mb, server.max_upload_mb)"
+        )
 
     @staticmethod
     async def _refuse(send: Send, status: int, kind: str, message: str) -> None:
@@ -184,7 +257,11 @@ class RequestGuard:
             {
                 "type": "http.response.start",
                 "status": status,
-                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                    *[(key.lower().encode(), value.encode()) for key, value in SECURITY_HEADERS],
+                ],
             }
         )
         await send({"type": "http.response.body", "body": body})

@@ -94,3 +94,17 @@ export const TERMINAL_STATUSES = [
 export function isTerminal(status: string): boolean {
   return (TERMINAL_STATUSES as readonly string[]).includes(status);
 }
+
+
+// ------------------------------------------------------------------------------------------------------- accounts
+export type AuthOptions = Resp<S["AuthOptions"]>;
+export type Me = Resp<S["MeOut"]>;
+export type Account = Resp<S["AccountOut"]>;
+export type SessionResult = Resp<S["SessionOut"]>;
+export type RegistrationResult = Resp<S["RegistrationOut"]>;
+export type TemporaryPassword = Resp<S["TemporaryPassword"]>;
+export type AccountEvent = Resp<S["AccountEventOut"]>;
+export type Role = Account["role"];
+export type RegisterRequest = S["RegisterRequest"];
+export type CreateUserRequest = S["CreateUserRequest"];
+export type UpdateUserRequest = S["UpdateUserRequest"];

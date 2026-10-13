@@ -11,6 +11,8 @@ export interface ClientOptions {
   getToken: () => string | null;
   /** Called when the server says the token is missing or wrong. */
   onUnauthorized?: () => void;
+  /** The CSRF token of a cookie session, sent on requests that change something. `null` when there is none. */
+  getCsrf?: () => string | null;
   fetchImpl?: typeof fetch;
 }
 
@@ -19,6 +21,8 @@ export interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  /** A 401 to this call is an answer, not a reason to ask for the token again (for example "who am I" before signing in). */
+  silentUnauthorized?: boolean;
 }
 
 export function withQuery(path: string, query?: Query): string {
@@ -37,19 +41,24 @@ export class ApiClient {
   private readonly base: string;
   private readonly getToken: () => string | null;
   private readonly onUnauthorized: () => void;
+  private readonly getCsrf: () => string | null;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: ClientOptions) {
     this.base = (options.base ?? "").replace(/\/$/, "");
     this.getToken = options.getToken;
     this.onUnauthorized = options.onUnauthorized ?? (() => undefined);
+    this.getCsrf = options.getCsrf ?? (() => null);
     this.fetchImpl = options.fetchImpl ?? ((...args) => fetch(...args));
   }
 
-  private headers(extra?: Record<string, string>, json = false): Headers {
+  private headers(extra?: Record<string, string>, json = false, method = "GET"): Headers {
     const headers = new Headers(extra);
     const token = this.getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    // a request authenticated by the session cookie that changes something proves it came from this page
+    const csrf = this.getCsrf();
+    if (!token && csrf && method !== "GET" && method !== "HEAD") headers.set("X-CSRF-Token", csrf);
     if (json) headers.set("Content-Type", "application/json");
     headers.set("Accept", headers.get("Accept") ?? "application/json");
     return headers;
@@ -61,7 +70,7 @@ export class ApiClient {
     try {
       response = await this.fetchImpl(this.base + withQuery(path, options.query), {
         method,
-        headers: this.headers(options.headers, hasJson),
+        headers: this.headers(options.headers, hasJson, method),
         body: raw ?? (hasJson ? JSON.stringify(options.body) : undefined),
         signal: options.signal,
         credentials: "same-origin",
@@ -71,11 +80,11 @@ export class ApiClient {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
       throw new NetworkError("Cannot reach the AgentLab server. Is it running?");
     }
-    if (!response.ok) throw await this.failure(response);
+    if (!response.ok) throw await this.failure(response, options.silentUnauthorized === true);
     return response;
   }
 
-  private async failure(response: Response): Promise<ApiError> {
+  private async failure(response: Response, silent = false): Promise<ApiError> {
     let kind = "error";
     let message = `The server answered ${response.status}.`;
     let details: { field: string; problem: string }[] = [];
@@ -89,7 +98,7 @@ export class ApiClient {
     } catch {
       /* the body was not the server's error shape; the status says enough */
     }
-    if (response.status === 401) this.onUnauthorized();
+    if (response.status === 401 && !silent) this.onUnauthorized();
     return new ApiError(response.status, kind, message, details);
   }
 
@@ -105,6 +114,10 @@ export class ApiClient {
 
   post<T>(path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
     return this.request<T>("POST", path, { ...options, body: body ?? {} });
+  }
+
+  patch<T>(path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
+    return this.request<T>("PATCH", path, { ...options, body: body ?? {} });
   }
 
   delete<T>(path: string, options?: RequestOptions): Promise<T> {

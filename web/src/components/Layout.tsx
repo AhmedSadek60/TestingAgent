@@ -35,6 +35,14 @@ const NAV: { heading: string; items: { to: string; label: string; icon: IconName
   { heading: "Admin", items: [{ to: "/settings", label: "Settings", icon: "gear" }] },
 ];
 
+/** The entries about accounts: everyone signed in has Account; only an administrator has Accounts. */
+function navFor(canManageAccounts: boolean, hasAccount: boolean): typeof NAV {
+  const admin = [...NAV[NAV.length - 1]!.items];
+  if (hasAccount) admin.push({ to: "/account", label: "Your account", icon: "lock" });
+  if (canManageAccounts) admin.push({ to: "/accounts", label: "Accounts", icon: "key" });
+  return [...NAV.slice(0, -1), { heading: "Admin", items: admin }];
+}
+
 function ProjectSwitcher() {
   const { api, project, setProject } = useSession();
   const projects = useAsync((signal) => api.projects(signal), [api]);
@@ -132,7 +140,8 @@ function ServerStatus() {
 }
 
 export function Layout() {
-  const { authRequired, signOut } = useSession();
+  const { authRequired, signOut, me } = useSession();
+  const groups = navFor(me?.can_manage_accounts ?? false, me?.kind === "user");
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -146,7 +155,7 @@ export function Layout() {
           </span>
           AgentLab
         </Link>
-        {NAV.map((group) => (
+        {groups.map((group) => (
           <div className="nav-group" key={group.heading}>
             <h4>{group.heading}</h4>
             <nav className="nav" aria-label={group.heading}>
@@ -178,7 +187,7 @@ export function Layout() {
             <Icon name={theme === "dark" ? "moon" : "sun"} />
             <span className="small theme-label">{theme}</span>
           </button>
-          {authRequired && (
+          {(authRequired || me?.kind === "user") && (
             <button type="button" className="btn ghost" onClick={signOut}>
               <Icon name="lock" size={16} /> Sign out
             </button>

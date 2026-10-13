@@ -97,6 +97,26 @@ Repository code runs only inside Docker sandboxes (no network, read-only file sy
 Docker socket is never given to any container. A sandbox has no network, so an agent that downloads models or packages at
 start-up cannot run in one.
 
+## People and accounts
+
+Anyone with the shared API token is a maintainer. People can also have accounts ([accounts.md](accounts.md)); open registration makes
+them *reporters*, who reach nothing but Feedback & Support. Make the first administrator on the server, once:
+
+```bash
+docker compose -f docker/compose.yaml -f docker/compose.vps.yaml --env-file /root/agentlab/.env \
+  exec api agentlab users create YOUR-NAME --role admin
+```
+
+The password is typed at a hidden prompt. On a server that anyone can reach, consider `accounts.registration: approval` or `closed`.
+
+## Who is calling
+
+Behind Caddy the API would see every request as coming from Caddy. `docker/compose.vps.yaml` therefore sets
+`FORWARDED_ALLOW_IPS=*` for the API, so it uses the `X-Forwarded-For` address Caddy sets to the visitor's real one (Caddy
+replaces a forwarded address a visitor sent; it passes one on only if `trusted_proxies` lists the sender, which this
+`Caddyfile` does not). The limits on wrong tokens, sign-in and registration are kept per visitor address, and the account audit
+trail records it. This is safe **only because no port of the API is published**; if you publish it, remove the setting.
+
 ## What the web containers can and cannot do
 
 **Browser tests work from the dashboard.** The image is built with Chromium (`WITH_BROWSER=1`, set in `docker/compose.vps.yaml`),

@@ -11,6 +11,11 @@ pull request adds to the governance template the repository started as.
 
 ### Added
 
+* **Accounts** beside the shared API token ([accounts.md](docs/accounts.md), [ADR 0011](docs/decisions/0011-accounts-beside-the-shared-token.md)):
+  registration, sign-in with a password, server-side sessions with CSRF protection, the roles `reporter`, `maintainer` and `admin`,
+  account administration in the web interface and API, `agentlab users` on the server, and an audit trail. A reporter reaches
+  Feedback & Support only; the shared token and maintainers keep what they had. Migration `0002`.
+
 * `scripts/ship.py`, the staged release process: `check` (what CI runs, locally), `pr`, `wait`, `merge` (only when every check on the
   exact head is green) and `publish` (backup, build, smoke test, rollback) ([ADR 0010](docs/decisions/0010-staged-release-process.md)).
 

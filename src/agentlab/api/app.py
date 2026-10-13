@@ -17,11 +17,12 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from agentlab import __version__
+from agentlab.accounts import AccountService
 from agentlab.api import errors, openapi_docs
-from agentlab.api.routes import catalog, projects, reports, runs
+from agentlab.api.routes import accounts, catalog, projects, reports, runs
 from agentlab.api.security import UI_CSP, RequestGuard, TokenGuard, is_loopback, resolve_token
 from agentlab.api.state import ApiState
-from agentlab.core.config import AgentLabConfig
+from agentlab.core.config import AgentLabConfig, ServerConfig
 from agentlab.core.errors import PolicyBlocked
 from agentlab.jobs.queue import JobQueue, RedisQueue, create_queue
 from agentlab.jobs.runner import reap_forever
@@ -34,6 +35,10 @@ LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "[::1]", "::1")
 
 TAGS = [
     {"name": "Server", "description": "Health, the environment this server can use, and its configuration."},
+    {
+        "name": "Accounts",
+        "description": "Registration, sign-in with a password, the signed-in person, and account administration.",
+    },
     {"name": "Projects", "description": "Projects group targets, documents and runs."},
     {"name": "Targets", "description": "The agents under test."},
     {"name": "Credentials", "description": "Encrypted, scoped test credentials. Values are write-only."},
@@ -148,6 +153,7 @@ def create_app(
             services=svc,
             queue=q,
             guard=TokenGuard(api_token),
+            accounts=AccountService(svc.store.db, svc.config.accounts),
             worker=worker,
             uploads_dir=uploads,
             allowed_roots=[Path(p if Path(p).is_absolute() else svc.base_dir / p) for p in scfg.allowed_paths],
@@ -197,21 +203,29 @@ def create_app(
         hosts = (
             LOOPBACK_HOSTS  # no token: only this machine's names, so a web page cannot reach the API by DNS rebinding
         )
-    cors = cfg_hint.server.cors_origins if cfg_hint else []
-    app.add_middleware(RequestGuard, allowed_hosts=hosts, allowed_origins=cors)
+    server_config = cfg_hint.server if cfg_hint else ServerConfig()
+    cors = server_config.cors_origins
+    app.add_middleware(
+        RequestGuard,
+        allowed_hosts=hosts,
+        allowed_origins=cors,
+        max_body_bytes=server_config.max_body_mb * 1024 * 1024,
+        max_upload_bytes=server_config.max_upload_mb * 1024 * 1024,
+    )
     if cors:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors,
-            allow_methods=["GET", "POST", "DELETE"],
-            allow_headers=["authorization", "content-type", "x-api-key", "last-event-id"],
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
+            allow_headers=["authorization", "content-type", "x-api-key", "last-event-id", "x-csrf-token"],
             expose_headers=["X-Next-Cursor"],
             allow_credentials=False,
         )
 
     app.include_router(catalog.public)
+    app.include_router(accounts.public)
     app.include_router(reports.public)
-    for module in (projects, runs, reports, catalog):
+    for module in (projects, runs, reports, catalog, accounts):
         app.include_router(module.router)
 
     resolved_ui = (

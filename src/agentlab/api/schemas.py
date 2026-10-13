@@ -487,3 +487,142 @@ class SettingsOut(Model):
     version: str
     config: dict[str, Any]
     startup_warnings: list[str] = Field(default_factory=list)
+
+
+# ==================================================================================================== accounts
+class AuthOptions(Model):
+    """What the sign-in page needs to know before anyone is signed in."""
+
+    registration: Literal["open", "approval", "closed"] = Field(description="Who may create an account on this server")
+    min_password_length: int = Field(description="The shortest password a new account may have")
+    api_token_sign_in: bool = Field(
+        description="Whether this server also accepts the shared API token in the web interface"
+    )
+    password_sign_in: bool = Field(description="Whether sign-in with a user name and password is available")
+
+
+class RegisterRequest(Model):
+    """A person asking for an account."""
+
+    username: str = Field(
+        min_length=3, max_length=64, description="3 to 64 characters: letters, digits, dot, dash, underscore"
+    )
+    password: str = Field(
+        min_length=1, max_length=256, description="The password; the server's rules say what is accepted"
+    )
+    display_name: str = Field(
+        default="", max_length=120, description="The name shown to other people (default: the user name)"
+    )
+    email: str | None = Field(
+        default=None, max_length=254, description="Optional. Only shown to administrators; nothing is sent to it"
+    )
+
+
+class LoginRequest(Model):
+    """A user name and a password."""
+
+    username: str = Field(max_length=64, description="The user name (case does not matter)")
+    password: str = Field(max_length=256, description="The password")
+
+
+class ChangePasswordRequest(Model):
+    """Changing the password of the signed-in account."""
+
+    current_password: str = Field(max_length=256, description="The password in use now")
+    new_password: str = Field(max_length=256, description="The new password")
+
+
+class AccountOut(Model):
+    """An account. Never contains a password, a hash or a session."""
+
+    id: str = Field(description="The account's id")
+    username: str = Field(description="The user name")
+    display_name: str = Field(description="The name shown to other people")
+    email: str | None = Field(description="The e-mail address the person gave, if any")
+    role: Literal["reporter", "maintainer", "admin"] = Field(
+        description="reporter: Feedback & Support only; maintainer: everything the shared token reaches plus triage; "
+        "admin: a maintainer who also manages accounts"
+    )
+    status: Literal["active", "pending", "disabled"] = Field(
+        description="pending: waiting for an administrator to approve it"
+    )
+    must_change_password: bool = Field(description="True while the password is a temporary one that has to be replaced")
+    created_at: datetime = Field(description="When the account was made")
+    last_login_at: datetime | None = Field(description="When the person last signed in")
+    locked_until: datetime | None = Field(description="Set while the account is locked after repeated wrong passwords")
+
+
+class MeOut(Model):
+    """Who the server believes is calling, and what that allows."""
+
+    kind: Literal["user", "service", "local"] = Field(
+        description="user: a signed-in person; service: the shared API token; local: a machine that needs no token"
+    )
+    role: Literal["reporter", "maintainer", "admin"] = Field(description="The role the caller has")
+    username: str | None = Field(description="The user name, for a signed-in person")
+    display_name: str | None = Field(description="The name shown to other people")
+    must_change_password: bool = Field(
+        description="True while the password is a temporary one: only changing it is allowed"
+    )
+    csrf_token: str | None = Field(
+        description="Send this value as X-CSRF-Token on every request that changes something, when authenticated by cookie"
+    )
+    operator: bool = Field(description="Whether the caller may use runs, targets, credentials and reports")
+    can_manage_accounts: bool = Field(description="Whether the caller may use the account administration endpoints")
+
+
+class SessionOut(Model):
+    """The result of signing in or registering."""
+
+    me: MeOut = Field(description="The signed-in caller")
+    account: AccountOut = Field(description="The account")
+
+
+class RegistrationOut(Model):
+    """The result of registering."""
+
+    account: AccountOut = Field(description="The new account")
+    signed_in: bool = Field(description="False when the account has to be approved by an administrator first")
+    me: MeOut | None = Field(description="The signed-in caller, when the account was active at once")
+
+
+class CreateUserRequest(Model):
+    """An administrator making an account."""
+
+    username: str = Field(min_length=3, max_length=64, description="The user name")
+    role: Literal["reporter", "maintainer", "admin"] = Field(description="The role to give")
+    password: str | None = Field(
+        default=None, max_length=256, description="A password; when omitted a temporary one is made"
+    )
+    display_name: str = Field(default="", max_length=120, description="The name shown to other people")
+    email: str | None = Field(
+        default=None, max_length=254, description="Optional e-mail address, shown to administrators only"
+    )
+
+
+class UpdateUserRequest(Model):
+    """What an administrator may change about an account."""
+
+    role: Literal["reporter", "maintainer", "admin"] | None = Field(default=None, description="The new role")
+    status: Literal["active", "pending", "disabled"] | None = Field(default=None, description="The new status")
+    display_name: str | None = Field(default=None, max_length=120, description="The new display name")
+
+
+class TemporaryPassword(Model):
+    """An account together with the temporary password that was set for it. Shown once."""
+
+    account: AccountOut = Field(description="The account")
+    temporary_password: str | None = Field(
+        description="The temporary password, to be handed to the person once. It must be changed at the next sign-in"
+    )
+
+
+class AccountEventOut(Model):
+    """One line of the account audit trail."""
+
+    event: str = Field(description="What happened: registered, signed_in, sign_in_failed, locked, role_changed, ...")
+    actor: str = Field(description="Who did it (a user name, or empty)")
+    subject: str = Field(description="The account it was done to")
+    client: str = Field(description="The network address it came from")
+    detail: dict[str, Any] = Field(description="Facts about the event; never a password or a token")
+    at: datetime = Field(description="When")

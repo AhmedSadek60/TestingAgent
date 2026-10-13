@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,17 @@ TOKEN = "api-" + "Qw7Er5Ty3Ui9Op1As4Df"  # a made-up API token
 SECRET = "sk-" + "proj" + "-" + "Zq81LmN4xW7sR2pK9vB3cD6e"  # looks like a provider key, is not one
 
 PUBLIC = {("GET", "/health")}
+#: The calls a person makes *before* they have any credential, so they cannot ask for one: the sign-in page's options,
+#: registration (which `accounts.registration` can close), the password sign-in itself, and signing out (already being signed
+#: out is not an error). Each is listed by method and path; anything not listed here must still answer 401. What each one can
+#: reach is tested in tests/api/test_accounts_api.py and tests/security/test_accounts_security.py.
+PUBLIC_ACCOUNT_CALLS = {
+    ("GET", "/auth/options"),
+    ("POST", "/auth/register"),
+    ("POST", "/auth/login"),
+    ("POST", "/auth/logout"),
+}
+PUBLIC = PUBLIC | PUBLIC_ACCOUNT_CALLS
 
 
 def concrete(path: str) -> str:
@@ -228,6 +240,17 @@ async def test_an_origin_the_operator_lists_may_call_the_api_from_a_browser(tmp_
             },
         )
         assert pre.status_code == 200 and "POST" in pre.headers["access-control-allow-methods"]
+        patch = await c.options(
+            "/users/x",
+            headers={
+                "Origin": "https://console.example",
+                "Access-Control-Request-Method": "PATCH",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        assert patch.status_code == 200 and "PATCH" in patch.headers["access-control-allow-methods"], (
+            "accounts and submissions are changed with PATCH"
+        )
         other = await c.post("/projects", json={"name": "no"}, headers={"Origin": "https://evil.example"})
         assert other.status_code == 403
         assert "access-control-allow-origin" not in other.headers
@@ -507,3 +530,70 @@ async def test_error_messages_and_the_log_never_contain_a_secret_that_was_sent(
             assert SECRET not in r.text, r.text
         assert SECRET not in caplog.text
     assert os.environ.get("AGENTLAB_TEST_NEVER_SET") is None
+
+
+# ============================================================================================= the size of a request
+async def test_a_body_larger_than_the_limit_is_refused_before_it_is_read_and_whoever_sends_it(tmp_path: Path) -> None:
+    config = api_config(tmp_path, server=ServerConfig(max_body_mb=1, max_upload_mb=2))
+    async with running_api(tmp_path, token=TOKEN, config=config, headers={"Authorization": ""}) as api:
+        c = api.client
+        big = b'{"name": "' + b"x" * (1024 * 1024 + 10) + b'"}'
+        headers = {"Content-Type": "application/json"}
+        for who, extra in (("nobody", {}), ("the token", {"Authorization": f"Bearer {TOKEN}"})):
+            r = await c.post("/projects", content=big, headers={**headers, **extra})
+            assert r.status_code == 413, (who, r.status_code, r.text[:120])
+            assert r.json()["error"]["kind"] == "too_large" and "server.max_body_mb" in r.json()["error"]["message"]
+            assert r.headers["x-content-type-options"] == "nosniff"
+        # the endpoints anyone may call
+        for path in ("/auth/register", "/auth/login"):
+            assert (await c.post(path, content=big, headers=headers)).status_code == 413, path
+        # one that fits is looked at in the ordinary way
+        ok = await c.post("/projects", json={"name": "fits"}, headers={"Authorization": f"Bearer {TOKEN}"})
+        assert ok.status_code == 201
+        # exactly at the limit is allowed through to validation, which then refuses its content
+        edge = b'{"name": "' + b"x" * (1024 * 1024 - 20) + b'"}'
+        r = await c.post("/projects", content=edge, headers={**headers, "Authorization": f"Bearer {TOKEN}"})
+        assert r.status_code != 413
+
+
+async def test_a_body_that_does_not_say_how_long_it_is_is_counted_as_it_arrives(tmp_path: Path) -> None:
+    config = api_config(tmp_path, server=ServerConfig(max_body_mb=1, max_upload_mb=2))
+    async with running_api(tmp_path, token=TOKEN, config=config, headers={"Authorization": ""}) as api:
+
+        async def chunks() -> AsyncIterator[bytes]:
+            yield b'{"username": "'
+            for _ in range(40):  # 40 x 64 KiB, 2.5 MiB in all, sent as a chunked body with no Content-Length
+                yield b"y" * 65536
+            yield b'"}'
+
+        r = await api.client.post("/auth/login", content=chunks(), headers={"Content-Type": "application/json"})
+        assert r.status_code == 413 and r.json()["error"]["kind"] == "too_large"
+        assert (await api.client.get("/health")).status_code == 200, "the server is still answering"
+
+
+async def test_an_upload_may_be_larger_than_a_request_body_but_not_larger_than_the_upload_limit(tmp_path: Path) -> None:
+    config = api_config(tmp_path, server=ServerConfig(max_body_mb=1, max_upload_mb=2))
+    async with running_api(tmp_path, token=TOKEN, config=config) as api:
+        c = api.client
+        fits = await c.post(
+            "/documents",
+            files={
+                "file": ("notes.txt", b"hello world " * 150_000, "text/plain")
+            },  # 1.7 MB: over a body, under an upload
+            data={"project": "default"},
+        )
+        assert fits.status_code == 201, fits.text[:300]
+        too_big = await c.post(
+            "/documents",
+            files={"file": ("notes.txt", b"hello world " * 400_000, "text/plain")},  # 4.6 MB
+            data={"project": "default"},
+        )
+        assert too_big.status_code == 413 and too_big.json()["error"]["kind"] == "too_large"
+
+
+async def test_a_request_the_guard_refuses_carries_the_security_headers_too(tmp_path: Path) -> None:
+    async with running_api(tmp_path, token=TOKEN, allowed_hosts=("agentlab.example",)) as api:
+        r = await api.client.get("/health", headers={"Host": "evil.example"})
+        assert r.status_code == 400 and r.json()["error"]["kind"] == "host_not_allowed"
+        assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"
+        assert len(r.headers.get_list("x-content-type-options")) == 1
