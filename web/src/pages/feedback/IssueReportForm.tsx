@@ -56,7 +56,7 @@ export function IssueReportForm() {
     return { ...draft, ...Object.fromEntries(CONTEXT_KEYS.filter((k) => fromLink[k]).map((k) => [k, fromLink[k]])) } as IssueValues;
   });
   const [restored] = useState(() => hasDraft(DRAFT));
-  const [problems, setProblems] = useState<Problems>({});
+  const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<SubmissionDetail | null>(null);
@@ -100,9 +100,10 @@ export function IssueReportForm() {
 
   const readiness = diagnosticsReadiness(choice);
 
+  const problems: Problems = attempted ? issueProblems(values) : {};
   const submit = async () => {
+    setAttempted(true);
     const found = issueProblems(values);
-    setProblems(found);
     if (Object.keys(found).length > 0) {
       setError("Some of what you wrote needs a look before this can be sent.");
       first.current?.focus();

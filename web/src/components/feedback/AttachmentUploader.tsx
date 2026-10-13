@@ -71,19 +71,19 @@ export function AttachmentUploader({
   return (
     <div className="stack">
       <div>
-        <label htmlFor={id} className="btn">
+        <label htmlFor={id} className="btn file-button">
           Add files
+          <input
+            id={id}
+            ref={input}
+            className="sr-only"
+            type="file"
+            multiple
+            disabled={disabled}
+            accept={options ? options.attachment_extensions.map((e) => `.${e}`).join(",") : undefined}
+            onChange={(event) => choose(event.target.files)}
+          />
         </label>
-        <input
-          id={id}
-          ref={input}
-          className="sr-only"
-          type="file"
-          multiple
-          disabled={disabled}
-          accept={options ? options.attachment_extensions.map((e) => `.${e}`).join(",") : undefined}
-          onChange={(event) => choose(event.target.files)}
-        />
         {options && (
           <p className="muted small" style={{ marginTop: 8 }}>
             Screenshots, logs and examples help most. Up to {options.attachment_max_files} files, each at most {options.attachment_max_file_mb} MB

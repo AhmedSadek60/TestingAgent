@@ -37,7 +37,7 @@ export function FeatureRequestForm() {
   const initial = useMemo(() => emptyFeature(contextFromSearch(params.toString())), [params]);
   const [values, setValues] = useState<FeatureValues>(() => loadDraft(DRAFT, initial));
   const [restored] = useState(() => hasDraft(DRAFT));
-  const [problems, setProblems] = useState<Problems>({});
+  const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<SubmissionDetail | null>(null);
@@ -75,9 +75,11 @@ export function FeatureRequestForm() {
     };
   }, [api, values.title, values.category, created]);
 
+  // what is missing is said next to the field, and goes away as soon as it is there (after a first attempt to send)
+  const problems: Problems = attempted ? featureProblems(values) : {};
   const submit = async () => {
+    setAttempted(true);
     const found = featureProblems(values);
-    setProblems(found);
     if (Object.keys(found).length > 0) {
       setError("Some of what you wrote needs a look before this can be sent.");
       first.current?.focus();

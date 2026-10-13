@@ -1131,3 +1131,7 @@ a.choice {
 .topbar nav.row {
   flex-wrap: wrap;
 }
+.file-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
