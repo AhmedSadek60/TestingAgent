@@ -23,9 +23,8 @@ produces reports, a REST API, a CLI and a web UI.
 - Honesty rule: a capability is either implemented and tested, or explicitly reported as unsupported.
 - Environment used to build and verify: Linux container, Python 3.12, Docker, Chromium (Playwright),
   PostgreSQL 16, Redis and a small local Ollama model. No hosted-provider API keys exist, so the Gemini,
-  OpenRouter, OpenAI and Anthropic adapters are contract-tested against fake servers only. No Railway account
-  was available, so the Railway files are checked against a container started the way Railway documents.
-- Added to the request while it was built: a deployment on Railway (back end and web interface), and the plug-in
+  OpenRouter, OpenAI and Anthropic adapters are contract-tested against fake servers only.
+- Added to the request while it was built: a hosted deployment (back end and web interface), and the plug-in
   architecture of the requirements, section 43, as registries for every kind of part.
 
 ## Current behavior / relevant code
@@ -50,7 +49,7 @@ be replaced without touching orchestration code:
 | Interfaces | `cli`, `api`, `web/` | Typer CLI, FastAPI, React + TypeScript UI |
 | Reports | `reporting` | JSON, Markdown, HTML and PDF renderers (a registry: a plug-in can add a format); versioned; checksummed artifact bundle |
 | Storage | `storage` | SQLAlchemy models and Alembic migrations (SQLite, PostgreSQL), artifact stores and vector stores (registries) |
-| Deployment | `docker/`, `railway.json` | one image for the API, the interface and the jobs; Compose with Redis and PostgreSQL; one Railway service ([ADR 0007](../decisions/0007-railway-one-service-one-volume.md)) |
+| Deployment | `docker/` | one image for the API, the interface and the jobs; Compose with Redis and PostgreSQL; one server behind Caddy ([ADR 0008](../decisions/0008-vps-compose-with-caddy.md)) |
 
 Delivery follows the development phases of the requirements: (1) core, providers, models, basic evaluator,
 CLI; (2) analyzers, skills, generation; (3) tool/RAG/memory/agent evaluations; (4) browser engine;
@@ -60,7 +59,7 @@ CLI; (2) analyzers, skills, generation; (3) tool/RAG/memory/agent evaluations; (
 
 See [the decision records](../decisions/README.md): one package with plug-in registries (0001), fail-closed isolation (0002),
 the skills trust model (0003), one origin for the interface and signed report links (0004), BLOCKED is not FAILED and an
-independent judge (0005), reviews never rewrite the evaluation (0006), and one service with one volume on Railway (0007).
+independent judge (0005), reviews never rewrite the evaluation (0006).
 
 ## Affected components and files
 
@@ -86,7 +85,7 @@ The commands, the markers and what each needs are in [development.md](../develop
 Docker-, browser-, PostgreSQL-, Redis- and Ollama-dependent tests carry pytest markers and are skipped
 (never silently passed) when the dependency is missing; they are run separately where the dependency exists.
 Acceptance scenarios 1–12 and the final audit checklist are re-run at the end and recorded in the pull request
-with their real outcome. What could not be verified (Railway itself, the hosted model providers) is listed in
+with their real outcome. What could not be verified (the hosted model providers) is listed in
 [development.md](../development.md#verification-status).
 
 ## Risks, rollback, migrations
@@ -96,8 +95,8 @@ with their real outcome. What could not be verified (Railway itself, the hosted 
 - Highest-risk surfaces: sandbox escape, secret leakage, prompt injection reaching the evaluator, and
   accidental attack of third-party systems. Mitigations are listed in `docs/security.md` and covered by
   the security test suite.
-- The server can be put on the public internet (Railway). Its only authentication is a token; see
-  [deployment-railway.md](../deployment-railway.md#security).
+- The server can be put on the public internet. Its only authentication is a token; see
+  [deployment-vps.md](../deployment-vps.md) and [security.md](../security.md#web-interface-and-api).
 
 ## Irreversible steps and human approval point
 

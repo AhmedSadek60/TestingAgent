@@ -182,7 +182,7 @@ by name, and what cannot, is in [plugins.md](plugins.md); the skills are in [ski
 | Team server | `agentlab serve --host 0.0.0.0` with `server.token_ref` | A token is required beyond loopback. Put TLS in front. |
 | Scaled | `agentlab serve --no-worker` + `agentlab worker` × N + Redis | `queue.backend: redis`. |
 | Containers | `docker compose up` | API, worker, Redis and PostgreSQL; see [installation.md](installation.md#docker). |
-| Railway | `railway.json` | One service with the jobs inside it, PostgreSQL and a volume; see [deployment-railway.md](deployment-railway.md). |
+| One server | `docker compose -f docker/compose.yaml -f docker/compose.vps.yaml up` | The same stack behind Caddy, with a local judge and a worker that has Chromium; see [deployment-vps.md](deployment-vps.md). |
 
 ## Decisions
 
@@ -192,4 +192,5 @@ by name, and what cannot, is in [plugins.md](plugins.md); the skills are in [ski
 [0004 One origin for the API and the interface](decisions/0004-one-origin-interface-and-signed-report-links.md) ·
 [0005 BLOCKED is not FAILED; the judge is independent](decisions/0005-blocked-is-not-failed-independent-judge.md) ·
 [0006 Reviews sit beside the evaluation](decisions/0006-reviews-never-rewrite-the-evaluation.md) ·
-[0007 Railway: one service, one volume](decisions/0007-railway-one-service-one-volume.md).
+[0008 A single server: the Compose stack behind Caddy](decisions/0008-vps-compose-with-caddy.md) ·
+[0009 Chromium in the worker, with a seccomp profile that allows user namespaces](decisions/0009-chromium-in-the-worker-with-a-userns-seccomp-profile.md).

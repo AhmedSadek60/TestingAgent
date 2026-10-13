@@ -13,7 +13,14 @@ responsible for understanding and reviewing the final change, whichever tool wro
 4. **Test** — run the project's real checks; add tests for behavior changes.
 5. **PR** — fill the template honestly; link the issue.
 6. **Review** — at least one human reviewer approves; address feedback.
-7. **Merge** — a human merges via the PR once checks pass.
+7. **Merge** — a human merges via the PR once checks pass, or the staged release process does (below).
+
+## The staged release process
+This repository's owner has chosen one path for every change, scripted in `scripts/ship.py`: test locally, verify,
+open the pull request, wait for the checks, fix what is red and repeat until all are green, merge to `main`, publish to the
+system link. The steps, the merge rule and the credential it needs are in
+[docs/development.md](docs/development.md#the-staged-release-process); the exception it makes to "a human merges" is in
+`AGENTS.md` section 8.
 
 ## AI-assisted workflow
 1. **Issue** — preferably the *AI-assisted task* template, so context is not trapped in a private chat.

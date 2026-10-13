@@ -89,6 +89,10 @@ Details: `.ai/policies/testing.md`.
 - Do not stash automatically unless necessary; never drop stashes you did not create.
 - Commit only changes belonging to the task, using Conventional Commits.
 - Never merge your own work, bypass review, or claim approval that does not exist.
+  The one exception is the staged release process (`scripts/ship.py`, `docs/development.md#the-staged-release-process`),
+  which the repository owner has chosen for this repository: it merges a pull request only when every check on the exact
+  head commit is green, the pull request is mergeable and nobody has requested changes. It never merges around a red
+  check, never pushes to `main`, and never alters branch protection or CI permissions.
 Details: `.ai/policies/git.md`.
 
 ## 9. Security

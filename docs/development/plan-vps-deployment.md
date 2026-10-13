@@ -9,8 +9,7 @@
 ## Objective
 
 Run AgentLab (API, web interface, worker, Redis, PostgreSQL) on the Hostinger VPS `srv2045942` (KVM 1, 1 vCPU, 4 GB RAM,
-50 GB disk, Ubuntu 24.04), with no domain yet, and replace the Railway-only deployment path as the target for this
-installation.
+50 GB disk, Ubuntu 24.04), with no domain yet, as the target for this installation.
 
 ## Context and constraints
 
@@ -29,9 +28,7 @@ Facts checked on 2026-10-08, not assumed:
 
 ## Current behavior / relevant code
 
-The Railway path (`railway.json`, `docker/railway-start.sh`, `docker/agentlab.railway.yaml`, ADR 0007) is for one service
-with one volume and the jobs inside it. It does not apply here: the VPS can run the full Compose stack with a separate
-worker and Redis, which is the repository's primary path.
+The VPS can run the full Compose stack with a separate worker and Redis, which is the repository's primary container setup.
 
 ## Proposed approach
 
@@ -59,7 +56,7 @@ worker and Redis, which is the repository's primary path.
   be part of daily use. It needs no Caddy and no open `443`.
 - **Hostinger Docker Manager (`vps_docker_create`):** rejected; it takes a compose file, not a build context from
   this repository, and would send the secrets to Hostinger's API as project variables.
-- **The Railway single-service layout:** rejected; it exists only because of Railway's volume limits.
+- **A single service with the jobs inside it:** rejected; it exists only for platforms that allow one volume per service.
 - **Mounting the Docker socket so sandbox tests run:** rejected; it hands every tested repository root on the host.
   Those tests stay BLOCKED. A separate sandbox host is the right fix and would be its own decision.
 
@@ -67,7 +64,7 @@ worker and Redis, which is the repository's primary path.
 
 New: `docker/compose.vps.yaml`, `docker/Caddyfile`, `docs/deployment-vps.md`, `docs/decisions/0008-vps-compose-with-caddy.md`.
 Edited: `docs/decisions/README.md` (index), `docs/installation.md` (one link), `README.md` (one link).
-Not touched: application code, `railway.json`, CI, the existing Compose file. On the VPS: `/root/agentlab/` (new),
+Not touched: application code, CI, the existing Compose file. On the VPS: `/root/agentlab/` (new),
 Docker images and volumes (new), a Hostinger firewall group (new) and one VPS snapshot.
 
 ## Verification plan
@@ -119,7 +116,7 @@ Nothing is run, installed or changed on the VPS, the firewall, or in the reposit
 1. Certificate warning (Caddy `tls internal`) or SSH tunnel only (no open web port)? Recommended: Caddy now, a real
    certificate when a domain exists.
 2. Your own public IP, if you want 22 and 443 limited to it. Unknown to me; this server's address is not yours.
-3. Keep `allow_private_networks: false`? Recommended yes, as on Railway.
+3. Keep `allow_private_networks: false`? Recommended yes.
 4. Model providers: only the offline `mock` provider is configured. Say which provider and I will add a reference to a
    key you set in `.env` yourself.
 5. Assumed: the branch `claude/agentlab-votw7h` is the task branch and the pull request goes to `main`; no issue
